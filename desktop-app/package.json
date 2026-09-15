@@ -31,6 +31,7 @@
     "postinstall": "yarn rimraf --glob node_modules/browser-sync/dist/**/*.map && tsx .erb/scripts/check-native-dep.js && tsx postinstall.ts && electron-builder install-app-deps && cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.ts && node node_modules/electron/install.js",
     "lint": "eslint . --max-warnings 0",
     "package": "tsx ./.erb/scripts/clean.js dist && yarn run build && electron-builder build --publish never",
+    "package:mcp-local": "bash ./.erb/scripts/package-mcp-local-macos.sh",
     "prepare": "lefthook install",
     "rebuild": "electron-rebuild --parallel --types prod,dev,optional --module-dir release/app",
     "dev": "yarn start",
