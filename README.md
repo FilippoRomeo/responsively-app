@@ -118,7 +118,7 @@ Or add to Cursor's `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "responsively": {"command": "npx", "args": ["-y", "@responsively/mcp"]}
+    "responsively": { "command": "npx", "args": ["-y", "@responsively/mcp"] }
   }
 }
 ```
@@ -127,16 +127,16 @@ Or add to Cursor's `.cursor/mcp.json`:
 
 Available tools:
 
-| Tool | Description |
-| --- | --- |
-| `get_app_state` | Current URL, page title, layout, zoom and active devices |
-| `navigate` | Load a URL in all device previews (waits for the page to load) |
-| `list_devices` | Full device catalog, including custom devices |
-| `set_active_devices` | Change which devices are previewed, by id or name |
-| `screenshot` | Capture one or all device previews as JPEG images |
-| `read_page` | Read a preview's page text and interactive elements with CSS selectors |
-| `click` | Click an element (trusted mouse event; mirrors across previews) |
-| `type_text` | Type into a form field with real keystrokes, optionally press Enter |
+| Tool                 | Description                                                            |
+| -------------------- | ---------------------------------------------------------------------- |
+| `get_app_state`      | Current URL, page title, layout, zoom and active devices               |
+| `navigate`           | Load a URL in all device previews (waits for the page to load)         |
+| `list_devices`       | Full device catalog, including custom devices                          |
+| `set_active_devices` | Change which devices are previewed, by id or name                      |
+| `screenshot`         | Capture one or all device previews as JPEG images                      |
+| `read_page`          | Read a preview's page text and interactive elements with CSS selectors |
+| `click`              | Click an element (trusted mouse event; mirrors across previews)        |
+| `type_text`          | Type into a form field with real keystrokes, optionally press Enter    |
 
 Screenshots capture the visible viewport and are downscaled to at most 1000px wide.
 
@@ -151,15 +151,53 @@ claude mcp add --transport http responsively http://127.0.0.1:12720/mcp
 
 Environment variables understood by `@responsively/mcp`:
 
-| Variable | Purpose |
-| --- | --- |
-| `RESPONSIVELY_APP_PATH` | Path to a custom app install (auto-detected otherwise) |
-| `RESPONSIVELY_MCP_PORT` | Port of the app's MCP server (default `12720`) |
+| Variable                  | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `RESPONSIVELY_APP_PATH`   | Path to a custom app install (auto-detected otherwise)  |
+| `RESPONSIVELY_MCP_PORT`   | Port of the app's MCP server (default `12720`)          |
 | `RESPONSIVELY_MCP_BRIDGE` | Direct path to a bridge `cli.js` (development override) |
 
 Linux note: the app ships as an AppImage, so launch it once before first agent use — that's how the CLI learns where it lives.
 
 </details>
+
+### Local Claude Code MCP build
+
+This fork adds an isolated macOS (Apple Silicon) Responsively build for Claude Code MCP use. It runs alongside the normal stable Responsively App, which stays untouched: same bundle ID, ports (`12720`/`12719`), `ResponsivelyApp` user data, protocol registration and auto-updates.
+
+Build and install to `~/Applications/ResponsivelyMCP.app` (bundle ID `app.responsively.mcp.local`):
+
+```bash
+cd desktop-app
+npx -y yarn@1.22.22 package:mcp-local
+```
+
+When macOS launches it under that bundle ID, the local build uses these baked-in defaults:
+
+| Setting                                 | Stable app                                      | Local MCP build                                 |
+| --------------------------------------- | ----------------------------------------------- | ----------------------------------------------- |
+| MCP port                                | `12720`                                         | `12721`                                         |
+| BrowserSync port                        | `12719`                                         | `12722`                                         |
+| User data                               | `~/Library/Application Support/ResponsivelyApp` | `~/Library/Application Support/ResponsivelyMCP` |
+| `responsively://` protocol registration | enabled                                         | disabled                                        |
+| Auto-updater                            | enabled                                         | disabled                                        |
+
+Validated Claude Code setup (user scope, server named `responsively`):
+
+```bash
+claude mcp add responsively -s user \
+  -e RESPONSIVELY_APP_PATH="$HOME/Applications/ResponsivelyMCP.app" \
+  -e RESPONSIVELY_MCP_PORT=12721 \
+  -e RESPONSIVELY_BROWSER_SYNC_PORT=12722 \
+  -e RESPONSIVELY_USER_DATA_DIR="$HOME/Library/Application Support/ResponsivelyMCP" \
+  -e RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION=true \
+  -e CI=true \
+  -- npx -y @responsively/mcp@1.0.0
+```
+
+`RESPONSIVELY_APP_PATH` points the npx bootstrap at the local build's bridge. `RESPONSIVELY_MCP_PORT=12721` is required: without it the bridge targets `12720` and launches the stable app. Any explicit `RESPONSIVELY_*` variable overrides the baked defaults.
+
+Keep the remaining variables in the MCP config. The bridge starts the app binary directly, so the process inherits the parent's `__CFBundleIdentifier` (e.g. your terminal or editor) instead of the local bundle ID. The baked defaults cover launches through Finder, the Dock or `open`; the variables cover bridge launches.
 
 ## Issues
 
@@ -170,6 +208,7 @@ If you face any problems while using the application, please open an issue here 
 Here is the roadmap of the desktop app - https://github.com/responsively-org/responsively-app/projects/
 
 ## Gold sponsors 🥇
+
 <table style="width: 100%; border: none;" cellspacing="0" cellpadding="0" border="0" align="center" id="sponsors">
   <tr>
     <td style="border: none;"><a href="https://www.testmuai.com/?utm_medium=sponsor&utm_source=responsively-app" target="_blank">
@@ -183,8 +222,6 @@ Here is the roadmap of the desktop app - https://github.com/responsively-org/res
   </a></td>
   </tr>
 </table>
-
-
 
 [Become a sponsor and have your company logo here](https://opencollective.com/responsively)
 

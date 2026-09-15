@@ -1,3 +1,6 @@
+import os from 'os';
+import path from 'path';
+
 export const DEFAULT_BROWSER_SYNC_PORT = 12719;
 
 export const BROWSER_SYNC_PORT_ENV_VAR = 'RESPONSIVELY_BROWSER_SYNC_PORT';
@@ -6,7 +9,24 @@ export const DISABLE_PROTOCOL_REGISTRATION_ENV_VAR = 'RESPONSIVELY_DISABLE_PROTO
 
 export const USER_DATA_DIR_ENV_VAR = 'RESPONSIVELY_USER_DATA_DIR';
 
-export const resolveUserDataDir = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
+export const LOCAL_MCP_BUNDLE_ID = 'app.responsively.mcp.local';
+
+export const LOCAL_MCP_DEFAULTS = {
+  mcpPort: 12721,
+  browserSyncPort: 12722,
+  userDataDirName: 'ResponsivelyMCP',
+} as const;
+
+// macOS LaunchServices sets __CFBundleIdentifier when it starts the app
+// (Finder, Dock, `open`). A binary spawned directly inherits the parent's
+// value instead, so explicit RESPONSIVELY_* env vars must cover that path.
+export const isLocalMcpBundle = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  env.__CFBundleIdentifier === LOCAL_MCP_BUNDLE_ID;
+
+export const resolveUserDataDir = (
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = os.homedir()
+): string | undefined => {
   const explicitDir = env[USER_DATA_DIR_ENV_VAR];
 
   if (explicitDir !== undefined) {
@@ -16,7 +36,15 @@ export const resolveUserDataDir = (env: NodeJS.ProcessEnv = process.env): string
     return explicitDir;
   }
 
-  return env.E2E_USER_DATA_DIR;
+  if (env.E2E_USER_DATA_DIR !== undefined) {
+    return env.E2E_USER_DATA_DIR;
+  }
+
+  if (isLocalMcpBundle(env)) {
+    return path.join(home, 'Library', 'Application Support', LOCAL_MCP_DEFAULTS.userDataDirName);
+  }
+
+  return undefined;
 };
 
 const parsePort = (raw: string): number => {
@@ -48,8 +76,24 @@ export const resolveBrowserSyncPort = (
     return DEFAULT_BROWSER_SYNC_PORT + Math.floor(random() * 10000);
   }
 
+  if (isLocalMcpBundle(env)) {
+    return LOCAL_MCP_DEFAULTS.browserSyncPort;
+  }
+
   return DEFAULT_BROWSER_SYNC_PORT;
 };
 
-export const shouldRegisterProtocol = (env: NodeJS.ProcessEnv = process.env): boolean =>
-  env[DISABLE_PROTOCOL_REGISTRATION_ENV_VAR] !== 'true';
+export const shouldRegisterProtocol = (env: NodeJS.ProcessEnv = process.env): boolean => {
+  const explicit = env[DISABLE_PROTOCOL_REGISTRATION_ENV_VAR];
+
+  if (explicit !== undefined) {
+    return explicit !== 'true';
+  }
+
+  return !isLocalMcpBundle(env);
+};
+
+export const shouldCheckForUpdates = (
+  isPackaged: boolean,
+  env: NodeJS.ProcessEnv = process.env
+): boolean => isPackaged && !env.CI && !env.E2E_TEST && !isLocalMcpBundle(env);

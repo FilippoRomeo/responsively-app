@@ -1,13 +1,15 @@
 import {DEFAULT_MCP_PORT, MCP_PORT_ENV_VAR} from '../../common/mcp';
+import {LOCAL_MCP_DEFAULTS, isLocalMcpBundle} from '../runtime-isolation';
 
 export const resolveMcpPort = (env: NodeJS.ProcessEnv = process.env): number => {
+  const fallback = isLocalMcpBundle(env) ? LOCAL_MCP_DEFAULTS.mcpPort : DEFAULT_MCP_PORT;
   const raw = env[MCP_PORT_ENV_VAR];
   if (raw === undefined || raw.trim() === '') {
-    return DEFAULT_MCP_PORT;
+    return fallback;
   }
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    return DEFAULT_MCP_PORT;
+    return fallback;
   }
   return port;
 };

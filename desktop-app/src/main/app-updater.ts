@@ -1,6 +1,7 @@
 import {app} from 'electron';
 import {autoUpdater} from 'electron-updater';
 import log from './logging';
+import {shouldCheckForUpdates} from './runtime-isolation';
 
 export interface AppUpdaterStatus {
   status: string;
@@ -28,7 +29,8 @@ export class AppUpdater {
     autoUpdater.logger = log;
     // electron-updater can't update unpacked (dev) builds and only logs
     // "Skip checkForUpdates" noise there, so don't even start the check.
-    if (process.env.CI || process.env.E2E_TEST || !app.isPackaged) {
+    // The local MCP bundle is self-built and must never pull upstream releases.
+    if (!shouldCheckForUpdates(app.isPackaged)) {
       return;
     }
     autoUpdater.checkForUpdatesAndNotify().catch((error) => {

@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {DEFAULT_MCP_PORT, MCP_PORT_ENV_VAR} from '../../common/mcp';
+import {LOCAL_MCP_BUNDLE_ID} from '../runtime-isolation';
 import {isAllowedHostHeader, normalizeUrl, resolveMcpPort} from './utils';
 
 describe('resolveMcpPort', () => {
@@ -20,6 +21,26 @@ describe('resolveMcpPort', () => {
     expect(resolveMcpPort({[MCP_PORT_ENV_VAR]: '12720.5'})).toBe(DEFAULT_MCP_PORT);
     expect(resolveMcpPort({[MCP_PORT_ENV_VAR]: '0'})).toBe(DEFAULT_MCP_PORT);
     expect(resolveMcpPort({[MCP_PORT_ENV_VAR]: '70000'})).toBe(DEFAULT_MCP_PORT);
+  });
+
+  describe('local MCP bundle', () => {
+    const localBundle = {__CFBundleIdentifier: LOCAL_MCP_BUNDLE_ID};
+
+    it('keeps the stable default for other bundle identities', () => {
+      expect(resolveMcpPort({__CFBundleIdentifier: 'app.responsively'})).toBe(12720);
+    });
+
+    it('defaults to 12721 when the env var is absent', () => {
+      expect(resolveMcpPort(localBundle)).toBe(12721);
+    });
+
+    it('lets the explicit env var override the bundle default', () => {
+      expect(resolveMcpPort({...localBundle, [MCP_PORT_ENV_VAR]: '23456'})).toBe(23456);
+    });
+
+    it('falls back to the bundle default, not 12720, for invalid values', () => {
+      expect(resolveMcpPort({...localBundle, [MCP_PORT_ENV_VAR]: 'abc'})).toBe(12721);
+    });
   });
 });
 
