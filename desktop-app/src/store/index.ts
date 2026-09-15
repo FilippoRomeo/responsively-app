@@ -4,9 +4,12 @@ import {app} from 'electron';
 import {homedir} from 'os';
 import {DOCK_POSITION, PREVIEW_LAYOUTS} from '../common/constants';
 import {migrations} from './migrations';
+import {resolveUserDataDir} from '../main/runtime-isolation';
 
-if (process.env.E2E_USER_DATA_DIR) {
-  app.setPath('userData', process.env.E2E_USER_DATA_DIR);
+const isolatedUserDataDir = resolveUserDataDir();
+
+if (isolatedUserDataDir !== undefined) {
+  app.setPath('userData', isolatedUserDataDir);
 }
 
 import ElectronStore from 'electron-store';
