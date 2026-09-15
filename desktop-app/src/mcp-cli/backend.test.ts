@@ -13,7 +13,11 @@ interface FakeApp {
 
 const running: FakeApp[] = [];
 
-const startFakeApp = async (name = 'responsively', port = 0): Promise<FakeApp> => {
+const startFakeApp = async (
+  name = 'responsively',
+  port = 0,
+  windowReady: () => boolean = () => true
+): Promise<FakeApp> => {
   const httpServer = http.createServer(async (req, res) => {
     const server = new McpServer({name, version: '0.0.1-test'});
     server.registerTool(
@@ -28,6 +32,21 @@ const startFakeApp = async (name = 'responsively', port = 0): Promise<FakeApp> =
       content: [{type: 'text', text: 'boom'}],
       isError: true,
     }));
+    server.registerTool('window-state', {description: 'window readiness'}, async () => {
+      if (!windowReady()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'The Responsively App window is not open. Open the app window and retry.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {content: [{type: 'text', text: 'ready'}]};
+    });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -120,6 +139,64 @@ describe('mcp-cli backend', () => {
     const result = await backend.callTool({name: 'echo', arguments: {value: 'cold-start'}});
     expect(launched).toBe(true);
     expect(result.content).toEqual([{type: 'text', text: 'cold-start'}]);
+    await backend.invalidate();
+  });
+
+  it('retries the transient window-not-open result after a cold launch', async () => {
+    const port = await freePort();
+    let windowChecks = 0;
+
+    const backend = createBackend({
+      port,
+      probeTimeoutMs: 500,
+      launchTimeoutMs: 5_000,
+      pollIntervalMs: 50,
+      launcher: async () => {
+        await startFakeApp('responsively', port, () => {
+          windowChecks += 1;
+          return windowChecks > 1;
+        });
+      },
+    });
+
+    const result = await backend.callTool({
+      name: 'window-state',
+      arguments: {},
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.content).toEqual([{type: 'text', text: 'ready'}]);
+    expect(windowChecks).toBe(2);
+
+    await backend.invalidate();
+  });
+
+  it('does not retry window-not-open for an already-running app', async () => {
+    let windowChecks = 0;
+
+    const app = await startFakeApp('responsively', 0, () => {
+      windowChecks += 1;
+      return false;
+    });
+
+    const backend = createBackend({
+      port: app.port,
+      probeTimeoutMs: 500,
+      launchTimeoutMs: 5_000,
+      pollIntervalMs: 50,
+    });
+
+    const result = await backend.callTool({
+      name: 'window-state',
+      arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain(
+      'The Responsively App window is not open. Open the app window and retry.'
+    );
+    expect(windowChecks).toBe(1);
+
     await backend.invalidate();
   });
 

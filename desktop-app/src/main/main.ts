@@ -40,6 +40,7 @@ import {injectHostIntoCsp} from './csp';
 import {isOpenableUrl} from './url-validation';
 import {wireWebviewSecurity} from './webview-registry';
 import {getTitleBarOptions} from './titlebar';
+import {shouldRegisterProtocol} from './runtime-isolation';
 
 initLogging();
 initCrashHandlers();
@@ -96,12 +97,14 @@ app.on('second-instance', (_event, argv) => {
   }
 });
 
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+if (shouldRegisterProtocol()) {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
+    }
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL);
   }
-} else {
-  app.setAsDefaultProtocolClient(PROTOCOL);
 }
 
 // One-time process-level wiring: IPC handlers and app-level listeners live

@@ -40,6 +40,31 @@ const isTransportError = (error: unknown): boolean => {
   return /fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|network error/i.test(message);
 };
 
+const WINDOW_NOT_READY_MESSAGE =
+  'The Responsively App window is not open. Open the app window and retry.';
+
+const isWindowNotReadyResult = (result: unknown): boolean => {
+  if (typeof result !== 'object' || result === null) {
+    return false;
+  }
+
+  const candidate = result as {isError?: unknown; content?: unknown};
+
+  if (candidate.isError !== true || !Array.isArray(candidate.content)) {
+    return false;
+  }
+
+  return candidate.content.some((item) => {
+    if (typeof item !== 'object' || item === null) {
+      return false;
+    }
+
+    const block = item as {type?: unknown; text?: unknown};
+
+    return block.type === 'text' && block.text === WINDOW_NOT_READY_MESSAGE;
+  });
+};
+
 export const createBackend = (options: BackendOptions) => {
   const {
     port,
@@ -51,6 +76,8 @@ export const createBackend = (options: BackendOptions) => {
 
   let cached: Client | null = null;
   let launching: Promise<Client> | null = null;
+  let launchGeneration = 0;
+  let lastLaunchStartedAt = 0;
 
   // One MCP initialize round-trip; the transport itself sends the required
   // `Accept: application/json, text/event-stream` headers on every POST.
@@ -86,6 +113,8 @@ export const createBackend = (options: BackendOptions) => {
     }
     if (launching === null) {
       launching = (async () => {
+        launchGeneration += 1;
+        lastLaunchStartedAt = Date.now();
         log(`Responsively App is not running — launching it (port ${port})`);
         await launcher(port);
         const deadline = Date.now() + launchTimeoutMs;
@@ -120,19 +149,41 @@ export const createBackend = (options: BackendOptions) => {
   };
 
   const callTool = async (params: unknown) => {
+    const launchGenerationBeforeCall = launchGeneration;
+
     const attempt = async () =>
       (await ensure()).request({method: 'tools/call', params} as never, CallToolResultSchema);
-    try {
-      return await attempt();
-    } catch (error) {
-      if (!isTransportError(error)) {
-        // A real backend answer (e.g. unknown tool) — pass through.
-        throw error;
+
+    const requestWithTransportRetry = async () => {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (!isTransportError(error)) {
+          // A real backend answer (e.g. unknown tool) — pass through.
+          throw error;
+        }
+
+        // The app quit mid-session: probe/launch again and retry once.
+        await invalidate();
+        return attempt();
       }
-      // The app quit mid-session: probe/launch again and retry once.
-      await invalidate();
-      return attempt();
+    };
+
+    let result = await requestWithTransportRetry();
+
+    // The HTTP MCP server starts before Electron creates its BrowserWindow.
+    // Retry only the exact pre-window result, and only when this call caused
+    // a launch/relaunch. No renderer command ran when this result is returned.
+    if (launchGeneration !== launchGenerationBeforeCall && isWindowNotReadyResult(result)) {
+      const deadline = lastLaunchStartedAt + launchTimeoutMs;
+
+      while (isWindowNotReadyResult(result) && Date.now() < deadline) {
+        await sleep(pollIntervalMs);
+        result = await requestWithTransportRetry();
+      }
     }
+
+    return result;
   };
 
   return {getIfRunning, ensure, invalidate, callTool};

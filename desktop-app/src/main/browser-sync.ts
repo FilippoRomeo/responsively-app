@@ -1,14 +1,9 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import BrowserSync, {BrowserSyncInstance} from 'browser-sync';
 import fs from 'fs-extra';
+import {resolveBrowserSyncPort} from './runtime-isolation';
 
-const DEFAULT_BROWSER_SYNC_PORT = 12719;
-
-// Each instance picks a unique port to allow parallel E2E runs
-const resolvedPort: number =
-  process.env.E2E_TEST === 'true'
-    ? DEFAULT_BROWSER_SYNC_PORT + Math.floor(Math.random() * 10000)
-    : DEFAULT_BROWSER_SYNC_PORT;
+const resolvedPort = resolveBrowserSyncPort();
 
 export function getBrowserSyncPort(): number {
   return resolvedPort;
