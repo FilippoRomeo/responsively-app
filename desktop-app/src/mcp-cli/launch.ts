@@ -2,6 +2,11 @@ import {execFile, spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {DEFAULT_MCP_PORT, MCP_PORT_ENV_VAR, McpBeacon} from '../common/mcp';
+import {
+  BROWSER_SYNC_PORT_ENV_VAR,
+  DISABLE_PROTOCOL_REGISTRATION_ENV_VAR,
+  USER_DATA_DIR_ENV_VAR,
+} from '../main/runtime-isolation';
 import {readBeacon} from './beacon';
 import {log} from './log';
 
@@ -63,6 +68,20 @@ const openViaLaunchServices = (deps: LaunchDeps, args: string[]): Promise<boolea
 
 export const launchApp = async (port: number, deps: LaunchDeps = defaultDeps): Promise<void> => {
   const env = {...process.env, [MCP_PORT_ENV_VAR]: String(port)};
+
+  // Parallel sessions are isolated by a tuple supplied by the MCP client:
+  // MCP port + BrowserSync port + userData. Preserve all three when launching
+  // the packaged binary directly; Electron's single-instance lock is keyed by
+  // userData, so distinct directories intentionally allow concurrent sessions.
+  for (const key of [
+    BROWSER_SYNC_PORT_ENV_VAR,
+    USER_DATA_DIR_ENV_VAR,
+    DISABLE_PROTOCOL_REGISTRATION_ENV_VAR,
+  ]) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key];
+    }
+  }
   const beacon = deps.beacon();
 
   if (deps.platform === 'darwin') {
