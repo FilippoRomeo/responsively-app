@@ -42,15 +42,21 @@ import {wireWebviewSecurity} from './webview-registry';
 import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
+import {startController} from './sessions/service';
+import {initSessions, startSessionRuntime} from './sessions/runtime';
+
 initLogging();
 initCrashHandlers();
 
 let windowShownOnOpen = false;
 let mainWindow: BrowserWindow | null = null;
 let urlToOpen: string | undefined =
-  cli.input[0] !== undefined && !cli.input[0].includes('electronmon') && isOpenableUrl(cli.input[0])
+  process.env.RESPONSIVELY_SESSION_URL ||
+  (cli.input[0] !== undefined &&
+  !cli.input[0].includes('electronmon') &&
+  isOpenableUrl(cli.input[0])
     ? cli.input[0]
-    : undefined;
+    : undefined);
 
 const normalizeProtocolUrl = (url: string): string => {
   let actualURL = url.replace(`${PROTOCOL}://`, '');
@@ -120,7 +126,7 @@ initWebviewContextMenu();
 initScreenshotHandlers();
 initWebviewStorageManagerHandlers();
 initNativeFunctionHandlers();
-initMcpServer(getMainWindow);
+if (process.env.RESPONSIVELY_SESSION_CONTROLLER !== 'true') initMcpServer(getMainWindow);
 initHttpBasicAuthHandlers(getMainWindow);
 const webPermissionHandlers = WebPermissionHandlers(getMainWindow);
 
@@ -247,6 +253,7 @@ let appUpdater: AppUpdater | null = null;
 let isBrowserSyncInitiated = false;
 
 const createWindow = async () => {
+  if (process.env.RESPONSIVELY_SESSION_ID) urlToOpen = store.get('homepage');
   windowShownOnOpen = false;
   if (process.env.E2E_TEST !== 'true') {
     await installExtensions();
@@ -399,14 +406,28 @@ app.on('certificate-error', (event, _, url, __, ___, callback) => {
 
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
+    if (!gotSingleInstanceLock) return;
+    if (process.env.RESPONSIVELY_SESSION_CONTROLLER === 'true') {
+      app.dock?.hide();
+      await startController();
+      return;
+    }
+    if (process.env.RESPONSIVELY_SESSION_URL)
+      store.set('homepage', process.env.RESPONSIVELY_SESSION_URL);
     wireSessionOnce();
     appUpdater = new AppUpdater();
-    createWindow();
+    initSessions(getMainWindow, createWindow);
+    await createWindow();
+    await startSessionRuntime();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
     });
   })
-  .catch((error) => log.error('Failed to start app', error));
+  .catch((error) => {
+    log.error('Failed to start app', error);
+    if (process.env.RESPONSIVELY_SESSION_CONTROLLER || process.env.RESPONSIVELY_SESSION_ID)
+      app.quit();
+  });

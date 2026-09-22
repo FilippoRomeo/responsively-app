@@ -7,6 +7,34 @@ import {z} from 'zod';
  * zod — never electron or anything that does.
  */
 export const toolDefs = {
+  list_sessions: {
+    description: 'List persistent Responsively Sessions and verified runtime status.',
+  },
+  create_session: {
+    description:
+      'Create a persistent isolated Session. Opens it by default; ports and browser data are allocated by Responsively.',
+    inputSchema: {
+      name: z.string().min(1).max(100),
+      url: z.string().optional(),
+      open: z.boolean().optional(),
+    },
+  },
+  get_session: {
+    description: 'Get a Session by stable UUID, including verified runtime diagnostics.',
+    inputSchema: {id: z.string().uuid()},
+  },
+  open_session: {
+    description: 'Open a stopped Session or focus its running window.',
+    inputSchema: {id: z.string().uuid()},
+  },
+  focus_session: {
+    description: 'Focus the window of a running Session.',
+    inputSchema: {id: z.string().uuid()},
+  },
+  stop_session: {
+    description: 'Stop a Session runtime, preserving its browser data and definition.',
+    inputSchema: {id: z.string().uuid()},
+  },
   get_app_state: {
     description:
       'Get the current state of Responsively App: the URL loaded in the device previews, ' +

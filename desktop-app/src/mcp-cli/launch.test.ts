@@ -2,7 +2,7 @@
 import path from 'path';
 import {describe, expect, it, vi} from 'vitest';
 import {McpBeacon} from '../common/mcp';
-import {launchApp, LaunchDeps} from './launch';
+import {launchApp, launchController, LaunchDeps} from './launch';
 
 const MAC_BRIDGE_DIR = '/Applications/ResponsivelyApp.app/Contents/Resources/mcp';
 const MAC_BINARY = '/Applications/ResponsivelyApp.app/Contents/MacOS/ResponsivelyApp';
@@ -130,5 +130,25 @@ describe('mcp-cli launch', () => {
     const {opened: openedCalls} = {opened};
     await launchApp(12720, deps);
     expect(openedCalls).toEqual([['-b', 'app.responsively'], [appDir]]);
+  });
+});
+
+describe('session controller launch', () => {
+  it('uses a detached packaged binary and independent controller userData without browser port overrides', async () => {
+    const {deps, spawned} = makeDeps({existsFn: (p) => p.startsWith('/Applications')});
+    await launchController('/tmp/session-root', deps);
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0].options).toMatchObject({
+      detached: true,
+      stdio: 'ignore',
+      env: {
+        RESPONSIVELY_SESSION_CONTROLLER: 'true',
+        RESPONSIVELY_SESSIONS_ROOT: '/tmp/session-root',
+        RESPONSIVELY_USER_DATA_DIR: '/tmp/session-root/controller',
+        RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
+      },
+    });
+    expect(spawned[0].options.env.RESPONSIVELY_MCP_PORT).toBeUndefined();
+    expect(spawned[0].options.env.RESPONSIVELY_SESSION_ID).toBeUndefined();
   });
 });

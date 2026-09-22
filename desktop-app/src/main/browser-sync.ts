@@ -16,6 +16,8 @@ export function getBrowserSyncHost(): string {
 const browserSyncEmbed: BrowserSyncInstance = BrowserSync.create('embed');
 
 let created = false;
+let ready = false;
+export const isBrowserSyncReady = () => ready;
 let filesWatcher: ReturnType<BrowserSyncInstance['watch']> | null = null;
 let cssWatcher: ReturnType<BrowserSyncInstance['watch']> | null = null;
 
@@ -29,6 +31,7 @@ export async function initInstance(): Promise<BrowserSyncInstance> {
       {
         open: false,
         localOnly: true,
+        listen: '127.0.0.1',
         https: true,
         notify: false,
         ui: false,
@@ -40,6 +43,9 @@ export async function initInstance(): Promise<BrowserSyncInstance> {
         if (err) {
           return reject(err);
         }
+        if (Number(bs.getOption('port')) !== resolvedPort)
+          return reject(new Error('BrowserSync did not bind its assigned port'));
+        ready = true;
         return resolve(bs);
       }
     );

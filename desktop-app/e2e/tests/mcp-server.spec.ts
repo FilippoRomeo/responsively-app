@@ -68,12 +68,18 @@ test.describe('MCP server', () => {
     const {tools} = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'click',
+      'create_session',
+      'focus_session',
       'get_app_state',
+      'get_session',
       'list_devices',
+      'list_sessions',
       'navigate',
+      'open_session',
       'read_page',
       'screenshot',
       'set_active_devices',
+      'stop_session',
       'type_text',
     ]);
   });

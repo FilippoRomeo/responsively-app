@@ -10,11 +10,20 @@ import {createBackend} from './backend';
 import {readBeacon, resolveTargetPort} from './beacon';
 import {log} from './log';
 import {loadManifest} from './manifest';
+import {
+  controllerClient,
+  controllerRoot,
+  sessionToolOperations,
+} from '../common/session-controller';
+import {launchController} from './launch';
+import {SessionRequest} from '../common/sessions';
 
 export const startBridge = async () => {
   const manifest = loadManifest();
   const port = resolveTargetPort(process.env, readBeacon());
   const backend = createBackend({port});
+  const root = controllerRoot();
+  const manage = controllerClient(root, () => launchController(root));
 
   const server = new Server(
     {name: MCP_SERVER_NAME, version: manifest.version},
@@ -26,13 +35,31 @@ export const startBridge = async () => {
     // build-time manifest until the app is up, then proxy the live list.
     const client = await backend.getIfRunning();
     if (client !== null) {
-      return client.listTools();
+      const live = await client.listTools();
+      // Lifecycle tools belong to this bridge/controller, even if an older
+      // browser runtime is already listening on the configured browser port.
+      return {
+        tools: [
+          ...live.tools.filter(
+            (tool) => !Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
+          ),
+          ...manifest.tools.filter((tool) =>
+            Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
+          ),
+        ],
+      };
     }
     return {tools: manifest.tools};
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
+      const operation =
+        sessionToolOperations[request.params.name as keyof typeof sessionToolOperations];
+      if (Object.prototype.hasOwnProperty.call(sessionToolOperations, request.params.name)) {
+        const value = await manage({...request.params.arguments, operation} as SessionRequest);
+        return {content: [{type: 'text' as const, text: JSON.stringify(value, null, 2)}]};
+      }
       return await backend.callTool(request.params);
     } catch (error) {
       if (error instanceof McpError) {

@@ -7,12 +7,18 @@ const CLI_PATH = path.join(__dirname, '..', '..', 'release', 'app', 'dist', 'mcp
 
 const EXPECTED_TOOLS = [
   'click',
+  'create_session',
+  'focus_session',
   'get_app_state',
+  'get_session',
   'list_devices',
+  'list_sessions',
   'navigate',
+  'open_session',
   'read_page',
   'screenshot',
   'set_active_devices',
+  'stop_session',
   'type_text',
 ];
 

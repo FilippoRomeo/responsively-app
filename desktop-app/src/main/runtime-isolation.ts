@@ -96,4 +96,10 @@ export const shouldRegisterProtocol = (env: NodeJS.ProcessEnv = process.env): bo
 export const shouldCheckForUpdates = (
   isPackaged: boolean,
   env: NodeJS.ProcessEnv = process.env
-): boolean => isPackaged && !env.CI && !env.E2E_TEST && !isLocalMcpBundle(env);
+): boolean =>
+  isPackaged &&
+  !env.CI &&
+  !env.E2E_TEST &&
+  !env.RESPONSIVELY_SESSION_ID &&
+  !env.RESPONSIVELY_SESSION_CONTROLLER &&
+  !isLocalMcpBundle(env);

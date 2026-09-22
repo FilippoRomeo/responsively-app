@@ -74,6 +74,7 @@ const schema = {
       // Not legacy: hydrates the active device set on boot (preloadedState),
       // is rewritten on every device change (persistence listener), and feeds
       // the 1.2.0 migration for configs predating preview suites.
+      activeSuiteId: {type: 'string', default: 'default'},
       activeDevices: {
         type: 'array',
         items: {
