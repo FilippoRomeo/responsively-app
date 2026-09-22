@@ -2,11 +2,9 @@ import {execFile, spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {DEFAULT_MCP_PORT, MCP_PORT_ENV_VAR, McpBeacon} from '../common/mcp';
-import {
-  BROWSER_SYNC_PORT_ENV_VAR,
-  DISABLE_PROTOCOL_REGISTRATION_ENV_VAR,
-  USER_DATA_DIR_ENV_VAR,
-} from '../main/runtime-isolation';
+const BROWSER_SYNC_PORT_ENV_VAR = 'RESPONSIVELY_BROWSER_SYNC_PORT';
+const USER_DATA_DIR_ENV_VAR = 'RESPONSIVELY_USER_DATA_DIR';
+const DISABLE_PROTOCOL_REGISTRATION_ENV_VAR = 'RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION';
 import {readBeacon} from './beacon';
 import {log} from './log';
 
