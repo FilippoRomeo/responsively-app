@@ -199,6 +199,58 @@ claude mcp add responsively -s user \
 
 Keep the remaining variables in the MCP config. The bridge starts the app binary directly, so the process inherits the parent's `__CFBundleIdentifier` (e.g. your terminal or editor) instead of the local bundle ID. The baked defaults cover launches through Finder, the Dock or `open`; the variables cover bridge launches.
 
+#### Codex and parallel project sessions
+
+Codex can use the same packaged app without installing the upstream Responsively release. Point the MCP bootstrap at this build explicitly:
+
+```toml
+[mcp_servers.responsively]
+command = "npx"
+args = ["-y", "@responsively/mcp@1.0.0"]
+
+[mcp_servers.responsively.env]
+RESPONSIVELY_APP_PATH = "/Users/YOU/Applications/ResponsivelyMCP.app"
+RESPONSIVELY_MCP_PORT = "12721"
+RESPONSIVELY_BROWSER_SYNC_PORT = "12722"
+RESPONSIVELY_USER_DATA_DIR = "/Users/YOU/Library/Application Support/ResponsivelyMCP"
+RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION = "true"
+CI = "true"
+```
+
+For two coding projects at the same time, give each MCP entry a unique MCP port, BrowserSync port and user-data directory. Both entries may use the same installed `ResponsivelyMCP.app`; the distinct user-data directories also give Electron distinct single-instance locks.
+
+```toml
+[mcp_servers.responsively_project_a]
+command = "npx"
+args = ["-y", "@responsively/mcp@1.0.0"]
+
+[mcp_servers.responsively_project_a.env]
+RESPONSIVELY_APP_PATH = "/Users/YOU/Applications/ResponsivelyMCP.app"
+RESPONSIVELY_MCP_PORT = "12721"
+RESPONSIVELY_BROWSER_SYNC_PORT = "12722"
+RESPONSIVELY_USER_DATA_DIR = "/Users/YOU/Library/Application Support/ResponsivelyMCP/project-a"
+RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION = "true"
+CI = "true"
+
+[mcp_servers.responsively_project_b]
+command = "npx"
+args = ["-y", "@responsively/mcp@1.0.0"]
+
+[mcp_servers.responsively_project_b.env]
+RESPONSIVELY_APP_PATH = "/Users/YOU/Applications/ResponsivelyMCP.app"
+RESPONSIVELY_MCP_PORT = "12731"
+RESPONSIVELY_BROWSER_SYNC_PORT = "12732"
+RESPONSIVELY_USER_DATA_DIR = "/Users/YOU/Library/Application Support/ResponsivelyMCP/project-b"
+RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION = "true"
+CI = "true"
+```
+
+The three per-session values are an isolation tuple and must stay unique together:
+
+`RESPONSIVELY_MCP_PORT` + `RESPONSIVELY_BROWSER_SYNC_PORT` + `RESPONSIVELY_USER_DATA_DIR`.
+
+The npm bootstrap now honors `RESPONSIVELY_USER_DATA_DIR` when reading `app-location.json`, so isolated sessions can discover their own beacon rather than falling back to the stable `ResponsivelyApp` user-data directory.
+
 ## Issues
 
 If you face any problems while using the application, please open an issue here - https://github.com/responsively-org/responsively-app/issues
