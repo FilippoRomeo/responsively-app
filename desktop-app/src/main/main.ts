@@ -65,6 +65,9 @@ const normalizeProtocolUrl = (url: string): string => {
 // window (which would also silently lose the MCP/browser-sync port races).
 // The lock is keyed on userData, so parallel E2E workers with isolated
 // E2E_USER_DATA_DIRs are unaffected.
+// Electron keys the single-instance lock by userData. Setting a distinct
+// RESPONSIVELY_USER_DATA_DIR therefore creates an intentionally independent
+// Responsively session with its own window, MCP port and BrowserSync port.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
