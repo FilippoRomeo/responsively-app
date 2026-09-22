@@ -65,7 +65,7 @@ const openViaLaunchServices = (deps: LaunchDeps, args: string[]): Promise<boolea
   });
 
 export const launchApp = async (port: number, deps: LaunchDeps = defaultDeps): Promise<void> => {
-  const env = {...process.env, [MCP_PORT_ENV_VAR]: String(port)};
+  const env: NodeJS.ProcessEnv = {...process.env, [MCP_PORT_ENV_VAR]: String(port)};
 
   // Parallel sessions are isolated by a tuple supplied by the MCP client:
   // MCP port + BrowserSync port + userData. Preserve all three when launching
