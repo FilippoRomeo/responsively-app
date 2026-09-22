@@ -29,6 +29,7 @@ import useKeyboardShortcut, {
   SHORTCUT_CHANNEL,
 } from '../KeyboardShortcutsManager/useKeyboardShortcut';
 import McpPanel from './McpPanel';
+import {SessionsButton} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
 
 const ToolBar = () => {
@@ -136,6 +137,7 @@ const ToolBar = () => {
         <ColorSchemeToggle />
       </ToolbarGroup>
       <ToolbarDivider />
+      <SessionsButton />
       <McpPanel />
       <PreviewSuiteSelector />
       <IconButton

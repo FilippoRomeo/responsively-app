@@ -1,3 +1,5 @@
+import {useEffect, useState} from 'react';
+import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {useSelector} from 'react-redux';
 import {selectAddress, selectPageTitle} from 'renderer/store/features/renderer';
 
@@ -28,10 +30,31 @@ const TRAFFIC_LIGHTS_WIDTH = 78;
 const TitleBar = () => {
   const pageTitle = useSelector(selectPageTitle);
   const address = useSelector(selectAddress);
+  const [sessionName, setSessionName] = useState<string>();
+  useEffect(() => {
+    const refresh = () =>
+      window.electron.ipcRenderer
+        .invoke<{url: string; title: string}, {name?: string}>(IPC_MAIN_CHANNELS.SESSION_CONTEXT, {
+          url: address,
+          title: [domainOf(address), pageTitle].filter(Boolean).join(' — '),
+        })
+        .then((value) => {
+          setSessionName(value.name);
+          return undefined;
+        })
+        .catch(() => {});
+    void refresh();
+    const timer = setInterval(refresh, 2000);
+    return () => clearInterval(timer);
+  }, [address, pageTitle]);
 
   // Full context in every mode: app — site — page. In presentation this is
   // the one piece of chrome that stays up.
-  const titleText = ['Responsively', domainOf(address), pageTitle === '' ? null : pageTitle]
+  const titleText = [
+    sessionName || 'Responsively',
+    domainOf(address),
+    pageTitle === '' ? null : pageTitle,
+  ]
     .filter(Boolean)
     .join(' — ');
 

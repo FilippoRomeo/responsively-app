@@ -43,6 +43,7 @@ export const test = base.extend<{}, ElectronFixtures>({
         NODE_ENV: 'production',
         E2E_TEST: 'true',
         E2E_USER_DATA_DIR: userDataDir,
+        RESPONSIVELY_SESSIONS_ROOT: path.join(userDataDir, 'session-test-root'),
         RESPONSIVELY_MCP_PORT: String(mcpPort),
       } as Record<string, string>;
       if (process.env.E2E_HEADLESS === 'true' || process.env.CI) {

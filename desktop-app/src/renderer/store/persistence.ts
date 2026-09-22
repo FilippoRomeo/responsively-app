@@ -16,6 +16,7 @@ import {
   deleteAllSuites,
   deleteSuite,
   setDevices,
+  setActiveSuite,
   setSuiteDevices,
   setCanvasPosition,
   resetCanvasPositions,
@@ -131,6 +132,7 @@ startListening({
 startListening({
   matcher: isAnyOf(
     setSuiteDevices,
+    setActiveSuite,
     addSuite,
     addSuites,
     deleteSuite,
@@ -139,6 +141,10 @@ startListening({
     resetCanvasPositions
   ),
   effect: (_action, api) => {
+    window.electron.store.set(
+      'deviceManager.activeSuiteId',
+      api.getState().deviceManager.activeSuite
+    );
     window.electron.store.set('deviceManager.previewSuites', api.getState().deviceManager.suites);
   },
 });

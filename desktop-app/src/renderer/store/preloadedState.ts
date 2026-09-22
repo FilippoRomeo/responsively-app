@@ -79,7 +79,9 @@ export const buildPreloadedState = () => {
     designOverlay: store.get('userPreferences.designOverlays') ?? {},
     deviceManager: {
       devices,
-      activeSuite: DEFAULT_SUITE.id,
+      activeSuite: suites.some((s) => s.id === store.get('deviceManager.activeSuiteId'))
+        ? (store.get('deviceManager.activeSuiteId') as string)
+        : DEFAULT_SUITE.id,
       suites,
       individualRotations: {},
     },

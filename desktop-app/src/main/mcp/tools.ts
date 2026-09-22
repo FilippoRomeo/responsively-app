@@ -1,3 +1,5 @@
+import {sessionRequest} from '../sessions/service';
+import {SessionRequest} from '../../common/sessions';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {webContents} from 'electron';
 import {
@@ -84,6 +86,33 @@ const captureTarget = async (
 };
 
 export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) => {
+  const manage = async (request: SessionRequest) => {
+    try {
+      if (request.operation === 'stop' && request.id === process.env.RESPONSIVELY_SESSION_ID)
+        throw new Error(
+          'To stop this Session, use stop_session through the stdio MCP bridge or the Sessions manager.'
+        );
+      return textResult(await sessionRequest(request));
+    } catch (error) {
+      return errorResult(error);
+    }
+  };
+  server.registerTool('list_sessions', toolDefs.list_sessions, () => manage({operation: 'list'}));
+  server.registerTool('create_session', toolDefs.create_session, (args) =>
+    manage({operation: 'create', ...args})
+  );
+  server.registerTool('get_session', toolDefs.get_session, ({id}) =>
+    manage({operation: 'get', id})
+  );
+  server.registerTool('open_session', toolDefs.open_session, ({id}) =>
+    manage({operation: 'open', id})
+  );
+  server.registerTool('focus_session', toolDefs.focus_session, ({id}) =>
+    manage({operation: 'focus', id})
+  );
+  server.registerTool('stop_session', toolDefs.stop_session, ({id}) =>
+    manage({operation: 'stop', id})
+  );
   server.registerTool('get_app_state', toolDefs.get_app_state, async () => {
     try {
       const state = await sendBridgeCommand<McpAppState>(getMainWindow, 'get-app-state');

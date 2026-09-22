@@ -124,3 +124,31 @@ export const launchApp = async (port: number, deps: LaunchDeps = defaultDeps): P
   log(`launching ${binary}`);
   spawnDetached(deps, binary, env);
 };
+
+/** Lifecycle tools bootstrap the controller, independently of any browser Session. */
+export const launchController = async (
+  root: string,
+  deps: LaunchDeps = defaultDeps
+): Promise<void> => {
+  const binary = derivedBinary(deps) ?? deps.beacon()?.binaryPath;
+  if (!binary || !deps.existsFn(binary))
+    throw new Error('Responsively binary not found; install or launch the app once');
+  const env: NodeJS.ProcessEnv = {...process.env};
+  for (const key of [
+    'RESPONSIVELY_SESSION_ID',
+    'RESPONSIVELY_SESSION_TOKEN',
+    'RESPONSIVELY_SESSION_URL',
+    'RESPONSIVELY_SESSION_NAME',
+    'RESPONSIVELY_MCP_PORT',
+    'RESPONSIVELY_BROWSER_SYNC_PORT',
+    'ELECTRON_RUN_AS_NODE',
+  ])
+    delete env[key];
+  Object.assign(env, {
+    RESPONSIVELY_SESSION_CONTROLLER: 'true',
+    RESPONSIVELY_SESSIONS_ROOT: root,
+    RESPONSIVELY_USER_DATA_DIR: path.join(root, 'controller'),
+    RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
+  });
+  spawnDetached(deps, binary, env);
+};

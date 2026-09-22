@@ -74,6 +74,11 @@ describe('runtime isolation', () => {
       expect(shouldCheckForUpdates(true, {E2E_TEST: 'true'})).toBe(false);
     });
 
+    it('skips managed runtimes and controller without depending on LaunchServices or CI', () => {
+      expect(shouldCheckForUpdates(true, {RESPONSIVELY_SESSION_ID: 'a-session'})).toBe(false);
+      expect(shouldCheckForUpdates(true, {RESPONSIVELY_SESSION_CONTROLLER: 'true'})).toBe(false);
+    });
+
     it('skips the local MCP bundle without CI=true', () => {
       expect(shouldCheckForUpdates(true, localBundle)).toBe(false);
     });

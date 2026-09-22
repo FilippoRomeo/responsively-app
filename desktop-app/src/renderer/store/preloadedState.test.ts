@@ -66,4 +66,15 @@ describe('buildPreloadedState', () => {
       {id: 'default', name: 'Default', devices: ['10008']},
     ]);
   });
+  it('restores the selected project suite instead of reverting to Default', () => {
+    mockStore({
+      'deviceManager.previewSuites': [
+        DEFAULT_SUITE,
+        {id: 'project-suite', name: 'Project', devices: ['10013']},
+      ],
+      'deviceManager.activeSuiteId': 'project-suite',
+      'deviceManager.customDevices': [],
+    });
+    expect(buildPreloadedState().deviceManager.activeSuite).toBe('project-suite');
+  });
 });

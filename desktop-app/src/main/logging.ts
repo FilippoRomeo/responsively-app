@@ -1,3 +1,4 @@
+import path from 'path';
 import {app} from 'electron';
 import log from 'electron-log';
 
@@ -7,6 +8,8 @@ import log from 'electron-log';
  * field issues finally leave a trace.
  */
 export const initLogging = () => {
+  if (process.env.RESPONSIVELY_SESSION_ID)
+    log.transports.file.resolvePath = () => path.join(app.getPath('userData'), 'logs', 'main.log');
   log.transports.file.level = 'info';
   log.transports.console.level =
     process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true' ? 'debug' : 'warn';

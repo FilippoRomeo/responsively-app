@@ -2,6 +2,7 @@ import {app, Menu, BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import {subMenuHelp} from './help';
 import {getViewMenu} from './view';
 import {AppUpdater} from '../app-updater';
+import {sessionsMenu} from '../sessions/runtime';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;
@@ -117,6 +118,7 @@ export default class MenuBuilder {
       subMenuEdit,
       getViewMenu(this.mainWindow),
       subMenuWindow,
+      sessionsMenu(),
       subMenuHelp(this.mainWindow, this.appUpdater),
     ];
   }
@@ -140,6 +142,7 @@ export default class MenuBuilder {
         ],
       },
       getViewMenu(this.mainWindow),
+      sessionsMenu(),
       subMenuHelp(this.mainWindow, this.appUpdater),
     ];
   }

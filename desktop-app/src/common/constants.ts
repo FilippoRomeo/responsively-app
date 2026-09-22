@@ -26,6 +26,10 @@ export interface OpenUrlArgs {
 }
 
 export const IPC_MAIN_CHANNELS = {
+  SESSIONS_REQUEST: 'sessions-request',
+  SESSIONS_SHOW: 'sessions-show',
+  SESSIONS_READY: 'sessions-ready',
+  SESSION_CONTEXT: 'session-context',
   APP_META: 'app-meta',
   PERMISSION_REQUEST: 'permission-request',
   PERMISSION_RESPONSE: 'permission-response',
