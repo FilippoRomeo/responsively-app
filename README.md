@@ -245,6 +245,8 @@ RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION = "true"
 CI = "true"
 ```
 
+Each MCP entry launches its own Electron process when its target MCP port is not already serving Responsively. The bridge forwards that entry's MCP port, BrowserSync port and user-data directory into the launched process. This means one Codex project can navigate or change devices in its Responsively window without taking over another project's session.
+
 The three per-session values are an isolation tuple and must stay unique together:
 
 `RESPONSIVELY_MCP_PORT` + `RESPONSIVELY_BROWSER_SYNC_PORT` + `RESPONSIVELY_USER_DATA_DIR`.
