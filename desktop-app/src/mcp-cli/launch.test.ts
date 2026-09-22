@@ -55,6 +55,35 @@ describe('mcp-cli launch', () => {
     expect(spawned[0].options.env.RESPONSIVELY_MCP_PORT).toBe('23456');
   });
 
+  it('darwin custom port preserves the full parallel-session isolation tuple', async () => {
+    const previous = {
+      browserSync: process.env.RESPONSIVELY_BROWSER_SYNC_PORT,
+      userData: process.env.RESPONSIVELY_USER_DATA_DIR,
+      protocol: process.env.RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION,
+    };
+    process.env.RESPONSIVELY_BROWSER_SYNC_PORT = '12732';
+    process.env.RESPONSIVELY_USER_DATA_DIR = '/tmp/responsively-project-b';
+    process.env.RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION = 'true';
+    try {
+      const {deps, spawned} = makeDeps({existsFn: (p) => p.startsWith('/Applications')});
+      await launchApp(12731, deps);
+      expect(spawned).toHaveLength(1);
+      const childEnv = spawned[0].options.env as NodeJS.ProcessEnv;
+      expect(childEnv.RESPONSIVELY_MCP_PORT).toBe('12731');
+      expect(childEnv.RESPONSIVELY_BROWSER_SYNC_PORT).toBe('12732');
+      expect(childEnv.RESPONSIVELY_USER_DATA_DIR).toBe('/tmp/responsively-project-b');
+      expect(childEnv.RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION).toBe('true');
+    } finally {
+      const restore = (key: string, value: string | undefined) => {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      };
+      restore('RESPONSIVELY_BROWSER_SYNC_PORT', previous.browserSync);
+      restore('RESPONSIVELY_USER_DATA_DIR', previous.userData);
+      restore('RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION', previous.protocol);
+    }
+  });
+
   it('windows launches the beacon binary detached', async () => {
     const binary = 'C:\\Somewhere\\ResponsivelyApp.exe';
     const {deps, spawned} = makeDeps({

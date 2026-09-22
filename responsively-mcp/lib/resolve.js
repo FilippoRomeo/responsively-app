@@ -6,6 +6,7 @@ const path = require('path');
 
 // Electron userData folder name — from release/app/package.json "name".
 const APP_DATA_DIR = 'ResponsivelyApp';
+const USER_DATA_DIR_ENV_VAR = 'RESPONSIVELY_USER_DATA_DIR';
 const BRIDGE = ['mcp', 'cli.js'];
 
 /**
@@ -21,6 +22,9 @@ const candidatesFromAppPath = (p) => [
 ];
 
 const userDataDir = (platform, env, home) => {
+  if (env[USER_DATA_DIR_ENV_VAR]) {
+    return env[USER_DATA_DIR_ENV_VAR];
+  }
   if (platform === 'darwin') {
     return path.join(home, 'Library', 'Application Support', APP_DATA_DIR);
   }
@@ -35,7 +39,8 @@ const userDataDir = (platform, env, home) => {
  * Responsively App. Resolution order:
  *   1. RESPONSIVELY_MCP_BRIDGE — direct path to a cli.js (dev override)
  *   2. RESPONSIVELY_APP_PATH — user-specified install location
- *   3. The beacon the app writes to its userData dir on every startup
+ *   3. The beacon the app writes to its userData dir on every startup.
+ *      RESPONSIVELY_USER_DATA_DIR selects an isolated instance beacon.
  *   4. Platform default install paths (none exist for Linux AppImages)
  */
 function resolveBridgeEntry(env, platform, home = os.homedir(), exists = fs.existsSync) {

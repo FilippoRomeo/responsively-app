@@ -39,6 +39,19 @@ test('RESPONSIVELY_APP_PATH resolves a win/linux install dir', () => {
   assert.equal(entry, bridge);
 });
 
+test('RESPONSIVELY_USER_DATA_DIR selects an isolated instance beacon', () => {
+  const home = makeTmp();
+  const userData = path.join(home, 'instances', 'project-a');
+  const bridge = touch(path.join(home, 'app', 'mcp', 'cli.js'));
+  fs.mkdirSync(userData, {recursive: true});
+  fs.writeFileSync(
+    path.join(userData, 'app-location.json'),
+    JSON.stringify({bridgeEntry: bridge})
+  );
+  const entry = resolveBridgeEntry({RESPONSIVELY_USER_DATA_DIR: userData}, 'darwin', home);
+  assert.equal(entry, bridge);
+});
+
 test('beacon bridgeEntry is used when present', () => {
   const home = makeTmp();
   const bridge = touch(path.join(home, 'somewhere', 'mcp', 'cli.js'));
@@ -98,6 +111,10 @@ test('nothing found → null', () => {
 });
 
 test('userDataDir honors platform conventions', () => {
+  assert.equal(
+    userDataDir('darwin', {RESPONSIVELY_USER_DATA_DIR: '/tmp/responsively-a'}, '/Users/dev'),
+    '/tmp/responsively-a'
+  );
   assert.equal(
     userDataDir('darwin', {}, '/Users/dev'),
     '/Users/dev/Library/Application Support/ResponsivelyApp'
