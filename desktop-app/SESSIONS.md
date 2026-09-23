@@ -1,11 +1,14 @@
 # Sessions
 
-Use **Sessions → New Session…** or the toolbar's **Sessions** button. A Session is a saved project context with an immutable UUID, a name, its own browser data and device suites. Duplicate names are allowed. Ports and processes are temporary resources, not identities.
+Use **Sessions → New Session…** or the toolbar's **Sessions** button. A Session is a saved project context with an immutable UUID, a name, its own browser data and device suites. Names must be unique. Ports and processes are temporary resources, not identities.
 
 - **Open** starts a stopped Session; opening a running Session focuses it.
-- **Focus** restores its window, including after closing the window on macOS.
+- **Focus** brings a running Session's window to the front.
 - **Stop** quits that Session's process and preserves its data.
-- **Close Window** retains the running Session on macOS, matching the existing app behavior. Other platforms retain quit-on-last-window behavior.
+- **Close Window** (⌘W or the red button) stops that Session through the controller, so it ends as "stopped" with its data kept.
+- **⌘Q in a Session window** first shows "Press ⌘Q again to quit Responsively"; a second ⌘Q within 2.5 s quits the whole app (every Session stops and the active ones reopen at the next launch). Without a running shell, as for an agent-only Session, it stops just that Session.
+- **Reset** is available only when stopped and requires confirmation. Its profile moves to the OS Trash; its name and starting URL are kept, and the next Open starts fresh.
+- **New windows** open on the monitor under the pointer, then each Session remembers its own window position.
 - **Rename** changes the display name without changing identity or data paths.
 - **Delete** is available only when stopped and requires confirmation. Its profile moves to the OS Trash; its registry entry is removed. Stop never deletes data.
 
@@ -15,7 +18,7 @@ Existing unmanaged windows and their data remain unchanged; this version does no
 
 ## MCP
 
-The npm bootstrap is unchanged. Its bundled bridge adds `list_sessions`, `create_session`, `get_session`, `open_session`, `focus_session` and `stop_session`. `create_session` takes `name`, optional `url`, and optional `open` (default true). Other lifecycle calls use the stable `id`. No request accepts paths, PIDs or ports. Delete through MCP is intentionally not exposed.
+The npm bootstrap is unchanged. Its bundled bridge adds `list_sessions`, `create_session`, `get_session`, `open_session`, `focus_session` and `stop_session`. `create_session` takes `name`, optional `url`, and optional `open` (default true). Other lifecycle calls use the stable `id`. No request accepts paths, PIDs or ports. Reset and Delete through MCP are intentionally not exposed.
 
 Lifecycle calls work with no browser runtime running: the bridge starts/discovers the controller directly. Existing `get_app_state`, `navigate`, `list_devices`, `set_active_devices`, `read_page`, `click`, `type_text` and `screenshot` retain their existing per-runtime behavior. To attach those browser tools to a new Session, use its verified `runtime.mcpPort` in the existing `RESPONSIVELY_MCP_PORT` bridge configuration; obtain it again after reopening. A Session can run with its MCP toggle off (`runtime.mcpPort` is null); human management still works.
 
@@ -23,7 +26,7 @@ A direct HTTP client must not synchronously stop the runtime serving its own rep
 
 ## Ownership and recovery
 
-A dedicated headless instance of the same app is the registry's single writer, protected by an Electron single-instance lock. Both UI and MCP use its authenticated loopback control service. A runtime's own private control endpoint verifies its identity and performs its own focus/stop; a persisted PID never authorizes a kill.
+A dedicated headless instance of the same app is the registry's single writer, protected by an Electron single-instance lock. Both UI and MCP use its authenticated loopback control service. A runtime's own private control endpoint verifies its identity and performs its own focus/stop; a persisted PID never authorizes a kill. The macOS shell publishes its own authenticated endpoint (`shell.json`), used for presence checks and for a Session window's ⌘Q to request a whole-app quit.
 
 The root is `app.getPath('appData')/ResponsivelySessions` (macOS: `~/Library/Application Support/ResponsivelySessions`). It contains:
 

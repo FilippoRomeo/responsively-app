@@ -20,16 +20,16 @@ A single controller owns the Session registry and lifecycle. Session identity ne
 
 ## What is different from upstream
 
-| Area | Upstream Responsively | This fork |
-| --- | --- | --- |
-| Project isolation | One app/browser context | Named persistent Sessions with separate profiles/processes |
-| Session lifecycle | Not applicable | Create, Open, Focus, Stop, Rename, Reset and Delete |
-| Launcher | Normal app launch | Native macOS menu-bar/Dock Session launcher |
-| Restore | App-level state | Reopens only Sessions that were active at the last clean Quit |
-| MCP lifecycle | Browser tools | Adds Session lifecycle tools alongside browser tools |
-| Destructive agent actions | Not applicable | MCP cannot Reset or Delete Sessions |
-| Local build | Standard app identity | Isolated `ResponsivelyMCP.app` with its own bundle ID, ports and data |
-| Runtime baseline | Upstream moves independently | Intentionally frozen on Electron **43.1.1** until a concrete need justifies migration |
+| Area                      | Upstream Responsively        | This fork                                                                             |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| Project isolation         | One app/browser context      | Named persistent Sessions with separate profiles/processes                            |
+| Session lifecycle         | Not applicable               | Create, Open, Focus, Stop, Rename, Reset and Delete                                   |
+| Launcher                  | Normal app launch            | Native macOS menu-bar/Dock Session launcher                                           |
+| Restore                   | App-level state              | Reopens only Sessions that were active at the last clean Quit                         |
+| MCP lifecycle             | Browser tools                | Adds Session lifecycle tools alongside browser tools                                  |
+| Destructive agent actions | Not applicable               | MCP cannot Reset or Delete Sessions                                                   |
+| Local build               | Standard app identity        | Isolated `ResponsivelyMCP.app` with its own bundle ID, ports and data                 |
+| Runtime baseline          | Upstream moves independently | Intentionally frozen on Electron **43.1.1** until a concrete need justifies migration |
 
 The current known-good source baseline is:
 
@@ -37,7 +37,7 @@ The current known-good source baseline is:
 b2cc658040a33d350cd434948012b471376753ef
 ```
 
-That baseline has been validated as a packaged and installed macOS app. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
+That baseline has been validated as a packaged and installed macOS app. Later fixes (for example the window/Quit milestone M1) become the baseline only after they are merged, installed and smoke-tested. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
 
 ## Current product model
 
@@ -47,7 +47,10 @@ The intended model is one normal Mac app with multiple project Sessions:
 2. Previously active Sessions restore after a clean Quit.
 3. Use the menu-bar icon or Dock menu to open/focus Sessions.
 4. Use **Manage Sessions** to create, rename, stop, reset or delete them.
-5. Agents may create/open/focus/stop Sessions through MCP, but they cannot Reset or Delete them.
+5. Close a Session window (⌘W or the red button) to stop that Session; its data is kept.
+6. Press ⌘Q twice in any Session window to quit the whole app; Sessions that were open reopen at the next launch.
+7. New Session windows open on the monitor you are working on.
+8. Agents may create/open/focus/stop Sessions through MCP, but they cannot Reset or Delete them.
 
 Reset is intentionally stopped-only and moves the Session profile to the OS Trash while keeping the Session definition, name and starting URL. Delete also uses the Trash rather than silently destroying profile data.
 
@@ -133,16 +136,16 @@ open "$HOME/Applications/ResponsivelyMCP.app"
 
 The isolated build uses these defaults:
 
-| Setting | Value |
-| --- | --- |
-| App | `~/Applications/ResponsivelyMCP.app` |
-| Bundle ID | `app.responsively.mcp.local` |
-| MCP port | `12721` |
-| BrowserSync port | `12722` |
-| App data | `~/Library/Application Support/ResponsivelyMCP` |
-| Session data | `~/Library/Application Support/ResponsivelySessions` |
-| `responsively://` registration | disabled |
-| Auto-updater | disabled |
+| Setting                        | Value                                                |
+| ------------------------------ | ---------------------------------------------------- |
+| App                            | `~/Applications/ResponsivelyMCP.app`                 |
+| Bundle ID                      | `app.responsively.mcp.local`                         |
+| MCP port                       | `12721`                                              |
+| BrowserSync port               | `12722`                                              |
+| App data                       | `~/Library/Application Support/ResponsivelyMCP`      |
+| Session data                   | `~/Library/Application Support/ResponsivelySessions` |
+| `responsively://` registration | disabled                                             |
+| Auto-updater                   | disabled                                             |
 
 ## Connect Claude Code
 
@@ -211,12 +214,13 @@ Reset and Delete are deliberately **not exposed to MCP**.
 
 The stable baseline is intentionally frozen because it is the version proven end-to-end. There are still known UX issues; they are documented instead of being hidden behind continuous refactoring.
 
-Current verified examples include:
+Milestone M1 fixed the window and Quit behavior: `⌘W` / the red button now stop the Session, `⌘Q` in a Session window quits the whole app after a second press, new windows open on the current monitor, and the per-Session "What's new" card is gone.
 
-- `⌘Q` from a Session window does not yet behave like whole-app Quit;
-- `⌘W` / the red close button can leave a Session running without a visible window;
-- a brand-new Session initially opens on the primary display rather than the display currently in use;
-- some per-profile UI/migration noise remains.
+Remaining known issues include:
+
+- a Session window has two managers (the toolbar popover and the ⌘⇧M floating panel), and the toolbar does not show which Session you are in;
+- each new profile logs harmless migration errors once (upstream has a small fix, not yet cherry-picked);
+- the hidden manager panel and Session processes poll more often than necessary.
 
 The evidence, severity and planned milestones are tracked in [SESSIONS_ROADMAP.md](desktop-app/SESSIONS_ROADMAP.md).
 
