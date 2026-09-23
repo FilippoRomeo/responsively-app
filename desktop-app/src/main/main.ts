@@ -91,7 +91,11 @@ app.on('second-instance', (_event, argv) => {
       mainWindow.restore();
     }
     mainWindow.focus();
-  } else if (!process.env.RESPONSIVELY_SESSION_ID) {
+  } else if (
+    // The controller holds its own instance lock; a duplicate launch must not show UI there.
+    !process.env.RESPONSIVELY_SESSION_ID &&
+    process.env.RESPONSIVELY_SESSION_CONTROLLER !== 'true'
+  ) {
     void showLauncher();
   }
   // On Windows/Linux, protocol deep links and CLI URLs arrive on the second
