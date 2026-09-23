@@ -20,6 +20,7 @@ import {getMcpServerStatus} from '../mcp';
 import {getBrowserSyncPort, isBrowserSyncReady} from '../browser-sync';
 import {normalizeUrl} from '../mcp/utils';
 import {resolveHtmlPath} from '../util';
+import {processRole} from '../process-role';
 
 let name = process.env.RESPONSIVELY_SESSION_NAME;
 let getWindow: () => BrowserWindow | null;
@@ -125,13 +126,7 @@ export const showLauncher = async () => {
   if (tray && !tray.isDestroyed()) tray.popUpContextMenu(statusMenu(items));
 };
 export const initSessionsTray = () => {
-  if (
-    process.platform !== 'darwin' ||
-    process.env.RESPONSIVELY_SESSION_ID ||
-    process.env.RESPONSIVELY_SESSION_CONTROLLER === 'true' ||
-    tray
-  )
-    return tray;
+  if (process.platform !== 'darwin' || processRole() !== 'shell' || tray) return tray;
   const assets = app.isPackaged
     ? path.join(process.resourcesPath, 'assets')
     : path.join(__dirname, '../../assets');
@@ -176,7 +171,7 @@ const dockLabel = (s: SessionInfo) => {
   return `${s.name.slice(0, 60)}${site ? ` — ${site.slice(0, 60)}` : ''}`;
 };
 const updateDockMenu = () => {
-  if (process.platform !== 'darwin' || process.env.RESPONSIVELY_SESSION_ID) return;
+  if (process.platform !== 'darwin' || processRole() === 'session') return;
   app.dock?.setMenu(
     Menu.buildFromTemplate([
       ...cached
@@ -277,7 +272,7 @@ export const initSessions = (
           .filter(Boolean)
           .join(' — ');
         getWindow()?.setTitle(title);
-        if (process.env.RESPONSIVELY_SESSION_ID && value.url) {
+        if (processRole() === 'session' && value.url) {
           try {
             store.set('homepage', normalizeUrl(value.url));
           } catch {

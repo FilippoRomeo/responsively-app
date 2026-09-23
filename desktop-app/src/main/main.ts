@@ -50,6 +50,9 @@ import {
   showSessions,
   startSessionRuntime,
 } from './sessions/runtime';
+import {processRole} from './process-role';
+
+const role = processRole();
 
 initLogging();
 initCrashHandlers();
@@ -93,8 +96,7 @@ app.on('second-instance', (_event, argv) => {
     mainWindow.focus();
   } else if (
     // The controller holds its own instance lock; a duplicate launch must not show UI there.
-    !process.env.RESPONSIVELY_SESSION_ID &&
-    process.env.RESPONSIVELY_SESSION_CONTROLLER !== 'true'
+    role === 'shell'
   ) {
     void showLauncher();
   }
@@ -138,7 +140,7 @@ initWebviewContextMenu();
 initScreenshotHandlers();
 initWebviewStorageManagerHandlers();
 initNativeFunctionHandlers();
-if (process.env.RESPONSIVELY_SESSION_CONTROLLER !== 'true') initMcpServer(getMainWindow);
+if (role !== 'controller') initMcpServer(getMainWindow);
 initHttpBasicAuthHandlers(getMainWindow);
 const webPermissionHandlers = WebPermissionHandlers(getMainWindow);
 
@@ -266,7 +268,7 @@ let isBrowserSyncInitiated = false;
 let menuBuilder: MenuBuilder | null = null;
 
 const createWindow = async () => {
-  if (process.env.RESPONSIVELY_SESSION_ID) urlToOpen = store.get('homepage');
+  if (role === 'session') urlToOpen = store.get('homepage');
   windowShownOnOpen = false;
   if (process.env.E2E_TEST !== 'true') {
     await installExtensions();
@@ -298,7 +300,7 @@ const createWindow = async () => {
       webviewTag: true,
     },
   });
-  if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID) {
+  if (process.platform === 'darwin' && role === 'session') {
     // Accessory apps have windows but no menu bar; retain the local Sessions shortcuts.
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown' || !input.meta || !input.shift || input.alt || input.control)
@@ -432,25 +434,20 @@ app
   .whenReady()
   .then(async () => {
     if (!gotSingleInstanceLock) return;
-    if (process.env.RESPONSIVELY_SESSION_CONTROLLER === 'true') {
+    if (role === 'controller') {
       if (process.platform === 'darwin') app.setActivationPolicy('prohibited');
       await startController();
       return;
     }
-    if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID)
-      app.setActivationPolicy('accessory');
+    if (process.platform === 'darwin' && role === 'session') app.setActivationPolicy('accessory');
     if (process.env.RESPONSIVELY_SESSION_URL)
       store.set('homepage', process.env.RESPONSIVELY_SESSION_URL);
     wireSessionOnce();
     appUpdater = new AppUpdater();
     initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
-    if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
+    if (process.platform === 'darwin' && role === 'shell')
       await startShellOwner((message) => showSessions(false, message, true));
-    if (
-      process.platform === 'darwin' &&
-      !process.env.RESPONSIVELY_SESSION_ID &&
-      process.env.E2E_TEST !== 'true'
-    ) {
+    if (process.platform === 'darwin' && role === 'shell' && process.env.E2E_TEST !== 'true') {
       menuBuilder = new MenuBuilder(null, appUpdater);
       menuBuilder.buildMenu();
       initSessionsTray();
@@ -462,12 +459,11 @@ app
     await startSessionRuntime();
     app.on('activate', () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
-      else if (process.env.RESPONSIVELY_SESSION_ID) void createWindow();
+      else if (role === 'session') void createWindow();
       else void showLauncher();
     });
   })
   .catch((error) => {
     log.error('Failed to start app', error);
-    if (process.env.RESPONSIVELY_SESSION_CONTROLLER || process.env.RESPONSIVELY_SESSION_ID)
-      app.quit();
+    if (role !== 'shell') app.quit();
   });

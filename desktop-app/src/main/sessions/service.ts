@@ -6,6 +6,7 @@ import {SessionInfo, SessionRuntime} from '../../common/sessions';
 import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
+import {processRole} from '../process-role';
 import {z} from 'zod';
 import {
   controllerClient,
@@ -80,9 +81,7 @@ const childEnv = (): NodeJS.ProcessEnv => {
     RESPONSIVELY_SESSIONS_ROOT: sessionsRoot(),
     RESPONSIVELY_SHELL_USER_DATA_DIR:
       process.env.RESPONSIVELY_SHELL_USER_DATA_DIR ||
-      (!process.env.RESPONSIVELY_SESSION_ID && !process.env.RESPONSIVELY_SESSION_CONTROLLER
-        ? app.getPath('userData')
-        : undefined),
+      (processRole() === 'shell' ? app.getPath('userData') : undefined),
     RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
   };
 };

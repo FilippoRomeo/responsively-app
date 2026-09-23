@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import {processRole} from './process-role';
 
 export const DEFAULT_BROWSER_SYNC_PORT = 12719;
 
@@ -97,9 +98,4 @@ export const shouldCheckForUpdates = (
   isPackaged: boolean,
   env: NodeJS.ProcessEnv = process.env
 ): boolean =>
-  isPackaged &&
-  !env.CI &&
-  !env.E2E_TEST &&
-  !env.RESPONSIVELY_SESSION_ID &&
-  !env.RESPONSIVELY_SESSION_CONTROLLER &&
-  !isLocalMcpBundle(env);
+  isPackaged && !env.CI && !env.E2E_TEST && processRole(env) === 'shell' && !isLocalMcpBundle(env);

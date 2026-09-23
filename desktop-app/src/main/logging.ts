@@ -1,6 +1,7 @@
 import path from 'path';
 import {app} from 'electron';
 import log from 'electron-log';
+import {processRole} from './process-role';
 
 /**
  * Central logging + crash capture for the main process. File transport lands
@@ -8,7 +9,7 @@ import log from 'electron-log';
  * field issues finally leave a trace.
  */
 export const initLogging = () => {
-  if (process.env.RESPONSIVELY_SESSION_ID)
+  if (processRole() === 'session')
     log.transports.file.resolvePath = () => path.join(app.getPath('userData'), 'logs', 'main.log');
   log.transports.file.level = 'info';
   log.transports.console.level =
