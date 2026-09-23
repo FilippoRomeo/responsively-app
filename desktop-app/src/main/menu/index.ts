@@ -2,7 +2,7 @@ import {app, Menu, BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import {subMenuHelp} from './help';
 import {getViewMenu} from './view';
 import {AppUpdater} from '../app-updater';
-import {sessionsMenu} from '../sessions/runtime';
+import {sessionsMenu} from '../sessions/launcher';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;

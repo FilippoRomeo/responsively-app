@@ -43,13 +43,9 @@ import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
 import {restoreSessions, startController, startShellOwner} from './sessions/service';
-import {
-  initSessions,
-  initSessionsTray,
-  showLauncher,
-  showSessions,
-  startSessionRuntime,
-} from './sessions/runtime';
+import {initSessions, initSessionsTray, showLauncher} from './sessions/launcher';
+import {showSessions} from './sessions/panel';
+import {startSessionRuntime} from './sessions/session-control';
 import {processRole} from './process-role';
 
 const role = processRole();
