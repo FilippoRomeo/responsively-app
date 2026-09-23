@@ -1,4 +1,13 @@
-import {app, BrowserWindow, ipcMain, Menu, MenuItemConstructorOptions} from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  MenuItemConstructorOptions,
+  screen,
+  Tray,
+} from 'electron';
+import path from 'path';
 import fs from 'fs';
 import {z} from 'zod';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
@@ -10,27 +19,141 @@ import store from '../../store';
 import {getMcpServerStatus} from '../mcp';
 import {getBrowserSyncPort, isBrowserSyncReady} from '../browser-sync';
 import {normalizeUrl} from '../mcp/utils';
+import {resolveHtmlPath} from '../util';
 
 let name = process.env.RESPONSIVELY_SESSION_NAME;
 let getWindow: () => BrowserWindow | null;
 let reopen: () => Promise<void>;
-let pendingShow: boolean | undefined;
-export const showSessions = async (create = false) => {
-  if (!getWindow()) {
-    pendingShow = create;
-    await reopen();
+let panel: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let panelCreate = false;
+let panelError = '';
+export const showSessions = (
+  create = false,
+  error = '',
+  keyboard = false,
+  anchor?: Electron.Rectangle
+) => {
+  const owner = getWindow();
+  const cursor = screen.getCursorScreenPoint();
+  const display = anchor
+    ? screen.getDisplayMatching(anchor)
+    : keyboard
+      ? owner && !owner.isDestroyed()
+        ? screen.getDisplayMatching(owner.getBounds())
+        : screen.getPrimaryDisplay()
+      : screen.getDisplayNearestPoint(cursor);
+  const area = display.workArea;
+  const width = Math.min(420, area.width - 16);
+  const height = Math.min(560, area.height - 16);
+  const x = Math.max(
+    area.x + 8,
+    Math.min(
+      anchor ? anchor.x + anchor.width / 2 - width / 2 : keyboard ? area.x + 24 : cursor.x - 28,
+      area.x + area.width - width - 8
+    )
+  );
+  const y = Math.max(area.y + 8, anchor ? anchor.y + anchor.height + 8 : area.y + 8);
+  panelCreate = create;
+  panelError = error;
+  if (panel && !panel.isDestroyed()) {
+    panel.setBounds({x, y, width, height: Math.min(panel.getBounds().height, height)});
+    panel.show();
+    panel.focus();
+    panel.webContents.send(IPC_MAIN_CHANNELS.SESSIONS_PANEL_SHOW, {
+      create,
+      error,
+      darkMode: Boolean(store.get('ui.darkMode')),
+    });
     return;
   }
-  const win = getWindow();
-  if (!win) return;
-  win.show();
-  win.focus();
-  win.webContents.send(IPC_MAIN_CHANNELS.SESSIONS_SHOW, create);
+  const win = new BrowserWindow({
+    x,
+    y,
+    width,
+    height,
+    show: false,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    backgroundColor: store.get('ui.darkMode') ? '#0d1420' : '#ffffff',
+    webPreferences: {
+      preload:
+        app.isPackaged || process.env.E2E_TEST === 'true'
+          ? path.join(__dirname, 'preload-sessions.js')
+          : path.join(__dirname, '../../.erb/dll/preload-sessions.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+  panel = win;
+  win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.on('ready-to-show', () => {
+    if (!win.isDestroyed()) {
+      win.show();
+      win.focus();
+    }
+  });
+  win.on('blur', () => {
+    if (!win.isDestroyed()) win.hide();
+  });
+  win.on('closed', () => {
+    if (panel === win) panel = null;
+  });
+  void win.loadURL(`${resolveHtmlPath('index.html')}?sessionsPanel=1`);
+};
+export const initSessionsTray = () => {
+  if (
+    process.platform !== 'darwin' ||
+    process.env.RESPONSIVELY_SESSION_ID ||
+    process.env.RESPONSIVELY_SESSION_CONTROLLER === 'true' ||
+    tray
+  )
+    return tray;
+  const assets = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets')
+    : path.join(__dirname, '../../assets');
+  tray = new Tray(path.join(assets, 'sessionsTemplate.png'));
+  tray.setToolTip('Responsively Sessions');
+  const open = () => showSessions(false, '', false, tray!.getBounds());
+  tray.on('click', open);
+  tray.on('right-click', open);
+  app.on('will-quit', () => tray?.destroy());
+  return tray;
 };
 const menuAction = (id: string, operation: 'open' | 'focus' | 'stop') => () => {
-  sessionRequest({operation, id}).catch(() => showSessions());
+  sessionRequest({operation, id}).catch((cause) =>
+    showSessions(false, cause instanceof Error ? cause.message : String(cause))
+  );
 };
 let cached: SessionInfo[] = [];
+const dockLabel = (s: SessionInfo) => {
+  let site = '';
+  try {
+    site = s.lastUrl ? new URL(s.lastUrl).host : '';
+  } catch {
+    /* A saved URL may predate URL normalization. */
+  }
+  return `${s.name.slice(0, 60)}${site ? ` — ${site.slice(0, 60)}` : ''}`;
+};
+const updateDockMenu = () => {
+  if (process.platform !== 'darwin' || process.env.RESPONSIVELY_SESSION_ID) return;
+  app.dock?.setMenu(
+    Menu.buildFromTemplate([
+      ...cached
+        .filter((s) => s.status === 'running')
+        .map((s): MenuItemConstructorOptions => ({
+          label: dockLabel(s),
+          click: menuAction(s.id, 'focus'),
+        })),
+      ...(cached.some((s) => s.status === 'running') ? [{type: 'separator' as const}] : []),
+      {label: 'New Session…', click: () => showSessions(true)},
+      {label: 'Manage Sessions…', click: () => showSessions()},
+    ])
+  );
+};
 export const sessionsMenu = (): MenuItemConstructorOptions => ({
   label: 'Sessions',
   submenu: [
@@ -54,32 +177,56 @@ export const sessionsMenu = (): MenuItemConstructorOptions => ({
     {
       label: 'New Session…',
       accelerator: 'CmdOrCtrl+Shift+N',
-      click: () => {
-        void showSessions(true);
+      click: (_item, _window, event) => {
+        showSessions(true, '', Boolean(event.triggeredByAccelerator));
       },
     },
     {
       label: 'Manage Sessions…',
-      click: () => {
-        void showSessions();
+      accelerator: 'CmdOrCtrl+Shift+M',
+      click: (_item, _window, event) => {
+        showSessions(false, '', Boolean(event.triggeredByAccelerator));
       },
     },
   ],
 });
 
-export const initSessions = (getter: () => BrowserWindow | null, create: () => Promise<void>) => {
+export const initSessions = (
+  getter: () => BrowserWindow | null,
+  create: () => Promise<void>,
+  rebuildMenu: () => void
+) => {
   getWindow = getter;
   reopen = create;
-  ipcMain.handle(IPC_MAIN_CHANNELS.SESSIONS_READY, (event) => {
-    if (event.sender !== getWindow()?.webContents) throw new Error('Invalid application window');
-    const value = pendingShow;
-    pendingShow = undefined;
-    return value ?? null;
+  updateDockMenu();
+  const isPanel = (sender: Electron.WebContents, frame: Electron.WebFrameMain | null) =>
+    panel && !panel.isDestroyed() && sender === panel.webContents && frame === sender.mainFrame;
+  ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_CONTEXT, (event) => {
+    if (!isPanel(event.sender, event.senderFrame)) return;
+    event.returnValue = {
+      create: panelCreate,
+      error: panelError,
+      darkMode: Boolean(store.get('ui.darkMode')),
+    };
+  });
+  ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_DISMISS, (event) => {
+    if (isPanel(event.sender, event.senderFrame)) {
+      panel?.hide();
+      const owner = getWindow();
+      if (owner && !owner.isDestroyed()) owner.focus();
+    }
+  });
+  ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_RESIZE, (event, height: number) => {
+    if (!isPanel(event.sender, event.senderFrame) || !Number.isFinite(height)) return;
+    const area = screen.getDisplayMatching(panel!.getBounds()).workArea;
+    const target = Math.min(Math.max(Math.ceil(height), 190), area.height - 16);
+    if (panel!.getBounds().height !== target) panel!.setSize(panel!.getBounds().width, target);
   });
   ipcMain.handle(IPC_MAIN_CHANNELS.SESSIONS_REQUEST, async (event, request: SessionRequest) => {
+    const main = getWindow()?.webContents;
     if (
-      event.sender !== getWindow()?.webContents ||
-      event.senderFrame !== getWindow()?.webContents.mainFrame
+      !isPanel(event.sender, event.senderFrame) &&
+      (event.sender !== main || event.senderFrame !== main?.mainFrame)
     )
       throw new Error('Sessions requests must come from the application window');
     return sessionRequest(request);
@@ -114,12 +261,9 @@ export const initSessions = (getter: () => BrowserWindow | null, create: () => P
       const next = (await sessionRequest({operation: 'list'})) as SessionInfo[];
       if (JSON.stringify(next) === JSON.stringify(cached)) return;
       cached = next;
-      const menu = Menu.getApplicationMenu();
-      const item = menu?.items.find((m) => m.label === 'Sessions');
-      if (item)
-        item.submenu = Menu.buildFromTemplate(
-          sessionsMenu().submenu as MenuItemConstructorOptions[]
-        );
+      // Electron application menus cannot add or remove items in place.
+      rebuildMenu();
+      updateDockMenu();
     } catch {
       /* manager UI reports actionable errors */
     } finally {
@@ -149,12 +293,28 @@ export const startSessionRuntime = async () => {
     throw new Error('Invalid session launch identity');
   const schema = z
     .object({
-      operation: z.enum(['status', 'focus', 'stop', 'rename']),
+      operation: z.enum(['status', 'focus', 'stop', 'rename', 'e2e-show-panel', 'e2e-panel-state']),
       name: sessionName.optional(),
     })
     .strict();
   const {server, endpoint} = await serve(token, async (body) => {
     const req = schema.parse(body);
+    if (req.operation === 'e2e-show-panel' || req.operation === 'e2e-panel-state') {
+      if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
+      if (req.operation === 'e2e-show-panel') {
+        showSessions();
+        return {visible: true};
+      }
+      return {
+        visible: Boolean(panel?.isVisible()),
+        content: panel?.isDestroyed()
+          ? ''
+          : await panel?.webContents.executeJavaScript('document.body?.innerText ?? ""'),
+        hosts: BrowserWindow.getAllWindows().filter((w) =>
+          w.webContents.getURL().includes('sessionsPanel=1')
+        ).length,
+      };
+    }
     if (req.operation === 'focus') {
       if (!getWindow()) await reopen();
       const win = getWindow();

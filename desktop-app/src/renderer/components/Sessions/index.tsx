@@ -1,298 +1,417 @@
-import {Dialog, DialogPanel, DialogTitle} from '@headlessui/react';
 import {Icon} from '@iconify/react';
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {SessionInfo, SessionRequest} from 'common/sessions';
 import {getDevicesMap} from 'common/deviceList';
+import Popover from '../Popover';
 import Input from '../Input';
 import {ToolbarAction} from '../ToolBar/primitives';
-import useOverlayRegistry from 'renderer/hooks/useOverlayRegistry';
 
-const request = (value: SessionRequest) =>
-  window.electron.ipcRenderer.invoke<SessionRequest, SessionInfo | SessionInfo[]>(
-    IPC_MAIN_CHANNELS.SESSIONS_REQUEST,
-    value
-  );
+export type SessionRequester = (value: SessionRequest) => Promise<SessionInfo | SessionInfo[]>;
+const request: SessionRequester = (value) =>
+  window.electron.ipcRenderer.invoke(IPC_MAIN_CHANNELS.SESSIONS_REQUEST, value);
 const actionClass =
-  'min-w-[64px] justify-center border border-line disabled:cursor-not-allowed disabled:opacity-40';
+  'justify-center border border-line bg-card disabled:cursor-not-allowed disabled:opacity-40';
 
 export const SessionsButton = () => (
-  <ToolbarAction
-    onClick={() => window.dispatchEvent(new Event('responsively:sessions'))}
-    title="Manage Sessions"
+  <Popover
+    trigger={
+      <span className="flex items-center gap-[7px]">
+        <Icon icon="lucide:panels-top-left" />
+        Sessions
+      </span>
+    }
+    triggerClassName="flex h-[30px] items-center rounded-[7px] px-[11px] text-[12.5px] text-fg hover:bg-hover"
+    triggerTitle="Manage Sessions"
+    className="w-[420px] max-w-[calc(100vw-24px)] overflow-hidden"
+    keepMounted
   >
-    <Icon icon="lucide:panels-top-left" />
-    Sessions
-  </ToolbarAction>
+    {({close, open}) => <SessionsManager request={request} onClose={close} active={open} />}
+  </Popover>
 );
-export default function Sessions() {
-  const [visible, setVisible] = useState(false);
+
+export default function SessionsManager({
+  request: send,
+  onClose,
+  initialCreate = false,
+  initialError = '',
+  active = true,
+  showRequest,
+  native = false,
+  onHeight,
+}: {
+  request: SessionRequester;
+  onClose: () => void;
+  initialCreate?: boolean;
+  initialError?: string;
+  active?: boolean;
+  showRequest?: {create: boolean; error: string} | null;
+  native?: boolean;
+  onHeight?: (height: number) => void;
+}) {
   const [items, setItems] = useState<SessionInfo[]>([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState('');
+  const [actionError, setActionError] = useState(initialError);
+  const [pending, setPending] = useState<Record<string, SessionRequest['operation'] | undefined>>(
+    {}
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState('');
+  const [editing, setEditing] = useState<string | null>(initialCreate ? 'new' : null);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [start, setStart] = useState(true);
   const [deleting, setDeleting] = useState<SessionInfo | null>(null);
   const [filter, setFilter] = useState('');
-  useOverlayRegistry(visible);
-  useEffect(() => {
-    window.electron.ipcRenderer
-      .invoke<unknown, boolean | null>(IPC_MAIN_CHANNELS.SESSIONS_READY)
-      .then((create) => {
-        if (create !== null) {
-          setVisible(true);
-          if (create) setEditing('new');
-        }
-        return undefined;
-      })
-      .catch(() => {});
-  }, []);
-  useEffect(() => {
-    const open = () => setVisible(true);
-    window.addEventListener('responsively:sessions', open);
-    return () => window.removeEventListener('responsively:sessions', open);
-  }, []);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const refreshId = useRef(0);
+  const refreshing = useRef(false);
+  const mutationId = useRef(0);
+  const mounted = useRef(true);
+  const draft = useRef<{id: string; name: string; url: string; start: boolean} | null>(null);
+
   const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
+    const id = ++refreshId.current;
     try {
-      setItems((await request({operation: 'list'})) as SessionInfo[]);
-    } catch (e) {
-      setError(String(e));
+      const result = (await send({operation: 'list'})) as SessionInfo[];
+      if (!mounted.current || id !== refreshId.current) return;
+      setItems(result);
+      setListError('');
+    } catch (error) {
+      if (mounted.current && id === refreshId.current)
+        setListError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (id === refreshId.current) {
+        refreshing.current = false;
+        if (mounted.current) setLoading(false);
+      }
     }
-  }, []);
-  useEffect(
-    () =>
-      window.electron.ipcRenderer.on<boolean>(IPC_MAIN_CHANNELS.SESSIONS_SHOW, (create) => {
-        setVisible(true);
-        if (create) {
-          setEditing('new');
-          setName('');
-          setUrl('');
-        }
-      }),
-    []
-  );
+  }, [send]);
+
   useEffect(() => {
-    if (!visible) return undefined;
+    mounted.current = true;
+    if (!active) return undefined;
+    panelRef.current?.focus();
     void refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => clearInterval(timer);
-  }, [visible, refresh]);
+    const timer = setInterval(() => void refresh(), 2000);
+    return () => {
+      mounted.current = false;
+      refreshId.current += 1;
+      refreshing.current = false;
+      clearInterval(timer);
+    };
+  }, [active, refresh]);
+
+  useEffect(() => {
+    if (initialError) setActionError(initialError);
+  }, [initialError]);
+
+  useEffect(() => {
+    if (!showRequest) return;
+    if (showRequest.create) newSession();
+    setActionError(showRequest.error);
+    panelRef.current?.focus();
+  }, [showRequest]);
+
+  useEffect(() => {
+    if (editing) panelRef.current?.querySelector<HTMLInputElement>('input[required]')?.focus();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!onHeight || !panelRef.current) return undefined;
+    const observer = new ResizeObserver(() => onHeight(panelRef.current!.offsetHeight));
+    observer.observe(panelRef.current);
+    return () => observer.disconnect();
+  }, [onHeight]);
+
   const run = async (value: SessionRequest) => {
-    setBusy(value.id ?? 'new');
-    setError('');
+    const key = value.id ?? 'new';
+    mutationId.current += 1;
+    setPending((previous) => ({...previous, [key]: value.operation}));
+    setErrors((previous) => ({...previous, [key]: ''}));
+    setSuccess('');
     try {
-      await request(value);
+      const result = await send(value);
+      if (value.operation === 'stop' && (Array.isArray(result) || result.status !== 'stopped'))
+        throw new Error('Session stop could not be verified.');
+      if (!mounted.current) return;
       setEditing(null);
       setDeleting(null);
+      draft.current = null;
       await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setSuccess(
+        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : 'Session opened'}.`
+      );
+    } catch (error) {
+      if (mounted.current)
+        setErrors((previous) => ({
+          ...previous,
+          [key]: error instanceof Error ? error.message : String(error),
+        }));
     } finally {
-      setBusy(null);
+      if (mounted.current) setPending((previous) => ({...previous, [key]: undefined}));
     }
   };
+
   const newSession = () => {
     setEditing('new');
-    setName('');
-    setUrl('');
-    setStart(true);
-    setError('');
+    setDeleting(null);
+    setName(draft.current?.id === 'new' ? draft.current.name : '');
+    setUrl(draft.current?.id === 'new' ? draft.current.url : '');
+    setStart(draft.current?.id === 'new' ? draft.current.start : true);
+    setErrors((previous) => ({...previous, new: ''}));
   };
+  const matches = items.filter((item) =>
+    `${item.name} ${item.lastUrl ?? ''}`.toLowerCase().includes(filter.toLowerCase())
+  );
+  const closeSubview = (preserve = false) => {
+    draft.current = preserve && editing ? {id: editing, name, url, start} : null;
+    setEditing(null);
+    setDeleting(null);
+    panelRef.current?.focus();
+  };
+
   return (
-    <>
-      <Dialog open={visible} onClose={() => setVisible(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel
-            className="flex max-h-[85vh] w-[660px] max-w-full flex-col rounded-[10px] border border-line bg-panel text-fg shadow-elevated"
-            data-testid="sessions-manager"
-          >
-            <div className="flex items-center gap-3 border-b border-line p-4">
-              <DialogTitle className="flex-1 text-lg font-semibold">Sessions</DialogTitle>
-              <ToolbarAction onClick={newSession}>
-                <Icon icon="lucide:plus" />
-                New Session
-              </ToolbarAction>
-              <ToolbarAction onClick={() => setVisible(false)} aria-label="Close Sessions">
-                <Icon icon="lucide:x" />
-              </ToolbarAction>
-            </div>
-            {error && (
-              <p role="alert" className="px-4 pt-3 text-sm text-red-500">
-                {error}
-              </p>
-            )}
-            {editing !== null ? (
-              <form
-                className="grid gap-4 p-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(
-                    editing === 'new'
-                      ? {operation: 'create', name, url: url || undefined, open: start}
-                      : {operation: 'rename', id: editing, name}
-                  );
-                }}
-              >
-                <h2 className="font-semibold">
-                  {editing === 'new' ? 'New Session' : 'Rename Session'}
-                </h2>
-                <Input
-                  label="Name"
-                  value={name}
-                  maxLength={100}
-                  required
-                  onChange={(e) => setName(e.target.value)}
-                />
-                {editing === 'new' && (
-                  <>
-                    <Input
-                      label="Starting URL (optional)"
-                      placeholder="localhost:3000"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                    />
-                    <Input
-                      label="Open immediately"
-                      type="checkbox"
-                      checked={start}
-                      onChange={(e) => setStart(e.target.checked)}
-                    />
-                  </>
-                )}
-                <div className="flex justify-end gap-2">
-                  <ToolbarAction onClick={() => setEditing(null)}>Cancel</ToolbarAction>
-                  <ToolbarAction
-                    type="submit"
-                    disabled={busy !== null || !name.trim()}
-                    className={actionClass}
-                  >
-                    {busy ? 'Saving…' : 'Save'}
-                  </ToolbarAction>
-                </div>
-              </form>
-            ) : (
-              <>
-                {items.length > 5 && (
-                  <div className="px-4 pt-3">
-                    <Input
-                      label="Find a session"
-                      value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
-                    />
-                  </div>
-                )}
-                <div className="min-h-[160px] overflow-y-auto p-4">
-                  {items.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <Icon
-                        icon="lucide:panels-top-left"
-                        className="mx-auto mb-3 text-muted"
-                        fontSize={28}
-                      />
-                      <p className="font-semibold">A separate space for each project</p>
-                      <p className="mt-2 text-sm text-muted">
-                        Create a Session to keep its pages, devices and browser data together.
-                      </p>
-                    </div>
-                  ) : (
-                    items
-                      .filter((s) =>
-                        (s.name + s.lastUrl).toLowerCase().includes(filter.toLowerCase())
-                      )
-                      .map((s) => (
-                        <div
-                          key={s.id}
-                          className="mb-3 rounded-[9px] border border-line bg-card p-3"
-                          data-testid={`session-${s.id}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="min-w-0 flex-1 truncate font-semibold" title={s.name}>
-                              {s.name}
-                            </span>
-                            <span className="text-xs capitalize text-muted">
-                              {busy === s.id ? 'Working…' : s.status}
-                            </span>
-                          </div>
-                          <p className="mt-1 truncate text-sm text-muted" title={s.lastUrl}>
-                            {s.lastUrl || 'No starting URL'}
-                          </p>
-                          <p className="mt-1 min-h-4 truncate text-xs text-muted">
-                            {s.devices?.map((id) => getDevicesMap()[id]?.name ?? id).join(' · ') ||
-                              'Devices saved with this Session'}
-                          </p>
-                          {s.error && <p className="mt-2 text-sm text-red-500">{s.error}</p>}
-                          <div className="mt-3 flex flex-wrap justify-end gap-2">
-                            <ToolbarAction
-                              className={actionClass}
-                              disabled={busy !== null}
-                              onClick={() => {
-                                setEditing(s.id);
-                                setName(s.name);
-                              }}
-                            >
-                              Rename
-                            </ToolbarAction>
-                            <ToolbarAction
-                              className={actionClass}
-                              disabled={busy !== null || s.status !== 'stopped'}
-                              onClick={() => setDeleting(s)}
-                            >
-                              Delete
-                            </ToolbarAction>
-                            <ToolbarAction
-                              className={actionClass}
-                              disabled={busy !== null || !['running', 'error'].includes(s.status)}
-                              onClick={() => void run({operation: 'stop', id: s.id})}
-                            >
-                              Stop
-                            </ToolbarAction>
-                            <ToolbarAction
-                              className={actionClass}
-                              disabled={
-                                busy !== null || ['starting', 'stopping'].includes(s.status)
-                              }
-                              onClick={() =>
-                                void run({
-                                  operation: s.status === 'running' ? 'focus' : 'open',
-                                  id: s.id,
-                                })
-                              }
-                            >
-                              {s.status === 'running' ? 'Focus' : 'Open'}
-                            </ToolbarAction>
-                          </div>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </>
-            )}
-            {deleting && (
-              <div className="border-t border-line p-4" role="alert">
-                <p className="break-words font-semibold">Delete “{deleting.name}”?</p>
-                <p className="mt-1 text-sm text-muted">
-                  Its browser data will move to Trash and it will be removed from Sessions.
-                </p>
-                <div className="mt-3 flex justify-end gap-2">
-                  <ToolbarAction onClick={() => setDeleting(null)}>Cancel</ToolbarAction>
-                  <ToolbarAction
-                    disabled={busy !== null}
-                    className={actionClass}
-                    onClick={() =>
-                      void run({operation: 'delete', id: deleting.id, confirmed: true})
-                    }
-                  >
-                    Delete Session
-                  </ToolbarAction>
-                </div>
-              </div>
-            )}
-          </DialogPanel>
+    <div
+      ref={panelRef}
+      tabIndex={-1}
+      role="region"
+      aria-label="Sessions manager"
+      className={`flex ${native ? 'max-h-[520px]' : 'max-h-[min(620px,calc(100vh-48px))]'} flex-col overflow-hidden rounded-lg bg-panel text-fg outline-none`}
+      data-testid="sessions-manager"
+      onKeyDownCapture={(event) => {
+        if (event.key !== 'Escape') return;
+        if (editing || deleting) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeSubview(true);
+        } else {
+          onClose();
+        }
+      }}
+    >
+      <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+        <h2 className="min-w-0 flex-1 text-sm font-semibold">Sessions</h2>
+        <ToolbarAction onClick={newSession} disabled={Boolean(pending.new)}>
+          <Icon icon="lucide:plus" /> New Session
+        </ToolbarAction>
+        <ToolbarAction onClick={onClose} aria-label="Close Sessions" title="Close Sessions">
+          <Icon icon="lucide:x" />
+        </ToolbarAction>
+      </div>
+      {success && (
+        <p role="status" className="px-3 pt-2 text-xs text-accent">
+          {success}
+        </p>
+      )}
+      {listError && (
+        <div role="alert" className="px-3 pt-2 text-xs text-red-700 dark:text-red-300">
+          Sessions could not be refreshed: {listError}{' '}
+          <button type="button" className="underline" onClick={() => void refresh()}>
+            Retry
+          </button>
         </div>
-      </Dialog>
-    </>
+      )}
+      {actionError && (
+        <p role="alert" className="break-words px-3 pt-2 text-xs text-red-700 dark:text-red-300">
+          {actionError}
+        </p>
+      )}
+      {editing !== null ? (
+        <form
+          className="grid min-h-0 gap-3 overflow-y-auto p-3 text-sm"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void run(
+              editing === 'new'
+                ? {operation: 'create', name, url: url || undefined, open: start}
+                : {operation: 'rename', id: editing, name}
+            );
+          }}
+        >
+          <h3 className="font-semibold">{editing === 'new' ? 'New Session' : 'Rename Session'}</h3>
+          <Input
+            label="Name"
+            value={name}
+            maxLength={100}
+            required
+            onChange={(event) => setName(event.target.value)}
+          />
+          {editing === 'new' && (
+            <>
+              <Input
+                label="Starting URL (optional)"
+                placeholder="localhost:3000"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+              />
+              <Input
+                label="Open immediately"
+                type="checkbox"
+                checked={start}
+                onChange={(event) => setStart(event.target.checked)}
+              />
+            </>
+          )}
+          {errors[editing] && (
+            <p role="alert" className="break-words text-red-700 dark:text-red-300">
+              {errors[editing]}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <ToolbarAction onClick={() => closeSubview()}>Cancel</ToolbarAction>
+            <ToolbarAction
+              type="submit"
+              disabled={Boolean(pending[editing]) || !name.trim()}
+              className={actionClass}
+            >
+              {pending[editing]
+                ? editing === 'new' && start
+                  ? 'Starting…'
+                  : editing === 'new'
+                    ? 'Creating…'
+                    : 'Renaming…'
+                : 'Save'}
+            </ToolbarAction>
+          </div>
+        </form>
+      ) : deleting ? (
+        <div className="grid gap-3 overflow-y-auto p-3 text-sm">
+          <h3 className="break-words font-semibold">Delete “{deleting.name}”?</h3>
+          <p>Its browser data will move to Trash and it will be removed from Sessions.</p>
+          {errors[deleting.id] && (
+            <p role="alert" className="break-words text-red-700 dark:text-red-300">
+              {errors[deleting.id]}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <ToolbarAction onClick={() => closeSubview()}>Cancel</ToolbarAction>
+            <ToolbarAction
+              disabled={Boolean(pending[deleting.id])}
+              className={actionClass}
+              onClick={() => void run({operation: 'delete', id: deleting.id, confirmed: true})}
+            >
+              {pending[deleting.id] ? 'Deleting…' : 'Delete Session'}
+            </ToolbarAction>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="shrink-0 px-3 pt-3">
+            <Input
+              label="Find a session"
+              placeholder="Search by name or URL…"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          </div>
+          <div className="min-h-0 overflow-y-auto p-3" data-testid="sessions-list">
+            {loading ? (
+              <p role="status" className="py-6 text-center text-sm">
+                Loading Sessions…
+              </p>
+            ) : listError && items.length === 0 ? (
+              <p className="py-6 text-center text-sm">Sessions are unavailable. Retry above.</p>
+            ) : items.length === 0 ? (
+              <div className="py-6 text-center text-sm">
+                <Icon icon="lucide:panels-top-left" className="mx-auto mb-2" fontSize={26} />
+                <p className="font-semibold">A separate space for each project</p>
+                <p className="mt-2">
+                  Create a Session to keep its pages, devices and browser data together.
+                </p>
+              </div>
+            ) : matches.length === 0 ? (
+              <p className="py-6 text-center text-sm">No Sessions match “{filter}”.</p>
+            ) : (
+              matches.map((item) => (
+                <div
+                  key={item.id}
+                  className="mb-2 rounded-lg border border-line bg-card p-2.5 text-sm"
+                  data-testid={`session-${item.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-semibold" title={item.name}>
+                      {item.name}
+                    </span>
+                    <span className="shrink-0 text-xs">
+                      {pending[item.id] === 'open'
+                        ? 'Starting…'
+                        : pending[item.id] === 'stop'
+                          ? 'Stopping…'
+                          : pending[item.id] === 'rename'
+                            ? 'Renaming…'
+                            : item.status[0].toUpperCase() + item.status.slice(1)}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs" title={item.lastUrl}>
+                    {item.lastUrl || 'No starting URL'}
+                  </p>
+                  <p
+                    className="mt-1 truncate text-xs"
+                    title={item.devices?.map((id) => getDevicesMap()[id]?.name ?? id).join(' · ')}
+                  >
+                    {item.devices?.map((id) => getDevicesMap()[id]?.name ?? id).join(' · ') ||
+                      'Devices saved with this Session'}
+                  </p>
+                  {(errors[item.id] || item.error) && (
+                    <p
+                      role="alert"
+                      className="mt-2 break-words text-xs text-red-700 dark:text-red-300"
+                    >
+                      {errors[item.id] || item.error}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap justify-end gap-1">
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={Boolean(pending[item.id])}
+                      onClick={() => {
+                        setEditing(item.id);
+                        setName(draft.current?.id === item.id ? draft.current.name : item.name);
+                      }}
+                    >
+                      Rename
+                    </ToolbarAction>
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={Boolean(pending[item.id]) || item.status !== 'stopped'}
+                      onClick={() => setDeleting(item)}
+                    >
+                      Delete
+                    </ToolbarAction>
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={
+                        Boolean(pending[item.id]) || !['running', 'error'].includes(item.status)
+                      }
+                      onClick={() => void run({operation: 'stop', id: item.id})}
+                    >
+                      Stop
+                    </ToolbarAction>
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={
+                        Boolean(pending[item.id]) || ['starting', 'stopping'].includes(item.status)
+                      }
+                      onClick={() =>
+                        void run({
+                          operation: item.status === 'running' ? 'focus' : 'open',
+                          id: item.id,
+                        })
+                      }
+                    >
+                      {item.status === 'running' ? 'Focus' : 'Open'}
+                    </ToolbarAction>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

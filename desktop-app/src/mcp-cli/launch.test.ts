@@ -135,8 +135,15 @@ describe('mcp-cli launch', () => {
 
 describe('session controller launch', () => {
   it('uses a detached packaged binary and independent controller userData without browser port overrides', async () => {
+    const previous = process.env.RESPONSIVELY_USER_DATA_DIR;
+    process.env.RESPONSIVELY_USER_DATA_DIR = '/tmp/shell-profile';
     const {deps, spawned} = makeDeps({existsFn: (p) => p.startsWith('/Applications')});
-    await launchController('/tmp/session-root', deps);
+    try {
+      await launchController('/tmp/session-root', deps);
+    } finally {
+      if (previous === undefined) delete process.env.RESPONSIVELY_USER_DATA_DIR;
+      else process.env.RESPONSIVELY_USER_DATA_DIR = previous;
+    }
     expect(spawned).toHaveLength(1);
     expect(spawned[0].options).toMatchObject({
       detached: true,
@@ -144,6 +151,7 @@ describe('session controller launch', () => {
       env: {
         RESPONSIVELY_SESSION_CONTROLLER: 'true',
         RESPONSIVELY_SESSIONS_ROOT: '/tmp/session-root',
+        RESPONSIVELY_SHELL_USER_DATA_DIR: '/tmp/shell-profile',
         RESPONSIVELY_USER_DATA_DIR: '/tmp/session-root/controller',
         RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
       },

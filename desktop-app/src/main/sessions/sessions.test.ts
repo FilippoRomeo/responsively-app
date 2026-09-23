@@ -9,12 +9,14 @@ import {PortLeases, serve, call, secret} from '../../common/session-rpc';
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'responsively-sessions-unit-'));
 describe('persistent session boundaries', () => {
-  it('keeps UUID identity through rename and reload, including duplicate names', () => {
+  it('keeps UUID identity through rename and reload, and rejects duplicate names', () => {
     const dir = root();
     const registry = new SessionRegistry(dir);
     const a = registry.create('Project');
-    const b = registry.create('Project');
+    expect(() => registry.create('Project')).toThrow('already exists');
+    const b = registry.create('Other project');
     expect(a.id).not.toBe(b.id);
+    expect(() => registry.update(b.id, {name: 'Project'})).toThrow('already exists');
     registry.update(a.id, {name: 'Renamed', lastUrl: 'http://localhost:3020'});
     const reload = new SessionRegistry(dir);
     expect(reload.get(a.id)).toMatchObject({

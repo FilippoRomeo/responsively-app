@@ -10,6 +10,7 @@ import {controllerClient, controllerRoot} from '../../common/session-controller'
 
 export const sessionsRoot = () => controllerRoot(app.getPath('appData'));
 export const runtimeFile = (id: string) => path.join(sessionsRoot(), 'runtimes', `${id}.json`);
+const shellFile = () => path.join(sessionsRoot(), 'shell.json');
 export interface RuntimeLease extends Endpoint {
   id: string;
   pid: number;
@@ -59,8 +60,58 @@ const childEnv = (): NodeJS.ProcessEnv => {
   return {
     ...env,
     RESPONSIVELY_SESSIONS_ROOT: sessionsRoot(),
+    RESPONSIVELY_SHELL_USER_DATA_DIR:
+      process.env.RESPONSIVELY_SHELL_USER_DATA_DIR ||
+      (!process.env.RESPONSIVELY_SESSION_ID && !process.env.RESPONSIVELY_SESSION_CONTROLLER
+        ? app.getPath('userData')
+        : undefined),
     RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
   };
+};
+
+// A capability-protected presence beacon, not a second Sessions authority.
+export const startShellOwner = async () => {
+  const {server, endpoint} = await serve(secret(), async () => ({
+    userDataDir: app.getPath('userData'),
+  }));
+  atomicWrite(shellFile(), endpoint);
+  app.on('will-quit', () => {
+    server.close();
+    try {
+      if (read<Endpoint>(shellFile()).token === endpoint.token) fs.unlinkSync(shellFile());
+    } catch {
+      /* A newer shell may own the beacon. */
+    }
+  });
+};
+
+let shellStarting: Promise<void> | undefined;
+const ensureShellOwner = () => {
+  shellStarting ??= (async () => {
+    const alive = async () => {
+      try {
+        const endpoint = read<Endpoint>(shellFile());
+        const response = await call<{userDataDir: string}>(endpoint, {operation: 'status'}, 1000);
+        return Boolean(response.userDataDir);
+      } catch {
+        return false;
+      }
+    };
+    if (await alive()) return;
+    const child = launchRuntime({
+      ...childEnv(),
+      RESPONSIVELY_USER_DATA_DIR: process.env.RESPONSIVELY_SHELL_USER_DATA_DIR,
+    });
+    if (!child.pid) throw new Error('Could not start the Responsively shell');
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (await alive()) return;
+      await pause(100);
+    }
+    throw new Error('Responsively shell did not become ready');
+  })().finally(() => {
+    shellStarting = undefined;
+  });
+  return shellStarting;
 };
 
 /** A dedicated controller is the single writer; app windows and MCP are clients. */
@@ -141,6 +192,7 @@ export class SessionManager {
     return call(lease, {operation, name});
   }
   private async open(id: string) {
+    if (process.platform === 'darwin') await ensureShellOwner();
     const current = await this.inspect(id);
     if (current.status === 'running') {
       await this.control(id, 'focus');
@@ -327,6 +379,8 @@ export const startController = async () => {
   });
   const idle = setInterval(() => {
     const dir = path.join(sessionsRoot(), 'runtimes');
+    if (process.platform === 'darwin' && fs.existsSync(dir) && fs.readdirSync(dir).length > 0)
+      void ensureShellOwner().catch(() => {});
     if (
       requests === 0 &&
       Date.now() - lastRequest > 15_000 &&

@@ -14,17 +14,20 @@ export interface ReloadArgs {
 }
 
 export default class MenuBuilder {
-  mainWindow: BrowserWindow;
+  mainWindow: BrowserWindow | null;
 
   appUpdater: AppUpdater;
 
-  constructor(mainWindow: BrowserWindow, appUpdater: AppUpdater) {
+  constructor(mainWindow: BrowserWindow | null, appUpdater: AppUpdater) {
     this.mainWindow = mainWindow;
     this.appUpdater = appUpdater;
   }
 
   buildMenu(): Menu {
-    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true') {
+    if (
+      this.mainWindow &&
+      (process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true')
+    ) {
       this.setupDevelopmentEnvironment();
     }
 
@@ -38,17 +41,19 @@ export default class MenuBuilder {
   }
 
   setupDevelopmentEnvironment(): void {
-    this.mainWindow.webContents.on('context-menu', (_, props) => {
+    const mainWindow = this.mainWindow;
+    if (!mainWindow) return;
+    mainWindow.webContents.on('context-menu', (_, props) => {
       const {x, y} = props;
 
       Menu.buildFromTemplate([
         {
           label: 'Inspect element',
           click: () => {
-            this.mainWindow.webContents.inspectElement(x, y);
+            mainWindow.webContents.inspectElement(x, y);
           },
         },
-      ]).popup({window: this.mainWindow});
+      ]).popup({window: mainWindow});
     });
   }
 
@@ -116,7 +121,7 @@ export default class MenuBuilder {
     return [
       subMenuAbout,
       subMenuEdit,
-      getViewMenu(this.mainWindow),
+      ...(this.mainWindow ? [getViewMenu(this.mainWindow)] : []),
       subMenuWindow,
       sessionsMenu(),
       subMenuHelp(this.mainWindow, this.appUpdater),
@@ -136,12 +141,12 @@ export default class MenuBuilder {
             label: '&Close',
             accelerator: 'Ctrl+W',
             click: () => {
-              this.mainWindow.close();
+              this.mainWindow?.close();
             },
           },
         ],
       },
-      getViewMenu(this.mainWindow),
+      ...(this.mainWindow ? [getViewMenu(this.mainWindow)] : []),
       sessionsMenu(),
       subMenuHelp(this.mainWindow, this.appUpdater),
     ];
