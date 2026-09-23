@@ -6,11 +6,19 @@ import {SessionInfo, SessionRuntime} from '../../common/sessions';
 import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
-import {controllerClient, controllerRoot, stopAllSessions} from '../../common/session-controller';
+import {z} from 'zod';
+import {
+  controllerClient,
+  controllerRoot,
+  reopenSessions,
+  stopAllSessions,
+} from '../../common/session-controller';
 
 export const sessionsRoot = () => controllerRoot(app.getPath('appData'));
 export const runtimeFile = (id: string) => path.join(sessionsRoot(), 'runtimes', `${id}.json`);
 const shellFile = () => path.join(sessionsRoot(), 'shell.json');
+// Sessions active at the last clean Quit; consumed by the next user launch.
+const restoreFile = () => path.join(sessionsRoot(), 'restore.json');
 const runningIds = () => {
   const dir = path.join(sessionsRoot(), 'runtimes');
   return fs.existsSync(dir)
@@ -63,6 +71,7 @@ const childEnv = (): NodeJS.ProcessEnv => {
     'RESPONSIVELY_MCP_PORT',
     'RESPONSIVELY_BROWSER_SYNC_PORT',
     'RESPONSIVELY_USER_DATA_DIR',
+    'RESPONSIVELY_SHELL_SPAWNED',
     'ELECTRON_RUN_AS_NODE',
   ])
     delete env[key];
@@ -87,16 +96,27 @@ export const startShellOwner = async (onQuitBlocked: (message: string) => void) 
   // Quit means the whole app. It completes only when every Session has stopped
   // (data kept); otherwise the controller would relaunch this shell to own them.
   let stopping = false;
+  let saved = false;
+  // Kept across a blocked Quit, so Sessions stopped by the first attempt are still restored.
+  const active = new Set<string>();
   app.on('before-quit', (event) => {
-    if (runningIds().length === 0) return;
+    if (runningIds().length === 0) {
+      // A clean Quit with nothing running leaves nothing to restore.
+      if (!saved) fs.rmSync(restoreFile(), {force: true});
+      return;
+    }
     event.preventDefault();
     if (stopping) return;
     stopping = true;
     // ponytail: 30s cap only guards a hung controller; its own stop is bounded (~20s).
     void (async () => {
-      const blocked = await stopAllSessions(sessionRequest, runningIds, 30_000);
+      const result = await stopAllSessions(sessionRequest, runningIds, 30_000);
+      const {blocked} = result;
+      for (const id of result.active) active.add(id);
       stopping = false;
       if (blocked.length === 0) {
+        atomicWrite(restoreFile(), {version: 1, ids: [...active]});
+        saved = true;
         app.quit();
         return;
       }
@@ -124,6 +144,20 @@ export const startShellOwner = async (onQuitBlocked: (message: string) => void) 
   });
 };
 
+/** A user launch reopens what was active at the last clean Quit, once. */
+export const restoreSessions = async () => {
+  let ids: string[];
+  try {
+    ids = z
+      .object({version: z.literal(1), ids: z.array(z.string().uuid())})
+      .parse(read(restoreFile())).ids;
+  } catch {
+    return;
+  }
+  fs.rmSync(restoreFile(), {force: true});
+  await reopenSessions(sessionRequest, ids);
+};
+
 let shellStarting: Promise<void> | undefined;
 const ensureShellOwner = () => {
   shellStarting ??= (async () => {
@@ -140,6 +174,8 @@ const ensureShellOwner = () => {
     const child = launchRuntime({
       ...childEnv(),
       RESPONSIVELY_USER_DATA_DIR: process.env.RESPONSIVELY_SHELL_USER_DATA_DIR,
+      // An agent opening one Session must not also reopen the user's previous ones.
+      RESPONSIVELY_SHELL_SPAWNED: 'true',
     });
     if (!child.pid) throw new Error('Could not start the Responsively shell');
     for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -390,6 +426,16 @@ export class SessionManager {
             if (fs.existsSync(dir)) await shell.trashItem(dir);
             this.registry.remove(id);
             return {...old, status: 'stopped' as const};
+          }
+          case 'reset': {
+            // The profile is the unit of isolation: move it whole to Trash, keep the definition.
+            if (req.confirmed !== true) throw new Error('Explicit reset confirmation is required');
+            await this.inspect(id);
+            if (this.readLease(id)) throw new Error('Stop the session before resetting its data');
+            const dir = this.registry.dataDir(id);
+            if (fs.existsSync(dir)) await shell.trashItem(dir);
+            this.errors.delete(id);
+            return this.inspect(id);
           }
           default:
             throw new Error('Unsupported operation');

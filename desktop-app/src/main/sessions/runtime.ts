@@ -34,6 +34,8 @@ export const showSessions = (
   keyboard = false,
   anchor?: Electron.Rectangle
 ) => {
+  // In the shell, management always appears under the menu-bar icon, never beside the Dock.
+  if (!anchor && tray && !tray.isDestroyed()) anchor = tray.getBounds();
   const owner = getWindow();
   const cursor = screen.getCursorScreenPoint();
   const display = anchor
@@ -104,6 +106,24 @@ export const showSessions = (
   });
   void win.loadURL(`${resolveHtmlPath('index.html')}?sessionsPanel=1`);
 };
+/** The menu-bar menu is the launcher; without a menu-bar icon, fall back to the manager. */
+export const showLauncher = async () => {
+  if (!tray || tray.isDestroyed()) {
+    showSessions(false, '', true);
+    return;
+  }
+  // A fresh list when the controller answers quickly; otherwise the last refresh.
+  const items = await Promise.race([
+    sessionRequest({operation: 'list'}).then(
+      (value) => value as SessionInfo[],
+      () => cached
+    ),
+    new Promise<SessionInfo[]>((resolve) => {
+      setTimeout(() => resolve(cached), 1500);
+    }),
+  ]);
+  if (tray && !tray.isDestroyed()) tray.popUpContextMenu(statusMenu(items));
+};
 export const initSessionsTray = () => {
   if (
     process.platform !== 'darwin' ||
@@ -117,9 +137,8 @@ export const initSessionsTray = () => {
     : path.join(__dirname, '../../assets');
   tray = new Tray(path.join(assets, 'sessionsTemplate.png'));
   tray.setToolTip('Responsively Sessions');
-  const open = () => showSessions(false, '', false, tray!.getBounds());
-  tray.on('click', open);
-  tray.on('right-click', open);
+  tray.on('click', () => void showLauncher());
+  tray.on('right-click', () => void showLauncher());
   app.on('will-quit', () => tray?.destroy());
   return tray;
 };
@@ -129,6 +148,24 @@ const menuAction = (id: string, operation: 'open' | 'focus' | 'stop') => () => {
   );
 };
 let cached: SessionInfo[] = [];
+/** The menu-bar launcher: Sessions to open or focus, then management and Quit. */
+const statusMenu = (items: SessionInfo[]) =>
+  Menu.buildFromTemplate([
+    ...(items.length
+      ? [...items]
+          .sort((a, b) => Number(b.status === 'running') - Number(a.status === 'running'))
+          .map((s): MenuItemConstructorOptions => ({
+            label: `${s.status === 'running' ? '●' : '○'}  ${s.name.slice(0, 60)}`,
+            enabled: ['running', 'stopped', 'error'].includes(s.status),
+            click: menuAction(s.id, s.status === 'running' ? 'focus' : 'open'),
+          }))
+      : [{label: 'No Sessions', enabled: false}]),
+    {type: 'separator'},
+    {label: 'New Session…', click: () => showSessions(true)},
+    {label: 'Manage Sessions…', click: () => showSessions()},
+    {type: 'separator'},
+    {label: 'Quit Responsively', click: () => app.quit()},
+  ]);
 const dockLabel = (s: SessionInfo) => {
   let site = '';
   try {

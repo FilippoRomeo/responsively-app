@@ -194,3 +194,29 @@ it.each(staleCases)(
     }
   }
 );
+
+it('resets a stopped Session only after confirmation and keeps it listed', async () => {
+  const item: SessionInfo = {
+    id: 'f7a24040-4107-42b3-86c5-6c09ca126dbf',
+    name: 'Keep me',
+    createdAt: '2026-09-23T00:00:00.000Z',
+    updatedAt: '2026-09-23T00:00:00.000Z',
+    status: 'stopped',
+  };
+  const send = vi.fn(async (request: {operation: string}) =>
+    request.operation === 'list' ? [item] : item
+  );
+  render(<SessionsManager request={send} onClose={vi.fn()} native />);
+  fireEvent.click(await screen.findByRole('button', {name: 'Reset'}));
+  expect(screen.getByRole('heading', {name: 'Reset “Keep me”?'})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: 'Cancel'}));
+  expect(send).not.toHaveBeenCalledWith(expect.objectContaining({operation: 'reset'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Reset'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Reset Data'}));
+  expect(await screen.findByRole('status', {name: ''})).toHaveTextContent(
+    'Session data moved to Trash.'
+  );
+  expect(send).toHaveBeenCalledWith({operation: 'reset', id: item.id, confirmed: true});
+  expect(screen.getByTestId(`session-${item.id}`)).toHaveTextContent('Keep me');
+  expect(document.activeElement).toBe(screen.getByTestId('sessions-manager'));
+});

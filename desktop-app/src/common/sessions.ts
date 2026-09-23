@@ -21,7 +21,7 @@ export interface SessionInfo extends SessionDefinition {
   error?: string;
 }
 export type SessionOperation =
-  'list' | 'get' | 'create' | 'rename' | 'open' | 'focus' | 'stop' | 'delete';
+  'list' | 'get' | 'create' | 'rename' | 'open' | 'focus' | 'stop' | 'delete' | 'reset';
 export interface SessionRequest {
   operation: SessionOperation;
   id?: string;

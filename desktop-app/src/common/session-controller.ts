@@ -64,9 +64,13 @@ export const stopAllSessions = async (
   timeoutMs: number
 ) => {
   const names = new Map<string, string>();
+  const active: string[] = [];
   const attempt = (async () => {
     const all = (await request({operation: 'list'})) as SessionInfo[];
-    for (const s of all) names.set(s.id, s.name);
+    for (const s of all) {
+      names.set(s.id, s.name);
+      if (s.status === 'running' || s.status === 'starting') active.push(s.id);
+    }
     await Promise.all(
       all
         .filter((s) => s.status !== 'stopped')
@@ -81,7 +85,25 @@ export const stopAllSessions = async (
     }),
   ]);
   clearTimeout(timer);
-  return runningIds().map((id) => ({id, name: names.get(id) ?? id}));
+  return {active, blocked: runningIds().map((id) => ({id, name: names.get(id) ?? id}))};
+};
+
+/** Reopen Sessions left active at the last clean Quit; deleted or running ones are skipped. */
+export const reopenSessions = async (
+  request: (value: SessionRequest) => Promise<SessionInfo | SessionInfo[]>,
+  ids: string[]
+) => {
+  const opened: string[] = [];
+  for (const id of ids) {
+    try {
+      if (((await request({operation: 'get', id})) as SessionInfo).status !== 'stopped') continue;
+      await request({operation: 'open', id});
+      opened.push(id);
+    } catch {
+      /* Deleted since Quit, or failed to start: the manager shows its state. */
+    }
+  }
+  return opened;
 };
 
 export const sessionToolOperations = {
