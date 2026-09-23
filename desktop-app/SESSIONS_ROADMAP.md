@@ -20,11 +20,12 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 ## 1. Baseline (✅ verified)
 
-- **Code:** `main` @ `b2cc6580`, on Electron 43.1.1.
-- **Installed:** `~/Applications/ResponsivelyMCP.app`, `app.asar` hash `d0baa56f…`.
-- **Rollback:** `.work/install-backup-20260923-094410/`.
+- **Code:** `main` @ `e484db9e553ea6311c9cbb211a5e647428087808` (merge of PR #6, milestone M1), on Electron 43.1.1.
+- **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `e484db9e`: `app.asar` SHA-256 `11ab5180b8f04eeadbc57015a954d21d0cc5b028c9e7139a5ed965c4121a5137`; merged, installed and smoke-tested 2026-09-23.
+- **Rollback:** `.work/install-backup-20260923-122449/` (the previous `b2cc6580` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of both data folders).
 - **Parked:** `refactor/sessions-process-roles` (validated, on GitHub, not merged).
-- **In progress:** M1 on `feature/sessions-mac-window-quit`, validated in test package 011; becomes the baseline after merge, install and smoke test.
+
+How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md).
 
 ## 2. How the product should behave (the spec)
 
@@ -46,22 +47,22 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 ## 3. Known problems, with evidence
 
-| ID     | Problem                                                                                                           | Evidence                                                                       | Severity |
-| ------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------- |
-| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error"                                            | ✅ tested on 009; **fixed in M1**                                              | High     |
-| **B2** | ⌘W or the red button leaves an invisible Session running, in front                                                | ✅ tested; **fixed in M1**                                                     | High     |
-| **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                     | Medium   |
-| **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                        | Low      |
-| **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                      | Low      |
-| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read                                                                   | Medium   |
-| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read                                                                   | Low      |
-| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                     | Low      |
-| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured                                                | Low      |
-| **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); recheck after installing M1 | ?        |
+| ID     | Problem                                                                                                           | Evidence                                                                                   | Severity |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------- |
+| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error"                                            | ✅ tested on 009; **fixed in M1**                                                          | High     |
+| **B2** | ⌘W or the red button leaves an invisible Session running, in front                                                | ✅ tested; **fixed in M1**                                                                 | High     |
+| **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                                 | Medium   |
+| **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                                    | Low      |
+| **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                                  | Low      |
+| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read                                                                               | Medium   |
+| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read                                                                               | Low      |
+| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                                 | Low      |
+| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured                                                            | Low      |
+| **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); M1 is installed, so observe in real use | ?        |
 
 ## 4. Roadmap (each milestone = one branch, one test package, one PR, one install)
 
-### M1: "Windows and Quit behave like a Mac app" (fixes B1, B2, B3, B4) — implemented, validated in package 011
+### M1: "Windows and Quit behave like a Mac app" (fixes B1, B2, B3, B4) — ✅ done: merged (PR #6, `e484db9e`), installed and smoke-tested
 
 - ⌘W / red close button → stops that Session cleanly, with correct status and nothing left in front.
 - ⌘Q in a Session window → a notice, then a second ⌘Q quits the whole app through the existing safe Quit (stop all, remember, no relaunch). If no shell is running (agent-only), ⌘Q closes just that Session. The menu-bar **Quit Responsively** still quits immediately.
@@ -93,18 +94,9 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 Only if a real need appears: Electron 44 or an upstream merge, merging the refactor branch, restructuring `service.ts`, Windows/Linux work.
 
-## 5. How every milestone runs (the proven routine)
+## 5. How every milestone runs
 
-1. Branch from `main`; make the code change plus unit tests; each new test must fail without its fix.
-2. Type check, full lint (excluding `.work`), all unit tests.
-3. A test package with its own bundle ID and separate data, running the full test list.
-   - Keystrokes are only sent after checking that the test app is in front.
-   - Your clipboard is saved first and restored afterwards.
-   - Screenshots cover all 3 monitors.
-4. PR with a truthful description; CI green (unit, MCP, end-to-end, package).
-5. Your approval, then merge; main's CI green.
-6. Build from main, then back up (copy and hash-check) with the app fully quit, then your go-ahead, then install, then smoke test.
-7. Update the memory baseline.
+Follow [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md). It is the single canonical process (gates A–F, test packages, backup-first install, hard rules); this roadmap intentionally doesn't repeat it, so the two can't drift apart.
 
 ## 6. Decisions
 

@@ -34,10 +34,10 @@ A single controller owns the Session registry and lifecycle. Session identity ne
 The current known-good source baseline is:
 
 ```text
-b2cc658040a33d350cd434948012b471376753ef
+e484db9e553ea6311c9cbb211a5e647428087808
 ```
 
-That baseline has been validated as a packaged and installed macOS app. Later fixes (for example the window/Quit milestone M1) become the baseline only after they are merged, installed and smoke-tested. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
+That baseline (`main` after milestone M1: window close and ⌘Q behaviour, new windows on the current monitor) has been merged, installed and smoke-tested as a packaged macOS app. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
 
 ## Current product model
 
@@ -58,6 +58,7 @@ See:
 
 - [Sessions architecture and lifecycle](desktop-app/SESSIONS.md)
 - [Sessions roadmap, verified issues and planned milestones](desktop-app/SESSIONS_ROADMAP.md)
+- [Sessions execution and validation process](desktop-app/SESSIONS_PROCESS.md)
 
 ## Supported build
 
@@ -102,7 +103,7 @@ git rev-parse HEAD
 Expected stable baseline at the time of writing:
 
 ```text
-b2cc658040a33d350cd434948012b471376753ef
+e484db9e553ea6311c9cbb211a5e647428087808
 ```
 
 ### 2. Install dependencies
@@ -126,7 +127,7 @@ The packaging script:
 - ad-hoc signs and verifies the bundle;
 - installs it as `~/Applications/ResponsivelyMCP.app`.
 
-**Important:** if `~/Applications/ResponsivelyMCP.app` already exists with the expected bundle ID, the script replaces that app bundle. It does not remove the Application Support data directories, but back up anything important before updating a working installation.
+**Important:** use this script for a **first install**. If `~/Applications/ResponsivelyMCP.app` already exists with the expected bundle ID, the script deletes and replaces that app bundle without a backup. It does not remove the Application Support data directories, but to **update a working installation**, follow the backup-first install gate (Gate F) in [SESSIONS_PROCESS.md](desktop-app/SESSIONS_PROCESS.md) instead.
 
 ### 4. Launch it
 
