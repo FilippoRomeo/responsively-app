@@ -3,6 +3,7 @@ import {subMenuHelp} from './help';
 import {getViewMenu} from './view';
 import {AppUpdater} from '../app-updater';
 import {sessionsMenu} from '../sessions/runtime';
+import {quitFromSessionWindow} from '../sessions/window-lifecycle';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;
@@ -82,7 +83,9 @@ export default class MenuBuilder {
           label: 'Quit',
           accelerator: 'Command+Q',
           click: () => {
-            app.quit();
+            // In a Session window ⌘Q quits the whole app, after a second press.
+            if (process.env.RESPONSIVELY_SESSION_ID) void quitFromSessionWindow(this.mainWindow);
+            else app.quit();
           },
         },
       ],

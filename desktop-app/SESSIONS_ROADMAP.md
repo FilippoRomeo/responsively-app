@@ -24,46 +24,47 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 - **Installed:** `~/Applications/ResponsivelyMCP.app`, `app.asar` hash `d0baa56f…`.
 - **Rollback:** `.work/install-backup-20260923-094410/`.
 - **Parked:** `refactor/sessions-process-roles` (validated, on GitHub, not merged).
+- **In progress:** M1 on `feature/sessions-mac-window-quit`, validated in test package 011; becomes the baseline after merge, install and smoke test.
 
 ## 2. How the product should behave (the spec)
 
-| Area | Behaviour | Today |
-| --- | --- | --- |
-| **Launch** | Last-active Sessions reopen; nothing else pops up | ✅ |
-| **Launcher** (menu-bar icon or Dock click) | Sessions (● running, click to focus; ○ stopped, click to open), then New…, Manage…, Quit | ✅ |
-| **Manager** | Opens under the menu-bar icon on the monitor you're using. Create, Rename, Stop, Reset, Delete, Search | ✅ |
-| **Session window** | A normal window; copy, paste and undo work | ✅ |
-| **Toolbar in a Session** | Shows **which Session** you're in; opens the same manager | ❌ shows only "Sessions" |
-| **⌘W / red close button** | Closes the window and **stops that Session** (data kept, status "stopped") | ❌ runs on invisibly and stays the front app |
-| **⌘Q anywhere** | Quits the **whole app**, with a notice first (see decision D1) | ❌ quits only that Session and marks it "error" |
-| **Quit** (menu-bar menu) | Stops everything and remembers what was open; nothing relaunches | ✅ |
-| **New Session window** | Opens **on your current monitor**, then remembers its own position | ❌ always opens on the laptop screen |
-| **Reset** | Stopped Sessions only; profile to the Trash; name and URL kept | ✅ |
-| **Agents (MCP)** | Create/open/focus/stop only; an agent-started shell doesn't reopen your Sessions | ✅ |
-| **Noise** | No "What's new" card in Sessions; no error logs on new profiles | ❌ card appears in every new Session; migration errors on every new profile |
-| **Settings (later)** | "Start clean every time" per Session; "Reset everything" | ❌ not built |
+| Area                                       | Behaviour                                                                                              | Today                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| **Launch**                                 | Last-active Sessions reopen; nothing else pops up                                                      | ✅                                                              |
+| **Launcher** (menu-bar icon or Dock click) | Sessions (● running, click to focus; ○ stopped, click to open), then New…, Manage…, Quit               | ✅                                                              |
+| **Manager**                                | Opens under the menu-bar icon on the monitor you're using. Create, Rename, Stop, Reset, Delete, Search | ✅                                                              |
+| **Session window**                         | A normal window; copy, paste and undo work                                                             | ✅                                                              |
+| **Toolbar in a Session**                   | Shows **which Session** you're in; opens the same manager                                              | ❌ shows only "Sessions"                                        |
+| **⌘W / red close button**                  | Closes the window and **stops that Session** (data kept, status "stopped")                             | ✅ M1 (package 011)                                             |
+| **⌘Q in a Session window**                 | First press shows a notice; a second press within 2.5 s quits the **whole app**                        | ✅ M1 (package 011)                                             |
+| **Quit** (menu-bar menu)                   | Stops everything and remembers what was open; nothing relaunches                                       | ✅                                                              |
+| **New Session window**                     | Opens **on your current monitor**, then remembers its own position                                     | ✅ M1 (package 011)                                             |
+| **Reset**                                  | Stopped Sessions only; profile to the Trash; name and URL kept                                         | ✅                                                              |
+| **Agents (MCP)**                           | Create/open/focus/stop only; an agent-started shell doesn't reopen your Sessions                       | ✅                                                              |
+| **Noise**                                  | No "What's new" card in Sessions; no error logs on new profiles                                        | ⚠️ card gone (M1); migration errors on every new profile remain |
+| **Settings (later)**                       | "Start clean every time" per Session; "Reset everything"                                               | ❌ not built                                                    |
 
 ## 3. Known problems, with evidence
 
-| ID | Problem | Evidence | Severity |
-| --- | --- | --- | --- |
-| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error" | ✅ tested on 009 | High: you hit it daily |
-| **B2** | ⌘W or the red button leaves an invisible Session running, in front | ✅ tested | High |
-| **B3** | New Session windows open on the laptop screen, not your current one | ✅ tested; cause at `window-state.ts:24-29` | Medium |
-| **B4** | "What's new" card in every new Session | ✅ seen in screenshots | Low |
-| **B5** | Migration error logs on every new profile | ✅ seen in logs; upstream has a small fix | Low |
-| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel) | 🔍 code-read | Medium |
-| **U2** | Toolbar doesn't show the current Session's name | 🔍 code-read | Low |
-| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots | Low |
-| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show | 🔍 code-read, cost not measured | Low |
-| **Q1** | "Odd behaviour switching between Responsively and iTerm" | ❓ probably B2 (the invisible app stays in front); recheck after M1 | ? |
+| ID     | Problem                                                                                                           | Evidence                                                                       | Severity |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------- |
+| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error"                                            | ✅ tested on 009; **fixed in M1**                                              | High     |
+| **B2** | ⌘W or the red button leaves an invisible Session running, in front                                                | ✅ tested; **fixed in M1**                                                     | High     |
+| **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                     | Medium   |
+| **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                        | Low      |
+| **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                      | Low      |
+| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read                                                                   | Medium   |
+| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read                                                                   | Low      |
+| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                     | Low      |
+| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured                                                | Low      |
+| **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); recheck after installing M1 | ?        |
 
 ## 4. Roadmap (each milestone = one branch, one test package, one PR, one install)
 
-### M1: "Windows and Quit behave like a Mac app" (fixes B1, B2, B3, B4)
+### M1: "Windows and Quit behave like a Mac app" (fixes B1, B2, B3, B4) — implemented, validated in package 011
 
 - ⌘W / red close button → stops that Session cleanly, with correct status and nothing left in front.
-- ⌘Q anywhere → a notice, then quit the whole app through the existing safe Quit (stop all, remember, no relaunch). If no shell is running (agent-only), ⌘Q closes just that Session.
+- ⌘Q in a Session window → a notice, then a second ⌘Q quits the whole app through the existing safe Quit (stop all, remember, no relaunch). If no shell is running (agent-only), ⌘Q closes just that Session. The menu-bar **Quit Responsively** still quits immediately.
 - New Session windows open on the monitor under your mouse.
 - No "What's new" card in Sessions.
 - **Done when:** a package passes today's exact tests (⌘W, red button, single and double ⌘Q, a new window on display 2, restore after Quit) plus the existing checks; then CI is green, your go-ahead, install and smoke test.
@@ -105,10 +106,8 @@ Only if a real need appears: Electron 44 or an upstream merge, merging the refac
 6. Build from main, then back up (copy and hash-check) with the app fully quit, then your go-ahead, then install, then smoke test.
 7. Update the memory baseline.
 
-## 6. Decisions I need from you
+## 6. Decisions
 
-- **D1, ⌘Q style:** (a) press ⌘Q twice, with a notice after the first, or (b) a "Quit Responsively? N Sessions will reopen next time" dialog.
-- **D2, closing a window:** should ⌘W stop that Session (my recommendation, like Chrome closing a profile) or just hide it?
-- **D3, scope:** M1 only for now, or M1 + M2 together?
-
-Suggested starting point: choose your preferred D1 style, **stop** on close for D2, and **M1 only** for D3.
+- **D1, ⌘Q style:** press ⌘Q twice, with a notice after the first press. ✅ decided
+- **D2, closing a window:** ⌘W stops that Session. ✅ decided
+- **D3, scope:** M1 only; M2 is decided after using M1. ✅ decided

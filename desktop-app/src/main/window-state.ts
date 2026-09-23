@@ -17,13 +17,14 @@ const intersects = (a: Rectangle, b: {x?: number; y?: number; width: number; hei
 };
 
 /**
- * Restores the last window bounds, falling back to the full work area when
- * nothing was saved or the saved bounds no longer land on a connected display
- * (e.g. an unplugged monitor).
+ * Restores the last window bounds, falling back to the full work area of the
+ * monitor under the pointer (where the user is working) when nothing was saved
+ * or the saved bounds no longer land on a connected display (e.g. an unplugged
+ * monitor).
  */
 export const getSavedWindowState = (): WindowState => {
-  const {width, height} = screen.getPrimaryDisplay().workAreaSize;
-  const fallback: WindowState = {width, height, isMaximized: false};
+  const {workArea} = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const fallback: WindowState = {...workArea, isMaximized: false};
   const saved = store.get('windowState') as Partial<WindowState> | undefined;
   if (!saved?.width || !saved?.height) {
     return fallback;

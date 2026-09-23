@@ -88,10 +88,13 @@ const childEnv = (): NodeJS.ProcessEnv => {
 };
 
 // A capability-protected presence beacon, not a second Sessions authority.
+const shellRequest = z.object({operation: z.enum(['status', 'quit'])}).strict();
 export const startShellOwner = async (onQuitBlocked: (message: string) => void) => {
-  const {server, endpoint} = await serve(secret(), async () => ({
-    userDataDir: app.getPath('userData'),
-  }));
+  const {server, endpoint} = await serve(secret(), async (body) => {
+    // A Session window's ⌘Q asks the shell to quit the whole app (stop, remember, exit).
+    if (shellRequest.parse(body).operation === 'quit') setTimeout(() => app.quit(), 50);
+    return {userDataDir: app.getPath('userData')};
+  });
   atomicWrite(shellFile(), endpoint);
   // Quit means the whole app. It completes only when every Session has stopped
   // (data kept); otherwise the controller would relaunch this shell to own them.
@@ -156,6 +159,16 @@ export const restoreSessions = async () => {
   }
   fs.rmSync(restoreFile(), {force: true});
   await reopenSessions(sessionRequest, ids);
+};
+
+/** Ask the shell to quit the whole app; false when no shell is running (agent-only Sessions). */
+export const requestShellQuit = async () => {
+  try {
+    await call(read<Endpoint>(shellFile()), {operation: 'quit'}, 2000);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 let shellStarting: Promise<void> | undefined;
