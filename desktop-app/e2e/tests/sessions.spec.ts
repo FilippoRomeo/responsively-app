@@ -1,8 +1,46 @@
 import {test, expect} from '../fixtures/electron-app';
+import {ElectronApplication} from '@playwright/test';
 import {SessionInfo, SessionRequest} from '../../src/common/sessions';
 import fs from 'fs';
 import path from 'path';
 import {call, Endpoint} from '../../src/common/session-rpc';
+
+const openManager = async (electronApp: ElectronApplication) => {
+  await electronApp.evaluate(({Menu, BrowserWindow}) => {
+    const item = Menu.getApplicationMenu()
+      ?.items.find((entry) => entry.label === 'Sessions')
+      ?.submenu?.items.find((entry) => entry.label === 'Manage Sessions…');
+    item?.click?.(item, BrowserWindow.getFocusedWindow(), {triggeredByAccelerator: false});
+  });
+  await expect
+    .poll(
+      () =>
+        electronApp.windows().filter((window) => window.url().includes('sessionsPanel=1')).length
+    )
+    .toBe(1);
+  const panel = electronApp.windows().find((window) => window.url().includes('sessionsPanel=1'))!;
+  await expect
+    .poll(() =>
+      electronApp.evaluate(
+        ({BrowserWindow}) =>
+          BrowserWindow.getAllWindows().filter((window) =>
+            window.webContents.getURL().includes('sessionsPanel=1')
+          ).length
+      )
+    )
+    .toBe(1);
+  await expect
+    .poll(() =>
+      electronApp.evaluate(({BrowserWindow}) =>
+        BrowserWindow.getAllWindows()
+          .find((window) => window.webContents.getURL().includes('sessionsPanel=1'))
+          ?.isVisible()
+      )
+    )
+    .toBe(true);
+  await expect(panel.getByTestId('sessions-manager')).toBeVisible();
+  return panel;
+};
 
 test('native Sessions menu and human lifecycle share persistent identity', async ({
   app,
@@ -71,6 +109,7 @@ test('native Sessions menu and human lifecycle share persistent identity', async
     await row.getByRole('button', {name: 'Delete', exact: true}).click();
     await mainWindow.getByRole('button', {name: 'Delete Session', exact: true}).click();
     await expect(row).toHaveCount(0);
+    await expect(mainWindow.getByTestId('sessions-manager')).toBeFocused();
     id = undefined;
     await mainWindow.keyboard.press('Escape');
     await expect(mainWindow.getByTestId('sessions-manager')).toBeHidden();
@@ -81,25 +120,17 @@ test('native Sessions menu and human lifecycle share persistent identity', async
 
 test('native Manage reuses one compact Sessions host', async ({app, electronApp}) => {
   await app.dismissModals();
-  const invoke = () =>
-    electronApp.evaluate(({Menu, BrowserWindow}) => {
-      const item = Menu.getApplicationMenu()
-        ?.items.find((entry) => entry.label === 'Sessions')
-        ?.submenu?.items.find((entry) => entry.label === 'Manage Sessions…');
-      item?.click?.(item, BrowserWindow.getFocusedWindow(), {triggeredByAccelerator: false});
-    });
-  const panelPromise = electronApp.waitForEvent('window');
-  await invoke();
-  const panel = await panelPromise;
-  await panel.waitForURL(/sessionsPanel=1/);
-  await expect(panel.getByTestId('sessions-manager')).toBeVisible();
-  const firstCount = await electronApp.evaluate(
-    ({BrowserWindow}) => BrowserWindow.getAllWindows().length
-  );
-  await invoke();
-  expect(
-    await electronApp.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().length)
-  ).toBe(firstCount);
+  const panel = await openManager(electronApp);
+  const hostId = () =>
+    electronApp.evaluate(
+      ({BrowserWindow}) =>
+        BrowserWindow.getAllWindows().find((window) =>
+          window.webContents.getURL().includes('sessionsPanel=1')
+        )?.id
+    );
+  const firstHostId = await hostId();
+  await openManager(electronApp);
+  expect(await hostId()).toBe(firstHostId);
   await panel.keyboard.press('Escape');
   await expect
     .poll(() =>
@@ -110,7 +141,7 @@ test('native Manage reuses one compact Sessions host', async ({app, electronApp}
       )
     )
     .toBe(false);
-  await invoke();
+  await openManager(electronApp);
   await expect
     .poll(() =>
       electronApp.evaluate(({BrowserWindow}) =>
@@ -129,17 +160,7 @@ test('both processes retain manager content after creating an open Session', asy
 }) => {
   test.setTimeout(120_000);
   await app.dismissModals();
-  const invoke = () =>
-    electronApp.evaluate(({Menu, BrowserWindow}) => {
-      const item = Menu.getApplicationMenu()
-        ?.items.find((entry) => entry.label === 'Sessions')
-        ?.submenu?.items.find((entry) => entry.label === 'Manage Sessions…');
-      item?.click?.(item, BrowserWindow.getFocusedWindow(), {triggeredByAccelerator: false});
-    });
-  const panelPromise = electronApp.waitForEvent('window');
-  await invoke();
-  const panel = await panelPromise;
-  await expect(panel.getByTestId('sessions-manager')).toBeVisible();
+  const panel = await openManager(electronApp);
   await panel.getByRole('button', {name: 'New Session', exact: true}).click();
   await panel.getByLabel('Name', {exact: true}).fill('Regression B');
   await panel.getByLabel('Open immediately').check();
@@ -172,10 +193,10 @@ test('both processes retain manager content after creating an open Session', asy
         )
         .toBe(true);
     }
-    await invoke();
+    await openManager(electronApp);
     await expect(panel.getByTestId(`session-${id}`)).toContainText('Regression B');
     await panel.keyboard.press('Escape');
-    await invoke();
+    await openManager(electronApp);
     await expect(panel.getByTestId(`session-${id}`)).toContainText('Regression B');
     expect(
       await electronApp.evaluate(
@@ -202,6 +223,6 @@ test('both processes retain manager content after creating an open Session', asy
   } finally {
     if (id) await request({operation: 'stop', id}).catch(() => {});
   }
-  await invoke();
+  await openManager(electronApp);
   await expect(panel.getByTestId('sessions-manager')).toBeVisible();
 });

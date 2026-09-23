@@ -138,6 +138,13 @@ export default function SessionsManager({
       if (value.operation === 'stop' && (Array.isArray(result) || result.status !== 'stopped'))
         throw new Error('Session stop could not be verified.');
       if (!mounted.current) return;
+      if (
+        value.operation === 'delete' ||
+        value.operation === 'rename' ||
+        value.operation === 'stop' ||
+        (value.operation === 'create' && value.open === false)
+      )
+        panelRef.current?.focus();
       setEditing(null);
       setDeleting(null);
       draft.current = null;
