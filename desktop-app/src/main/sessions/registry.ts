@@ -76,11 +76,17 @@ export class SessionRegistry {
     atomicWrite(this.file, {version: 1, sessions: next});
     this.definitions = next;
   }
+  private uniqueName(name: string, exceptId?: string) {
+    const parsed = sessionName.parse(name);
+    if (this.definitions.some((s) => s.id !== exceptId && s.name === parsed))
+      throw new Error(`A Session named “${parsed}” already exists.`);
+    return parsed;
+  }
   create(name: string, lastUrl?: string) {
     const now = new Date().toISOString();
     const item = {
       id: randomUUID(),
-      name: sessionName.parse(name),
+      name: this.uniqueName(name),
       createdAt: now,
       updatedAt: now,
       lastUrl,
@@ -95,6 +101,7 @@ export class SessionRegistry {
     const item = definition.parse({
       ...this.get(id),
       ...values,
+      ...(values.name === undefined ? {} : {name: this.uniqueName(values.name, id)}),
       updatedAt: new Date().toISOString(),
     });
     this.save(this.definitions.map((s) => (s.id === id ? item : s)));

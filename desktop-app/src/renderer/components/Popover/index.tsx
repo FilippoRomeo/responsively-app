@@ -9,6 +9,7 @@ interface Props {
   triggerTitle?: string;
   anchor?: ComponentProps<typeof PopoverPanel>['anchor'];
   className?: string;
+  keepMounted?: boolean;
   /** Observes Headless UI's internal open state (e.g. to clear unread dots). */
   onOpenChange?: (open: boolean) => void;
   children: ComponentProps<typeof PopoverPanel>['children'];
@@ -46,6 +47,7 @@ const Popover = ({
   triggerTitle,
   anchor = 'bottom end',
   className,
+  keepMounted = false,
   onOpenChange,
   children,
 }: Props) => {
@@ -66,6 +68,7 @@ const Popover = ({
           <PopoverPanel
             anchor={anchor}
             transition
+            unmount={!keepMounted}
             className={cx(
               'z-50 rounded-lg border border-line bg-panel text-fg shadow-elevated transition duration-100 ease-out focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0',
               className

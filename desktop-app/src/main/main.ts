@@ -42,8 +42,13 @@ import {wireWebviewSecurity} from './webview-registry';
 import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
-import {startController} from './sessions/service';
-import {initSessions, startSessionRuntime} from './sessions/runtime';
+import {startController, startShellOwner} from './sessions/service';
+import {
+  initSessions,
+  initSessionsTray,
+  showSessions,
+  startSessionRuntime,
+} from './sessions/runtime';
 
 initLogging();
 initCrashHandlers();
@@ -85,6 +90,8 @@ app.on('second-instance', (_event, argv) => {
       mainWindow.restore();
     }
     mainWindow.focus();
+  } else if (!process.env.RESPONSIVELY_SESSION_ID) {
+    showSessions(false, '', true);
   }
   // On Windows/Linux, protocol deep links and CLI URLs arrive on the second
   // instance's argv rather than through 'open-url'.
@@ -251,6 +258,7 @@ const wireSessionOnce = () => {
 
 let appUpdater: AppUpdater | null = null;
 let isBrowserSyncInitiated = false;
+let menuBuilder: MenuBuilder | null = null;
 
 const createWindow = async () => {
   if (process.env.RESPONSIVELY_SESSION_ID) urlToOpen = store.get('homepage');
@@ -285,6 +293,17 @@ const createWindow = async () => {
       webviewTag: true,
     },
   });
+  if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID) {
+    // Accessory apps have windows but no menu bar; retain the local Sessions shortcuts.
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown' || !input.meta || !input.shift || input.alt || input.control)
+        return;
+      const key = input.key.toLowerCase();
+      if (key !== 'm' && key !== 'n') return;
+      event.preventDefault();
+      showSessions(key === 'n', '', true);
+    });
+  }
   if (windowState.isMaximized) {
     mainWindow.maximize();
   }
@@ -357,7 +376,7 @@ const createWindow = async () => {
     mainWindow = null;
   });
 
-  const menuBuilder = new MenuBuilder(mainWindow, appUpdater!);
+  menuBuilder = new MenuBuilder(mainWindow, appUpdater!);
   menuBuilder.buildMenu();
 
   // Open urls in the user's browser
@@ -409,21 +428,36 @@ app
   .then(async () => {
     if (!gotSingleInstanceLock) return;
     if (process.env.RESPONSIVELY_SESSION_CONTROLLER === 'true') {
-      app.dock?.hide();
+      if (process.platform === 'darwin') app.setActivationPolicy('prohibited');
       await startController();
       return;
     }
+    if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID)
+      app.setActivationPolicy('accessory');
     if (process.env.RESPONSIVELY_SESSION_URL)
       store.set('homepage', process.env.RESPONSIVELY_SESSION_URL);
     wireSessionOnce();
     appUpdater = new AppUpdater();
-    initSessions(getMainWindow, createWindow);
-    await createWindow();
+    initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
+    if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
+      await startShellOwner((message) => showSessions(false, message, true));
+    if (
+      process.platform === 'darwin' &&
+      !process.env.RESPONSIVELY_SESSION_ID &&
+      process.env.E2E_TEST !== 'true'
+    ) {
+      menuBuilder = new MenuBuilder(null, appUpdater);
+      menuBuilder.buildMenu();
+      const sessionsTray = initSessionsTray();
+      showSessions(false, '', false, sessionsTray?.getBounds());
+    } else {
+      await createWindow();
+    }
     await startSessionRuntime();
     app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      if (mainWindow === null) createWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+      else if (process.env.RESPONSIVELY_SESSION_ID) void createWindow();
+      else showSessions(false, '', true);
     });
   })
   .catch((error) => {

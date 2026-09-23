@@ -6,10 +6,20 @@ import {SessionInfo, SessionRuntime} from '../../common/sessions';
 import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
-import {controllerClient, controllerRoot} from '../../common/session-controller';
+import {controllerClient, controllerRoot, stopAllSessions} from '../../common/session-controller';
 
 export const sessionsRoot = () => controllerRoot(app.getPath('appData'));
 export const runtimeFile = (id: string) => path.join(sessionsRoot(), 'runtimes', `${id}.json`);
+const shellFile = () => path.join(sessionsRoot(), 'shell.json');
+const runningIds = () => {
+  const dir = path.join(sessionsRoot(), 'runtimes');
+  return fs.existsSync(dir)
+    ? fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => f.slice(0, -5))
+    : [];
+};
 export interface RuntimeLease extends Endpoint {
   id: string;
   pid: number;
@@ -59,8 +69,88 @@ const childEnv = (): NodeJS.ProcessEnv => {
   return {
     ...env,
     RESPONSIVELY_SESSIONS_ROOT: sessionsRoot(),
+    RESPONSIVELY_SHELL_USER_DATA_DIR:
+      process.env.RESPONSIVELY_SHELL_USER_DATA_DIR ||
+      (!process.env.RESPONSIVELY_SESSION_ID && !process.env.RESPONSIVELY_SESSION_CONTROLLER
+        ? app.getPath('userData')
+        : undefined),
     RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
   };
+};
+
+// A capability-protected presence beacon, not a second Sessions authority.
+export const startShellOwner = async (onQuitBlocked: (message: string) => void) => {
+  const {server, endpoint} = await serve(secret(), async () => ({
+    userDataDir: app.getPath('userData'),
+  }));
+  atomicWrite(shellFile(), endpoint);
+  // Quit means the whole app. It completes only when every Session has stopped
+  // (data kept); otherwise the controller would relaunch this shell to own them.
+  let stopping = false;
+  app.on('before-quit', (event) => {
+    if (runningIds().length === 0) return;
+    event.preventDefault();
+    if (stopping) return;
+    stopping = true;
+    // ponytail: 30s cap only guards a hung controller; its own stop is bounded (~20s).
+    void (async () => {
+      const blocked = await stopAllSessions(sessionRequest, runningIds, 30_000);
+      stopping = false;
+      if (blocked.length === 0) {
+        app.quit();
+        return;
+      }
+      const list = blocked
+        .map(({id, name}) => {
+          try {
+            return `${name} (process ${read<RuntimeLease>(runtimeFile(id)).pid})`;
+          } catch {
+            return name;
+          }
+        })
+        .join(', ');
+      onQuitBlocked(
+        `Quit cancelled: ${list} did not stop. No data was deleted. Stop it here, or end that process in Activity Monitor, then quit again.`
+      );
+    })();
+  });
+  app.on('will-quit', () => {
+    server.close();
+    try {
+      if (read<Endpoint>(shellFile()).token === endpoint.token) fs.unlinkSync(shellFile());
+    } catch {
+      /* A newer shell may own the beacon. */
+    }
+  });
+};
+
+let shellStarting: Promise<void> | undefined;
+const ensureShellOwner = () => {
+  shellStarting ??= (async () => {
+    const alive = async () => {
+      try {
+        const endpoint = read<Endpoint>(shellFile());
+        const response = await call<{userDataDir: string}>(endpoint, {operation: 'status'}, 1000);
+        return Boolean(response.userDataDir);
+      } catch {
+        return false;
+      }
+    };
+    if (await alive()) return;
+    const child = launchRuntime({
+      ...childEnv(),
+      RESPONSIVELY_USER_DATA_DIR: process.env.RESPONSIVELY_SHELL_USER_DATA_DIR,
+    });
+    if (!child.pid) throw new Error('Could not start the Responsively shell');
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (await alive()) return;
+      await pause(100);
+    }
+    throw new Error('Responsively shell did not become ready');
+  })().finally(() => {
+    shellStarting = undefined;
+  });
+  return shellStarting;
 };
 
 /** A dedicated controller is the single writer; app windows and MCP are clients. */
@@ -108,12 +198,14 @@ export class SessionManager {
           devices: runtime.devices,
         };
       } catch (e) {
+        // While opening, the lease exists before the runtime serves it; that is startup, not a hang.
         if (alive(lease.pid))
           return {
             ...item,
             status: pending ?? 'error',
-            error:
-              'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
+            error: pending
+              ? undefined
+              : 'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
           };
         if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
         if (!pending)
@@ -141,6 +233,7 @@ export class SessionManager {
     return call(lease, {operation, name});
   }
   private async open(id: string) {
+    if (process.platform === 'darwin') await ensureShellOwner();
     const current = await this.inspect(id);
     if (current.status === 'running') {
       await this.control(id, 'focus');
@@ -327,6 +420,8 @@ export const startController = async () => {
   });
   const idle = setInterval(() => {
     const dir = path.join(sessionsRoot(), 'runtimes');
+    if (process.platform === 'darwin' && fs.existsSync(dir) && fs.readdirSync(dir).length > 0)
+      void ensureShellOwner().catch(() => {});
     if (
       requests === 0 &&
       Date.now() - lastRequest > 15_000 &&

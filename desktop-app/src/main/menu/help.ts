@@ -1,4 +1,4 @@
-import {BrowserWindow, MenuItemConstructorOptions, ipcMain, shell} from 'electron';
+import {app, BrowserWindow, MenuItemConstructorOptions, ipcMain, shell} from 'electron';
 
 import {EnvironmentInfo, getEnvironmentInfo} from '../util';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
@@ -10,7 +10,7 @@ export interface AboutDialogArgs {
 }
 
 export const subMenuHelp = (
-  mainWindow: BrowserWindow,
+  mainWindow: BrowserWindow | null,
   appUpdater: AppUpdater
 ): MenuItemConstructorOptions => {
   const environmentInfo = getEnvironmentInfo();
@@ -65,10 +65,12 @@ export const subMenuHelp = (
         label: 'About',
         accelerator: 'F1',
         click: () => {
-          mainWindow.webContents.send(IPC_MAIN_CHANNELS.OPEN_ABOUT_DIALOG, {
-            environmentInfo,
-            updaterStatus: appUpdater.getStatus(),
-          });
+          if (mainWindow)
+            mainWindow.webContents.send(IPC_MAIN_CHANNELS.OPEN_ABOUT_DIALOG, {
+              environmentInfo,
+              updaterStatus: appUpdater.getStatus(),
+            });
+          else app.showAboutPanel();
         },
       },
     ],

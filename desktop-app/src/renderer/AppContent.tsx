@@ -1,6 +1,5 @@
 import {Provider, useSelector} from 'react-redux';
 
-import Sessions from './components/Sessions';
 import ToolBar from './components/ToolBar';
 import Previewer from './components/Previewer';
 import {store} from './store';
@@ -69,7 +68,6 @@ const AppContent = () => {
         </div>
         <AnnouncementCard />
         <AboutDialog />
-        <Sessions />
       </ThemeProvider>
     </Provider>
   );

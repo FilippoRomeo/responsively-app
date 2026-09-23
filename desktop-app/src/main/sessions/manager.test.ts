@@ -38,6 +38,29 @@ describe('SessionManager safety', () => {
     );
     expect(m.registry.get(s.id).name).toBe('Protected');
   });
+  it('reports a starting runtime without the not-responding error, but still reports a hang', async () => {
+    const m = new SessionManager();
+    const s = (await m.request({operation: 'create', name: 'Booting', open: false})) as SessionInfo;
+    // The lease is published before the runtime serves it (port 0) while the process is alive.
+    atomicWrite(runtimeFile(s.id), {
+      id: s.id,
+      pid: process.pid,
+      port: 0,
+      token: 'not-serving-yet',
+      userDataDir: m.registry.dataDir(s.id),
+      mcpPort: 20001,
+      browserSyncPort: 20002,
+      startedAt: new Date().toISOString(),
+    });
+    m['pending'].set(s.id, 'starting');
+    const starting = await m.inspect(s.id);
+    expect(starting.status).toBe('starting');
+    expect(starting.error).toBeUndefined();
+    m['pending'].delete(s.id);
+    const hung = await m.inspect(s.id);
+    expect(hung.status).toBe('error');
+    expect(hung.error).toMatch(/not responding/);
+  });
   it('requires deletion confirmation and validates identity at the boundary', async () => {
     const m = new SessionManager();
     const s = (await m.request({operation: 'create', name: 'A', open: false})) as SessionInfo;

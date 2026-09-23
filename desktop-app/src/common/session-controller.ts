@@ -53,6 +53,37 @@ export const controllerClient = (root: string, launch: () => Promise<void>) => {
     call<SessionInfo | SessionInfo[]>(await discover(), request, 90_000);
 };
 
+/**
+ * Quit asks the controller to stop every Session. Success is judged by the runtime
+ * leases left on disk (the same signal the controller uses to relaunch the shell),
+ * so a timed-out or failed stop is reported, never assumed.
+ */
+export const stopAllSessions = async (
+  request: (value: SessionRequest) => Promise<SessionInfo | SessionInfo[]>,
+  runningIds: () => string[],
+  timeoutMs: number
+) => {
+  const names = new Map<string, string>();
+  const attempt = (async () => {
+    const all = (await request({operation: 'list'})) as SessionInfo[];
+    for (const s of all) names.set(s.id, s.name);
+    await Promise.all(
+      all
+        .filter((s) => s.status !== 'stopped')
+        .map((s) => request({operation: 'stop', id: s.id}).catch(() => {}))
+    );
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    attempt.catch(() => {}),
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    }),
+  ]);
+  clearTimeout(timer);
+  return runningIds().map((id) => ({id, name: names.get(id) ?? id}));
+};
+
 export const sessionToolOperations = {
   list_sessions: 'list',
   create_session: 'create',

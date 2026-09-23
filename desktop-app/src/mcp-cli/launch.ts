@@ -147,6 +147,7 @@ export const launchController = async (
   Object.assign(env, {
     RESPONSIVELY_SESSION_CONTROLLER: 'true',
     RESPONSIVELY_SESSIONS_ROOT: root,
+    RESPONSIVELY_SHELL_USER_DATA_DIR: process.env.RESPONSIVELY_USER_DATA_DIR,
     RESPONSIVELY_USER_DATA_DIR: path.join(root, 'controller'),
     RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
   });
