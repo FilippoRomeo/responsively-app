@@ -6,7 +6,7 @@ import path from 'path';
 import net from 'net';
 import {SessionRegistry, requestSchema} from './registry';
 import {PortLeases, serve, call, secret} from '../../common/session-rpc';
-import {stopAllSessions} from '../../common/session-controller';
+import {reopenSessions, stopAllSessions} from '../../common/session-controller';
 import {SessionInfo, SessionRequest} from '../../common/sessions';
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'responsively-sessions-unit-'));
@@ -87,14 +87,17 @@ describe('quit stops every Session or reports what is left', () => {
       running.delete(value.id!);
       return session(value.id!, 'stopped');
     };
-    expect(await stopAllSessions(request, () => [...running], 1000)).toEqual([]);
+    expect(await stopAllSessions(request, () => [...running], 1000)).toEqual({
+      active: ['a'],
+      blocked: [],
+    });
   });
   it('reports a Session whose stop failed and whose lease remains', async () => {
     const request = async (value: SessionRequest) => {
       if (value.operation === 'list') return [session('a', 'error')];
       throw new Error('Session did not stop; its data has been preserved');
     };
-    expect(await stopAllSessions(request, () => ['a'], 1000)).toEqual([
+    expect((await stopAllSessions(request, () => ['a'], 1000)).blocked).toEqual([
       {id: 'a', name: 'Project a'},
     ]);
   });
@@ -102,7 +105,38 @@ describe('quit stops every Session or reports what is left', () => {
     const request = async (value: SessionRequest) =>
       value.operation === 'list' ? [session('a', 'running')] : new Promise<SessionInfo>(() => {});
     const started = Date.now();
-    expect(await stopAllSessions(request, () => ['a'], 50)).toEqual([{id: 'a', name: 'Project a'}]);
+    expect((await stopAllSessions(request, () => ['a'], 50)).blocked).toEqual([
+      {id: 'a', name: 'Project a'},
+    ]);
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe('launch restores only what was active at the last clean Quit', () => {
+  const session = (id: string, status: SessionInfo['status']): SessionInfo => ({
+    id,
+    name: `Project ${id}`,
+    createdAt: '2026-09-23T00:00:00.000Z',
+    updatedAt: '2026-09-23T00:00:00.000Z',
+    status,
+  });
+  it('opens stopped Sessions, skips running and deleted ones, and never creates any', async () => {
+    const statuses: Record<string, SessionInfo['status']> = {a: 'stopped', b: 'running'};
+    const calls: SessionRequest[] = [];
+    const request = async (value: SessionRequest) => {
+      calls.push(value);
+      if (!(value.id! in statuses)) throw new Error('Session not found');
+      return session(value.id!, value.operation === 'open' ? 'running' : statuses[value.id!]);
+    };
+    expect(await reopenSessions(request, ['a', 'b', 'deleted'])).toEqual(['a']);
+    expect(calls.filter((c) => c.operation === 'open').map((c) => c.id)).toEqual(['a']);
+    expect(calls.some((c) => c.operation === 'create')).toBe(false);
+  });
+  it('keeps going when one Session fails to start', async () => {
+    const request = async (value: SessionRequest) => {
+      if (value.operation === 'open' && value.id === 'a') throw new Error('startup failed');
+      return session(value.id!, 'stopped');
+    };
+    expect(await reopenSessions(request, ['a', 'b'])).toEqual(['b']);
   });
 });

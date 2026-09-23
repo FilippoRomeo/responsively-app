@@ -42,10 +42,11 @@ import {wireWebviewSecurity} from './webview-registry';
 import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
-import {startController, startShellOwner} from './sessions/service';
+import {restoreSessions, startController, startShellOwner} from './sessions/service';
 import {
   initSessions,
   initSessionsTray,
+  showLauncher,
   showSessions,
   startSessionRuntime,
 } from './sessions/runtime';
@@ -91,7 +92,7 @@ app.on('second-instance', (_event, argv) => {
     }
     mainWindow.focus();
   } else if (!process.env.RESPONSIVELY_SESSION_ID) {
-    showSessions(false, '', true);
+    void showLauncher();
   }
   // On Windows/Linux, protocol deep links and CLI URLs arrive on the second
   // instance's argv rather than through 'open-url'.
@@ -448,8 +449,9 @@ app
     ) {
       menuBuilder = new MenuBuilder(null, appUpdater);
       menuBuilder.buildMenu();
-      const sessionsTray = initSessionsTray();
-      showSessions(false, '', false, sessionsTray?.getBounds());
+      initSessionsTray();
+      // No manager on launch: the menu-bar icon is the launcher.
+      if (!process.env.RESPONSIVELY_SHELL_SPAWNED) void restoreSessions();
     } else {
       await createWindow();
     }
@@ -457,7 +459,7 @@ app
     app.on('activate', () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
       else if (process.env.RESPONSIVELY_SESSION_ID) void createWindow();
-      else showSessions(false, '', true);
+      else void showLauncher();
     });
   })
   .catch((error) => {
