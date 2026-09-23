@@ -1,4 +1,4 @@
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {expect, it, vi} from 'vitest';
 import SessionsManager from './index';
 import {SessionInfo} from '../../../common/sessions';
@@ -101,3 +101,96 @@ it('restores focus after deleting a stopped Session so Escape closes the popover
   fireEvent.keyDown(document.activeElement!, {key: 'Escape'});
   await waitFor(() => expect(manager).not.toBeVisible());
 });
+
+const staleCases: {
+  operation: string;
+  before: SessionInfo[];
+  after: SessionInfo[];
+  act: () => void;
+  expectFresh: () => void;
+}[] = (() => {
+  const base = {
+    id: 'f7a24040-4107-42b3-86c5-6c09ca126dbf',
+    createdAt: '2026-09-23T00:00:00.000Z',
+    updatedAt: '2026-09-23T00:00:00.000Z',
+  };
+  const old: SessionInfo = {...base, name: 'Old project', status: 'stopped'};
+  const row = () => screen.queryByTestId(`session-${base.id}`);
+  return [
+    {
+      operation: 'delete',
+      before: [old],
+      after: [],
+      act: () => {
+        fireEvent.click(screen.getByRole('button', {name: 'Delete'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Delete Session'}));
+      },
+      expectFresh: () => expect(row()).toBeNull(),
+    },
+    {
+      operation: 'rename',
+      before: [old],
+      after: [{...old, name: 'New project'}],
+      act: () => {
+        fireEvent.click(screen.getByRole('button', {name: 'Rename'}));
+        fireEvent.change(screen.getByRole('textbox', {name: 'Name'}), {
+          target: {value: 'New project'},
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Save'}));
+      },
+      expectFresh: () => expect(row()).toHaveTextContent('New project'),
+    },
+    {
+      operation: 'stop',
+      before: [{...old, status: 'running'}],
+      after: [old],
+      act: () => fireEvent.click(screen.getByRole('button', {name: 'Stop'})),
+      expectFresh: () => expect(row()).toHaveTextContent('Stopped'),
+    },
+    {
+      operation: 'create',
+      before: [],
+      after: [old],
+      act: () => {
+        fireEvent.click(screen.getByRole('button', {name: 'New Session'}));
+        fireEvent.change(screen.getByRole('textbox', {name: 'Name'}), {
+          target: {value: 'Old project'},
+        });
+        fireEvent.click(screen.getByRole('checkbox', {name: 'Open immediately'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Save'}));
+      },
+      expectFresh: () => expect(row()).toHaveTextContent('Old project'),
+    },
+  ];
+})();
+
+it.each(staleCases)(
+  'never lets a refresh started before $operation overwrite its result',
+  async ({before, after, act: mutate, expectFresh}) => {
+    vi.useFakeTimers({shouldAdvanceTime: true});
+    try {
+      const lists: ((value: SessionInfo[]) => void)[] = [];
+      let finish!: (value: SessionInfo) => void;
+      const send = vi.fn(
+        (request: {operation: string}) =>
+          new Promise<SessionInfo | SessionInfo[]>((resolve) => {
+            if (request.operation === 'list') lists.push(resolve);
+            else finish = resolve;
+          })
+      );
+      render(<SessionsManager request={send} onClose={vi.fn()} native />);
+      await act(async () => lists[0](before));
+      await screen.findByRole('heading', {name: 'Sessions'});
+      mutate();
+      // The periodic refresh starts while the change is in flight and captures old state.
+      await act(async () => vi.advanceTimersByTime(2000));
+      expect(lists).toHaveLength(2);
+      await act(async () => finish(after[0] ?? before[0]));
+      await act(async () => lists[2]?.(after));
+      await act(async () => lists[1](before));
+      expectFresh();
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);

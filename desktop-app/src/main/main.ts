@@ -440,7 +440,7 @@ app
     appUpdater = new AppUpdater();
     initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
-      await startShellOwner();
+      await startShellOwner((message) => showSessions(false, message, true));
     if (
       process.platform === 'darwin' &&
       !process.env.RESPONSIVELY_SESSION_ID &&

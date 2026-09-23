@@ -6,11 +6,20 @@ import {SessionInfo, SessionRuntime} from '../../common/sessions';
 import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
-import {controllerClient, controllerRoot} from '../../common/session-controller';
+import {controllerClient, controllerRoot, stopAllSessions} from '../../common/session-controller';
 
 export const sessionsRoot = () => controllerRoot(app.getPath('appData'));
 export const runtimeFile = (id: string) => path.join(sessionsRoot(), 'runtimes', `${id}.json`);
 const shellFile = () => path.join(sessionsRoot(), 'shell.json');
+const runningIds = () => {
+  const dir = path.join(sessionsRoot(), 'runtimes');
+  return fs.existsSync(dir)
+    ? fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => f.slice(0, -5))
+    : [];
+};
 export interface RuntimeLease extends Endpoint {
   id: string;
   pid: number;
@@ -70,11 +79,41 @@ const childEnv = (): NodeJS.ProcessEnv => {
 };
 
 // A capability-protected presence beacon, not a second Sessions authority.
-export const startShellOwner = async () => {
+export const startShellOwner = async (onQuitBlocked: (message: string) => void) => {
   const {server, endpoint} = await serve(secret(), async () => ({
     userDataDir: app.getPath('userData'),
   }));
   atomicWrite(shellFile(), endpoint);
+  // Quit means the whole app. It completes only when every Session has stopped
+  // (data kept); otherwise the controller would relaunch this shell to own them.
+  let stopping = false;
+  app.on('before-quit', (event) => {
+    if (runningIds().length === 0) return;
+    event.preventDefault();
+    if (stopping) return;
+    stopping = true;
+    // ponytail: 30s cap only guards a hung controller; its own stop is bounded (~20s).
+    void (async () => {
+      const blocked = await stopAllSessions(sessionRequest, runningIds, 30_000);
+      stopping = false;
+      if (blocked.length === 0) {
+        app.quit();
+        return;
+      }
+      const list = blocked
+        .map(({id, name}) => {
+          try {
+            return `${name} (process ${read<RuntimeLease>(runtimeFile(id)).pid})`;
+          } catch {
+            return name;
+          }
+        })
+        .join(', ');
+      onQuitBlocked(
+        `Quit cancelled: ${list} did not stop. No data was deleted. Stop it here, or end that process in Activity Monitor, then quit again.`
+      );
+    })();
+  });
   app.on('will-quit', () => {
     server.close();
     try {
@@ -159,12 +198,14 @@ export class SessionManager {
           devices: runtime.devices,
         };
       } catch (e) {
+        // While opening, the lease exists before the runtime serves it; that is startup, not a hang.
         if (alive(lease.pid))
           return {
             ...item,
             status: pending ?? 'error',
-            error:
-              'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
+            error: pending
+              ? undefined
+              : 'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
           };
         if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
         if (!pending)

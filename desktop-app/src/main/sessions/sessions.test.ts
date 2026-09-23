@@ -6,6 +6,8 @@ import path from 'path';
 import net from 'net';
 import {SessionRegistry, requestSchema} from './registry';
 import {PortLeases, serve, call, secret} from '../../common/session-rpc';
+import {stopAllSessions} from '../../common/session-controller';
+import {SessionInfo, SessionRequest} from '../../common/sessions';
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'responsively-sessions-unit-'));
 describe('persistent session boundaries', () => {
@@ -67,5 +69,40 @@ describe('persistent session boundaries', () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+describe('quit stops every Session or reports what is left', () => {
+  const session = (id: string, status: SessionInfo['status']): SessionInfo => ({
+    id,
+    name: `Project ${id}`,
+    createdAt: '2026-09-23T00:00:00.000Z',
+    updatedAt: '2026-09-23T00:00:00.000Z',
+    status,
+  });
+  it('succeeds only when no runtime lease remains', async () => {
+    const running = new Set(['a', 'b']);
+    const request = async (value: SessionRequest) => {
+      if (value.operation === 'list') return [session('a', 'running'), session('b', 'error')];
+      running.delete(value.id!);
+      return session(value.id!, 'stopped');
+    };
+    expect(await stopAllSessions(request, () => [...running], 1000)).toEqual([]);
+  });
+  it('reports a Session whose stop failed and whose lease remains', async () => {
+    const request = async (value: SessionRequest) => {
+      if (value.operation === 'list') return [session('a', 'error')];
+      throw new Error('Session did not stop; its data has been preserved');
+    };
+    expect(await stopAllSessions(request, () => ['a'], 1000)).toEqual([
+      {id: 'a', name: 'Project a'},
+    ]);
+  });
+  it('returns after the cap when the controller never answers', async () => {
+    const request = async (value: SessionRequest) =>
+      value.operation === 'list' ? [session('a', 'running')] : new Promise<SessionInfo>(() => {});
+    const started = Date.now();
+    expect(await stopAllSessions(request, () => ['a'], 50)).toEqual([{id: 'a', name: 'Project a'}]);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });

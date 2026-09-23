@@ -67,7 +67,6 @@ export default function SessionsManager({
   const panelRef = useRef<HTMLDivElement>(null);
   const refreshId = useRef(0);
   const refreshing = useRef(false);
-  const mutationId = useRef(0);
   const mounted = useRef(true);
   const draft = useRef<{id: string; name: string; url: string; start: boolean} | null>(null);
 
@@ -129,7 +128,6 @@ export default function SessionsManager({
 
   const run = async (value: SessionRequest) => {
     const key = value.id ?? 'new';
-    mutationId.current += 1;
     setPending((previous) => ({...previous, [key]: value.operation}));
     setErrors((previous) => ({...previous, [key]: ''}));
     setSuccess('');
@@ -148,6 +146,9 @@ export default function SessionsManager({
       setEditing(null);
       setDeleting(null);
       draft.current = null;
+      // Discard any refresh that started before this change landed.
+      refreshId.current += 1;
+      refreshing.current = false;
       await refresh();
       setSuccess(
         `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : 'Session opened'}.`
