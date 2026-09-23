@@ -7,6 +7,7 @@ vi.mock('electron', () => ({app: {getPath: () => os.tmpdir()}, shell: {trashItem
 import {SessionManager, runtimeFile} from './service';
 import {atomicWrite} from './registry';
 import {SessionInfo} from '../../common/sessions';
+import {shell} from 'electron';
 
 describe('SessionManager safety', () => {
   beforeEach(() => {
@@ -60,6 +61,38 @@ describe('SessionManager safety', () => {
     const hung = await m.inspect(s.id);
     expect(hung.status).toBe('error');
     expect(hung.error).toMatch(/not responding/);
+  });
+  it('resets data only for a stopped Session, moving its profile to Trash and keeping it', async () => {
+    vi.mocked(shell.trashItem).mockClear();
+    const m = new SessionManager();
+    const s = (await m.request({
+      operation: 'create',
+      name: 'Resettable',
+      open: false,
+    })) as SessionInfo;
+    const dir = m.registry.dataDir(s.id);
+    fs.mkdirSync(dir, {recursive: true});
+    await expect(m.request({operation: 'reset', id: s.id})).rejects.toThrow(/confirmation/);
+    // A live, unverified runtime blocks the reset exactly like Delete.
+    atomicWrite(runtimeFile(s.id), {
+      id: s.id,
+      pid: process.pid,
+      port: 0,
+      token: 'not-a-runtime',
+      userDataDir: dir,
+      mcpPort: 20001,
+      browserSyncPort: 20002,
+      startedAt: new Date().toISOString(),
+    });
+    await expect(m.request({operation: 'reset', id: s.id, confirmed: true})).rejects.toThrow(
+      /Stop/
+    );
+    expect(shell.trashItem).not.toHaveBeenCalled();
+    fs.unlinkSync(runtimeFile(s.id));
+    const after = (await m.request({operation: 'reset', id: s.id, confirmed: true})) as SessionInfo;
+    expect(shell.trashItem).toHaveBeenCalledWith(dir);
+    expect(after).toMatchObject({id: s.id, name: 'Resettable', status: 'stopped'});
+    expect(m.registry.get(s.id).name).toBe('Resettable');
   });
   it('requires deletion confirmation and validates identity at the boundary', async () => {
     const m = new SessionManager();

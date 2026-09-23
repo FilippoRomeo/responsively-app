@@ -24,7 +24,17 @@ const definition = z.object({
 });
 export const requestSchema = z
   .object({
-    operation: z.enum(['list', 'get', 'create', 'rename', 'open', 'focus', 'stop', 'delete']),
+    operation: z.enum([
+      'list',
+      'get',
+      'create',
+      'rename',
+      'open',
+      'focus',
+      'stop',
+      'delete',
+      'reset',
+    ]),
     id: sessionId.optional(),
     name: sessionName.optional(),
     url: z.string().max(8192).optional(),

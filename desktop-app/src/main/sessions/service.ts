@@ -427,6 +427,16 @@ export class SessionManager {
             this.registry.remove(id);
             return {...old, status: 'stopped' as const};
           }
+          case 'reset': {
+            // The profile is the unit of isolation: move it whole to Trash, keep the definition.
+            if (req.confirmed !== true) throw new Error('Explicit reset confirmation is required');
+            await this.inspect(id);
+            if (this.readLease(id)) throw new Error('Stop the session before resetting its data');
+            const dir = this.registry.dataDir(id);
+            if (fs.existsSync(dir)) await shell.trashItem(dir);
+            this.errors.delete(id);
+            return this.inspect(id);
+          }
           default:
             throw new Error('Unsupported operation');
         }

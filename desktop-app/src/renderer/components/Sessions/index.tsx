@@ -62,7 +62,9 @@ export default function SessionsManager({
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [start, setStart] = useState(true);
-  const [deleting, setDeleting] = useState<SessionInfo | null>(null);
+  const [confirming, setConfirming] = useState<SessionInfo | null>(null);
+  // The confirmation view serves Delete and Reset data; both act on a stopped Session.
+  const [resetting, setResetting] = useState(false);
   const [filter, setFilter] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const refreshId = useRef(0);
@@ -138,20 +140,21 @@ export default function SessionsManager({
       if (!mounted.current) return;
       if (
         value.operation === 'delete' ||
+        value.operation === 'reset' ||
         value.operation === 'rename' ||
         value.operation === 'stop' ||
         (value.operation === 'create' && value.open === false)
       )
         panelRef.current?.focus();
       setEditing(null);
-      setDeleting(null);
+      setConfirming(null);
       draft.current = null;
       // Discard any refresh that started before this change landed.
       refreshId.current += 1;
       refreshing.current = false;
       await refresh();
       setSuccess(
-        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : 'Session opened'}.`
+        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : 'Session opened'}.`
       );
     } catch (error) {
       if (mounted.current)
@@ -166,7 +169,7 @@ export default function SessionsManager({
 
   const newSession = () => {
     setEditing('new');
-    setDeleting(null);
+    setConfirming(null);
     setName(draft.current?.id === 'new' ? draft.current.name : '');
     setUrl(draft.current?.id === 'new' ? draft.current.url : '');
     setStart(draft.current?.id === 'new' ? draft.current.start : true);
@@ -178,7 +181,7 @@ export default function SessionsManager({
   const closeSubview = (preserve = false) => {
     draft.current = preserve && editing ? {id: editing, name, url, start} : null;
     setEditing(null);
-    setDeleting(null);
+    setConfirming(null);
     panelRef.current?.focus();
   };
 
@@ -192,7 +195,7 @@ export default function SessionsManager({
       data-testid="sessions-manager"
       onKeyDownCapture={(event) => {
         if (event.key !== 'Escape') return;
-        if (editing || deleting) {
+        if (editing || confirming) {
           event.preventDefault();
           event.stopPropagation();
           closeSubview(true);
@@ -286,23 +289,41 @@ export default function SessionsManager({
             </ToolbarAction>
           </div>
         </form>
-      ) : deleting ? (
+      ) : confirming ? (
         <div className="grid gap-3 overflow-y-auto p-3 text-sm">
-          <h3 className="break-words font-semibold">Delete “{deleting.name}”?</h3>
-          <p>Its browser data will move to Trash and it will be removed from Sessions.</p>
-          {errors[deleting.id] && (
+          <h3 className="break-words font-semibold">
+            {resetting ? 'Reset' : 'Delete'} “{confirming.name}”?
+          </h3>
+          <p>
+            {resetting
+              ? 'Its browser data (cookies, storage, history and device choices) will move to Trash. The Session keeps its name and starting URL.'
+              : 'Its browser data will move to Trash and it will be removed from Sessions.'}
+          </p>
+          {errors[confirming.id] && (
             <p role="alert" className="break-words text-red-700 dark:text-red-300">
-              {errors[deleting.id]}
+              {errors[confirming.id]}
             </p>
           )}
           <div className="flex justify-end gap-2">
             <ToolbarAction onClick={() => closeSubview()}>Cancel</ToolbarAction>
             <ToolbarAction
-              disabled={Boolean(pending[deleting.id])}
+              disabled={Boolean(pending[confirming.id])}
               className={actionClass}
-              onClick={() => void run({operation: 'delete', id: deleting.id, confirmed: true})}
+              onClick={() =>
+                void run({
+                  operation: resetting ? 'reset' : 'delete',
+                  id: confirming.id,
+                  confirmed: true,
+                })
+              }
             >
-              {pending[deleting.id] ? 'Deleting…' : 'Delete Session'}
+              {pending[confirming.id]
+                ? resetting
+                  ? 'Resetting…'
+                  : 'Deleting…'
+                : resetting
+                  ? 'Reset Data'
+                  : 'Delete Session'}
             </ToolbarAction>
           </div>
         </div>
@@ -386,7 +407,21 @@ export default function SessionsManager({
                     <ToolbarAction
                       className={actionClass}
                       disabled={Boolean(pending[item.id]) || item.status !== 'stopped'}
-                      onClick={() => setDeleting(item)}
+                      title="Move this Session's browser data to Trash and keep the Session"
+                      onClick={() => {
+                        setResetting(true);
+                        setConfirming(item);
+                      }}
+                    >
+                      Reset
+                    </ToolbarAction>
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={Boolean(pending[item.id]) || item.status !== 'stopped'}
+                      onClick={() => {
+                        setResetting(false);
+                        setConfirming(item);
+                      }}
                     >
                       Delete
                     </ToolbarAction>
