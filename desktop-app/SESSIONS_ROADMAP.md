@@ -20,7 +20,7 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 ## 1. Baseline (✅ verified)
 
-- **Code:** `main` @ `e484db9e553ea6311c9cbb211a5e647428087808` (merge of PR #6, milestone M1), on Electron 43.1.1.
+- **App-code baseline:** `e484db9e553ea6311c9cbb211a5e647428087808` (merge of PR #6, milestone M1), on Electron 43.1.1. Later docs-only commits on `main` don't change the installed application baseline, so the tip of `main` can be newer.
 - **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `e484db9e`: `app.asar` SHA-256 `11ab5180b8f04eeadbc57015a954d21d0cc5b028c9e7139a5ed965c4121a5137`; merged, installed and smoke-tested 2026-09-23.
 - **Rollback:** `.work/install-backup-20260923-122449/` (the previous `b2cc6580` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of both data folders).
 - **Parked:** `refactor/sessions-process-roles` (validated, on GitHub, not merged).

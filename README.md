@@ -31,13 +31,13 @@ A single controller owns the Session registry and lifecycle. Session identity ne
 | Local build               | Standard app identity        | Isolated `ResponsivelyMCP.app` with its own bundle ID, ports and data                 |
 | Runtime baseline          | Upstream moves independently | Intentionally frozen on Electron **43.1.1** until a concrete need justifies migration |
 
-The current known-good source baseline is:
+The current known-good application-code baseline is:
 
 ```text
 e484db9e553ea6311c9cbb211a5e647428087808
 ```
 
-That baseline (`main` after milestone M1: window close and ⌘Q behaviour, new windows on the current monitor) has been merged, installed and smoke-tested as a packaged macOS app. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
+That commit (milestone M1: window close and ⌘Q behaviour, new windows on the current monitor) has been merged, installed and smoke-tested as a packaged macOS app. The tip of `main` can be newer because of documentation-only commits; those don't change the application. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
 
 ## Current product model
 
@@ -97,14 +97,13 @@ git checkout main
 For a reproducible install, confirm the expected baseline before building:
 
 ```bash
-git rev-parse HEAD
+git diff --quiet e484db9e553ea6311c9cbb211a5e647428087808 HEAD -- \
+  desktop-app \
+  ':(exclude,glob)desktop-app/**/*.md' \
+  && echo "desktop app non-doc files match the validated baseline"
 ```
 
-Expected stable baseline at the time of writing:
-
-```text
-e484db9e553ea6311c9cbb211a5e647428087808
-```
+This compares every non-Markdown file under `desktop-app` (source, assets, build config, lockfiles, tests) with the validated baseline `e484db9e553ea6311c9cbb211a5e647428087808`, so documentation-only commits on `main` don't cause a mismatch. If it prints nothing, something that can affect the app differs from what was validated.
 
 ### 2. Install dependencies
 
