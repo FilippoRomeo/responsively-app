@@ -43,6 +43,7 @@ import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
 import {restoreSessions, startController, startShellOwner} from './sessions/service';
+import {stopSessionWhenWindowsClose} from './sessions/window-lifecycle';
 import {
   initSessions,
   initSessionsTray,
@@ -191,8 +192,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Suppress the launch card during E2E tests (specs opt back in by resetting
-// these keys and reloading).
-if (process.env.E2E_TEST === 'true') {
+// these keys and reloading) and in Sessions, which are project workspaces.
+if (process.env.E2E_TEST === 'true' || process.env.RESPONSIVELY_SESSION_ID) {
   store.set('ui.announcements', {
     seenVersion: app.getVersion(),
     supportShownAt: Date.now(),
@@ -439,6 +440,7 @@ app
     }
     if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID)
       app.setActivationPolicy('accessory');
+    if (process.env.RESPONSIVELY_SESSION_ID) stopSessionWhenWindowsClose();
     if (process.env.RESPONSIVELY_SESSION_URL)
       store.set('homepage', process.env.RESPONSIVELY_SESSION_URL);
     wireSessionOnce();
