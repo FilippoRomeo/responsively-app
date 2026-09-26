@@ -194,10 +194,20 @@ describe('createSessionRouter', () => {
     const route = createSessionRouter({manage: async () => runningOn(dead)});
     const startedAt = Date.now();
 
-    await expect(route({name: 'whoami', arguments: {session: ID}})).rejects.toThrow(
-      'Session "Shop" stopped answering on its MCP port during this call'
-    );
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let lines: string[];
+    try {
+      await expect(route({name: 'whoami', arguments: {session: ID}})).rejects.toThrow(
+        'Session "Shop" stopped answering on its MCP port during this call'
+      );
+    } finally {
+      lines = logged.mock.calls.map((args) => args.join(' '));
+      logged.mockRestore();
+    }
     expect(Date.now() - startedAt).toBeLessThan(10_000);
+    // The log must say what happened, not claim a launch that never happens.
+    expect(lines.some((line) => line.includes('launching'))).toBe(false);
+    expect(lines).toContain(`[responsively-mcp] Session "Shop" is not answering on port ${dead}`);
   });
 
   it('rejects a non-string session without asking the controller', async () => {
