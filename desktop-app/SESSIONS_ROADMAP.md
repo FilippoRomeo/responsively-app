@@ -59,6 +59,7 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 | **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                                 | Low      |
 | **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured                                                            | Low      |
 | **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); M1 is installed, so observe in real use | ?        |
+| **R1** | Browser MCP tools use one fixed port, not the Session UUID; after a restart they miss the Session and wait 60 s   | 🔍 code-read; **fixed in M5** (unit + stdio bridge smoke; packaged check pending)          | High     |
 
 ## 4. Roadmap (each milestone = one branch, one test package, one PR, one install)
 
@@ -90,6 +91,16 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 - "Start clean every time" per Session.
 - "Reset everything" (all Sessions to the Trash, with a double confirmation).
 
+### M5: "Agents address Sessions by UUID" (R1) — implemented on a branch; packaged validation pending
+
+- Browser tools take an optional `session` UUID; the bridge resolves its current MCP port through the controller on every call. No port in the agent's config, no implicit Open.
+- Design: [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part R.
+
+### M6: "Session attention dialog", design only
+
+- When an agent addresses a Session that isn't usable, the Sessions panel shows you why, with Open/Restart, Reset, Delete and a warned Force quit. Only you click.
+- Open questions and the proposed D4 are in [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part D.
+
 ### Not planned
 
 Only if a real need appears: Electron 44 or an upstream merge, merging the refactor branch, restructuring `service.ts`, Windows/Linux work.
@@ -103,3 +114,4 @@ Follow [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md). It is the single canonical pr
 - **D1, ⌘Q style:** press ⌘Q twice, with a notice after the first press. ✅ decided
 - **D2, closing a window:** ⌘W stops that Session. ✅ decided
 - **D3, scope:** M1 only; M2 is decided after using M1. ✅ decided
+- **D4, agents asking for attention:** MCP may ask the app to show you a Session's problem; Reset, Delete and Force quit stay human-only clicks. ❓ proposed (M6)

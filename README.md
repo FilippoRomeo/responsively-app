@@ -184,6 +184,33 @@ CI = "true"
 
 Replace `YOU` with your macOS username.
 
+## Connect Claude Desktop
+
+Claude Desktop starts the bootstrap with only the environment in its config file. Without these variables the bootstrap looks for the standard `ResponsivelyApp` install, can't find this fork, and every request fails with "Responsively App is not installed, or an installed version predates the MCP bridge".
+
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "responsively": {
+      "command": "npx",
+      "args": ["-y", "@responsively/mcp@1.0.0"],
+      "env": {
+        "RESPONSIVELY_APP_PATH": "/Users/YOU/Applications/ResponsivelyMCP.app",
+        "RESPONSIVELY_MCP_PORT": "12721",
+        "RESPONSIVELY_BROWSER_SYNC_PORT": "12722",
+        "RESPONSIVELY_USER_DATA_DIR": "/Users/YOU/Library/Application Support/ResponsivelyMCP",
+        "RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION": "true",
+        "CI": "true"
+      }
+    }
+  }
+}
+```
+
+Replace `YOU` with your macOS username; JSON values are not shell-expanded, so `$HOME` does not work here.
+
 ## MCP tools
 
 The fork keeps the normal browser-control tools and adds Session lifecycle operations.
@@ -198,6 +225,15 @@ Browser tools include:
 - `read_page`
 - `click`
 - `type_text`
+
+Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions` or `create_session`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
+
+```text
+navigate   {"session": "<UUID>", "url": "http://localhost:3000"}
+screenshot {"session": "<UUID>"}
+```
+
+A stopped Session is never opened implicitly: the call returns an error naming the Session and telling the agent to call `open_session`. Without `session`, browser tools use the configured port as before.
 
 Session lifecycle tools include:
 
