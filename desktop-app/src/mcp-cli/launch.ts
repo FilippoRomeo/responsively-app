@@ -94,11 +94,14 @@ export const launchApp = async (port: number, deps: LaunchDeps = defaultDeps): P
         return;
       }
     }
-    if (await openViaLaunchServices(deps, ['-b', MAC_BUNDLE_ID])) {
-      return;
-    }
+    // Open the exact .app this bridge ships in. A bundle-id lookup would start
+    // whichever app owns MAC_BUNDLE_ID, e.g. upstream instead of a fork's
+    // separately identified bundle, so it is only the fallback.
     const appDir = derivedDarwinAppDir(deps);
     if (appDir !== null && (await openViaLaunchServices(deps, [appDir]))) {
+      return;
+    }
+    if (await openViaLaunchServices(deps, ['-b', MAC_BUNDLE_ID])) {
       return;
     }
     throw new Error(

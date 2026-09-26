@@ -116,20 +116,41 @@ describe('mcp-cli launch', () => {
     await expect(launchApp(12720, deps)).rejects.toThrow(/Launch the app manually once/);
   });
 
-  it('darwin falls back to opening the derived .app when bundle id fails', async () => {
+  it('darwin opens the .app this bridge ships in before any bundle-id lookup', async () => {
+    const appDir = '/Users/dev/Applications/ResponsivelyApp.app';
+    const {deps, opened} = makeDeps({
+      bridgeDir: path.join(appDir, 'Contents', 'Resources', 'mcp'),
+      existsFn: (p) => p === appDir,
+    });
+    await launchApp(12720, deps);
+    expect(opened).toEqual([[appDir]]);
+  });
+
+  it('darwin never launches upstream by bundle id for a bridge inside another bundle', async () => {
+    // The fork ships as ResponsivelyMCP.app (app.responsively.mcp.local); `open -b
+    // app.responsively` would start upstream Responsively instead, if installed.
+    const forkDir = '/Users/dev/Applications/ResponsivelyMCP.app';
+    const {deps, opened, spawned} = makeDeps({
+      bridgeDir: path.join(forkDir, 'Contents', 'Resources', 'mcp'),
+      existsFn: (p) => p === forkDir,
+    });
+    await launchApp(12720, deps);
+    expect(opened).toEqual([[forkDir]]);
+    expect(spawned).toHaveLength(0);
+  });
+
+  it('darwin falls back to the bundle id only when opening the derived .app fails', async () => {
     const appDir = '/Users/dev/Applications/ResponsivelyApp.app';
     const {deps, opened} = makeDeps({
       bridgeDir: path.join(appDir, 'Contents', 'Resources', 'mcp'),
       existsFn: (p) => p === appDir,
       execFileFn: vi.fn((_cmd: string, args: string[], cb: (e: Error | null) => void) => {
         opened.push(args);
-        // Simulate `open -b` failing (app not registered), direct open succeeding.
-        cb(args[0] === '-b' ? new Error('not found') : null);
+        cb(args[0] === appDir ? new Error('cannot open') : null);
       }) as never,
     });
-    const {opened: openedCalls} = {opened};
     await launchApp(12720, deps);
-    expect(openedCalls).toEqual([['-b', 'app.responsively'], [appDir]]);
+    expect(opened).toEqual([[appDir], ['-b', 'app.responsively']]);
   });
 });
 
