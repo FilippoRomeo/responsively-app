@@ -40,11 +40,13 @@ The root is `app.getPath('appData')/ResponsivelySessions` (macOS: `~/Library/App
 - `runtimes/<UUID>.json`: private runtime leases, verified against a live authenticated endpoint before use.
 - `controller.json`: private controller discovery information.
 
-No Session-specific state is stored in the global registry's ordinary electron-store. UUIDs are validated and profile symlinks refused. Corrupt metadata fails closed rather than being silently replaced. Runtime failures retain persistent data; stale live/reused PIDs produce an error rather than an unverified stop. Controller restart adopts runtimes only after verifying their endpoints. An idle controller exits after all runtime leases are gone and no clients have called it for 15 seconds. It is recreated on demand.
+No Session-specific state is stored in the global registry's ordinary electron-store. UUIDs are validated and profile symlinks refused. Corrupt metadata fails closed rather than being silently replaced. Runtime failures retain persistent data; stale live/reused PIDs produce an error rather than an unverified stop. Controller restart adopts runtimes only after verifying their endpoints. A crash is recorded only by the status check that still finds the exact lease it saw, with no stop or force quit in progress, so a check that overlaps a stop can't turn it into a false crash. An idle controller exits after all runtime leases are gone and no clients have called it for 15 seconds. It is recreated on demand.
 
 The manager reserves real loopback sockets using OS-assigned ports and retains logical leases across launch handoff. Different Sessions may start concurrently; duplicate mutations for one UUID are serialized. BrowserSync fallback to a different port is rejected. An unrelated process could race the socket handoff, so startup checks authenticated readiness and exact assigned ports; failure never becomes a false running result. There is no hard-coded Session count or A/B port mapping.
 
 Managed runtimes do not register protocols or check for app updates; they write separate logs. Updating a shared installed binary while Sessions are active is outside this feature. UI screenshot exports still follow the existing user-selected/default directory, which may be shared. This is project isolation within one OS user, not a security sandbox against that user or hostile local programs.
+
+The controller writes one `[sessions]` line to its log for every lifecycle action (create, open, focus, stop, force quit, rename, reset, delete), each attention panel shown and each recorded crash: the Session's UUID and name, who asked (`user`, `window`, `quit`, `agent`, or `unspecified`) and the outcome. On macOS the file is normally `~/Library/Logs/ResponsivelyApp/main.log`.
 
 ## Verification
 
