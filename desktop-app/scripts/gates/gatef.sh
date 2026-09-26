@@ -27,6 +27,8 @@ case "$PHASE" in
   *) usage ;;
 esac
 [ -n "$RUN_NAME" ] || usage
+# An interrupted phase must be logged as a failure, never as exit code 0.
+trap 'exit 130' INT TERM
 REPO_URL="https://github.com/FilippoRomeo/responsively-app.git"
 APP_ID="app.responsively.mcp.local"
 # Reads KEY=value from a file this workflow wrote; never sources it.
