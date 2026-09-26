@@ -74,7 +74,7 @@ export const stopAllSessions = async (
     await Promise.all(
       all
         .filter((s) => s.status !== 'stopped')
-        .map((s) => request({operation: 'stop', id: s.id}).catch(() => {}))
+        .map((s) => request({operation: 'stop', id: s.id, source: 'quit'}).catch(() => {}))
     );
   })();
   let timer: ReturnType<typeof setTimeout> | undefined;

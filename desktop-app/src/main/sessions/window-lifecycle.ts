@@ -68,9 +68,11 @@ const showQuitHint = (parent: BrowserWindow | null) => {
 
 // The controller performs the stop, so the Session ends as "stopped", not as a crash.
 const stopThisSession = () =>
-  sessionRequest({operation: 'stop', id: process.env.RESPONSIVELY_SESSION_ID}).catch(() =>
-    app.quit()
-  );
+  sessionRequest({
+    operation: 'stop',
+    id: process.env.RESPONSIVELY_SESSION_ID,
+    source: 'window',
+  }).catch(() => app.quit());
 
 const gate = createQuitGate();
 export const quitFromSessionWindow = async (parent: BrowserWindow | null) => {

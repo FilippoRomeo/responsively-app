@@ -28,6 +28,21 @@ let panel: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let panelCreate = false;
 let panelError = '';
+let panelAttention = '';
+/** A marker beside the menu-bar icon while a Session an agent could not use awaits you. */
+const setAttentionBadge = (on: boolean) => {
+  if (tray && !tray.isDestroyed()) tray.setTitle(on ? ' !' : '');
+};
+/** Attention never takes focus: shown inactive, floating so it is not hidden behind your app. */
+const present = (win: BrowserWindow, inactive: boolean) => {
+  win.setAlwaysOnTop(inactive, 'floating');
+  if (inactive) {
+    win.showInactive();
+  } else {
+    win.show();
+    win.focus();
+  }
+};
 /** A Session window manages Sessions in its own toolbar manager; only the shell uses the panel. */
 const showInSessionWindow = (create: boolean, error: string) => {
   const win = process.env.RESPONSIVELY_SESSION_ID ? getWindow() : null;
@@ -41,9 +56,12 @@ export const showSessions = (
   create = false,
   error = '',
   keyboard = false,
-  anchor?: Electron.Rectangle
+  anchor?: Electron.Rectangle,
+  attention = ''
 ) => {
   if (showInSessionWindow(create, error)) return;
+  const inactive = Boolean(attention);
+  setAttentionBadge(inactive);
   // In the shell, management always appears under the menu-bar icon, never beside the Dock.
   if (!anchor && tray && !tray.isDestroyed()) anchor = tray.getBounds();
   const owner = getWindow();
@@ -68,13 +86,14 @@ export const showSessions = (
   const y = Math.max(area.y + 8, anchor ? anchor.y + anchor.height + 8 : area.y + 8);
   panelCreate = create;
   panelError = error;
+  panelAttention = attention;
   if (panel && !panel.isDestroyed()) {
     panel.setBounds({x, y, width, height: Math.min(panel.getBounds().height, height)});
-    panel.show();
-    panel.focus();
+    present(panel, inactive);
     panel.webContents.send(IPC_MAIN_CHANNELS.SESSIONS_PANEL_SHOW, {
       create,
       error,
+      attention,
       darkMode: Boolean(store.get('ui.darkMode')),
     });
     return;
@@ -103,10 +122,12 @@ export const showSessions = (
   win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.on('ready-to-show', () => {
-    if (!win.isDestroyed()) {
-      win.show();
-      win.focus();
-    }
+    if (!win.isDestroyed()) present(win, inactive);
+  });
+  // Once you have used the panel it behaves normally again.
+  win.on('focus', () => {
+    if (!win.isDestroyed()) win.setAlwaysOnTop(false);
+    setAttentionBadge(false);
   });
   win.on('blur', () => {
     if (!win.isDestroyed()) win.hide();
@@ -116,8 +137,11 @@ export const showSessions = (
   });
   void win.loadURL(`${resolveHtmlPath('index.html')}?sessionsPanel=1`);
 };
+/** Shows you a Session an agent could not use, without taking focus from your work. */
+export const showAttention = (id: string) => showSessions(false, '', false, undefined, id);
 /** The menu-bar menu is the launcher; without a menu-bar icon, fall back to the manager. */
 export const showLauncher = async () => {
+  setAttentionBadge(false);
   if (!tray || tray.isDestroyed()) {
     showSessions(false, '', true);
     return;
@@ -153,7 +177,7 @@ export const initSessionsTray = () => {
   return tray;
 };
 const menuAction = (id: string, operation: 'open' | 'focus' | 'stop') => () => {
-  sessionRequest({operation, id}).catch((cause) =>
+  sessionRequest({operation, id, source: 'user'}).catch((cause) =>
     showSessions(false, cause instanceof Error ? cause.message : String(cause))
   );
 };
@@ -253,12 +277,15 @@ export const initSessions = (
     event.returnValue = {
       create: panelCreate,
       error: panelError,
+      attention: panelAttention,
       darkMode: Boolean(store.get('ui.darkMode')),
     };
   });
   ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_DISMISS, (event) => {
     if (isPanel(event.sender, event.senderFrame)) {
+      panel?.setAlwaysOnTop(false);
       panel?.hide();
+      setAttentionBadge(false);
       const owner = getWindow();
       if (owner && !owner.isDestroyed()) owner.focus();
     }
@@ -276,7 +303,8 @@ export const initSessions = (
       (event.sender !== main || event.senderFrame !== main?.mainFrame)
     )
       throw new Error('Sessions requests must come from the application window');
-    return sessionRequest(request);
+    // Requests from the Sessions UI are yours; the renderer cannot claim another origin.
+    return sessionRequest({...request, source: 'user'});
   });
   ipcMain.handle(
     IPC_MAIN_CHANNELS.SESSION_CONTEXT,

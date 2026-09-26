@@ -220,3 +220,39 @@ describe('createSessionRouter', () => {
     expect(manage).not.toHaveBeenCalled();
   });
 });
+
+describe('attention for unusable Sessions', () => {
+  const attentionCalls = (manage: ReturnType<typeof vi.fn>) =>
+    manage.mock.calls.filter(([request]) => request.operation === 'attention');
+
+  it.each([
+    ['stopped', session({status: 'stopped'})],
+    ['error', session({status: 'error', error: 'Session process exited unexpectedly.'})],
+  ])('asks the controller to show you a %s Session', async (_label, info) => {
+    const manage = vi.fn(async (_request: SessionRequest) => info);
+    const route = createSessionRouter({manage});
+    await expect(route({name: 'get_app_state', arguments: {session: ID}})).rejects.toThrow();
+    expect(attentionCalls(manage)).toEqual([[{operation: 'attention', id: ID}]]);
+  });
+
+  it.each([
+    ['starting', session({status: 'starting'})],
+    ['MCP off', runningOn(null)],
+  ])('does not interrupt you for a %s Session', async (_label, info) => {
+    const manage = vi.fn(async (_request: SessionRequest) => info);
+    const route = createSessionRouter({manage});
+    await expect(route({name: 'get_app_state', arguments: {session: ID}})).rejects.toThrow();
+    expect(attentionCalls(manage)).toEqual([]);
+  });
+
+  it('returns the agent its error even when the attention request fails', async () => {
+    const manage = vi.fn(async (request: SessionRequest) => {
+      if (request.operation === 'attention') throw new Error('controller busy');
+      return session({status: 'stopped'});
+    });
+    const route = createSessionRouter({manage});
+    await expect(route({name: 'get_app_state', arguments: {session: ID}})).rejects.toThrow(
+      /is stopped/
+    );
+  });
+});

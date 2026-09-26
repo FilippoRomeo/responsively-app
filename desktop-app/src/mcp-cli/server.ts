@@ -19,6 +19,12 @@ import {launchController} from './launch';
 import {SessionRequest} from '../common/sessions';
 import {createSessionRouter, hasSessionArgument, withSessionArgument} from './session-routing';
 
+/** Lifecycle calls through this bridge are an agent's, whatever the arguments claim. */
+export const agentLifecycleRequest = (
+  args: Record<string, unknown> | undefined,
+  operation: SessionRequest['operation']
+): SessionRequest => ({...args, operation, source: 'agent'}) as SessionRequest;
+
 export const startBridge = async () => {
   const manifest = loadManifest();
   const port = resolveTargetPort(process.env, readBeacon());
@@ -59,7 +65,7 @@ export const startBridge = async () => {
       const operation =
         sessionToolOperations[request.params.name as keyof typeof sessionToolOperations];
       if (Object.prototype.hasOwnProperty.call(sessionToolOperations, request.params.name)) {
-        const value = await manage({...request.params.arguments, operation} as SessionRequest);
+        const value = await manage(agentLifecycleRequest(request.params.arguments, operation));
         return {content: [{type: 'text' as const, text: JSON.stringify(value, null, 2)}]};
       }
       if (hasSessionArgument(request.params)) {

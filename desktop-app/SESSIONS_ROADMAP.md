@@ -99,10 +99,11 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 - Installed smoke test: `smoke-m5` stop and reopen changed the PID `36485 → 36627` and the port `65304 → 65426`; `get_app_state` with the same UUID returned the same page before and after.
 - Design: [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part R.
 
-### M6: "Session attention dialog", design only
+### M6: "Session attention dialog" — implemented on a branch; packaged validation pending
 
-- When an agent addresses a Session that isn't usable, the Sessions panel shows you why, with Open/Restart, Reset, Delete and a warned Force quit. Only you click.
-- Open questions and the proposed D4 are in [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part D.
+- When an agent addresses a Session that isn't usable, the Sessions panel shows you why, including who stopped it, with Open/Restart, Reset, Delete and a warned Force quit. Only you click.
+- At most one dialog per Session every 5 minutes; it never takes focus.
+- Design and decisions: [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part D.
 
 ### Not planned
 
@@ -117,4 +118,4 @@ Follow [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md). It is the single canonical pr
 - **D1, ⌘Q style:** press ⌘Q twice, with a notice after the first press. ✅ decided
 - **D2, closing a window:** ⌘W stops that Session. ✅ decided
 - **D3, scope:** M1 only; M2 is decided after using M1. ✅ decided
-- **D4, agents asking for attention:** MCP may ask the app to show you a Session's problem; Reset, Delete and Force quit stay human-only clicks. ❓ proposed (M6)
+- **D4, agents asking for attention:** MCP may ask the app to show you a Session's problem; Reset, Delete and Force quit stay human-only clicks. ✅ decided (M6)

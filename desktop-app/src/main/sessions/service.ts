@@ -2,10 +2,11 @@ import {app, shell} from 'electron';
 import fs from 'fs';
 import path from 'path';
 import {spawn} from 'child_process';
-import {SessionInfo, SessionRuntime} from '../../common/sessions';
+import {SessionInfo, SessionRuntime, SessionStopSource} from '../../common/sessions';
 import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
+import {provesRuntime, readProcess} from './process-proof';
 import {z} from 'zod';
 import {
   controllerClient,
@@ -43,6 +44,8 @@ export interface RuntimeReply extends SessionRuntime {
   devices: string[];
 }
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** At most one attention dialog per Session in this interval. */
+export const ATTENTION_INTERVAL_MS = 5 * 60_000;
 const read = <T>(file: string): T => JSON.parse(fs.readFileSync(file, 'utf8'));
 const alive = (pid: number) => {
   try {
@@ -88,11 +91,19 @@ const childEnv = (): NodeJS.ProcessEnv => {
 };
 
 // A capability-protected presence beacon, not a second Sessions authority.
-const shellRequest = z.object({operation: z.enum(['status', 'quit'])}).strict();
-export const startShellOwner = async (onQuitBlocked: (message: string) => void) => {
+const shellRequest = z
+  .object({operation: z.enum(['status', 'quit', 'attention']), id: z.string().uuid().optional()})
+  .strict();
+export const startShellOwner = async (
+  onQuitBlocked: (message: string) => void,
+  onAttention: (id: string) => void = () => {}
+) => {
   const {server, endpoint} = await serve(secret(), async (body) => {
+    const req = shellRequest.parse(body);
     // A Session window's ⌘Q asks the shell to quit the whole app (stop, remember, exit).
-    if (shellRequest.parse(body).operation === 'quit') setTimeout(() => app.quit(), 50);
+    if (req.operation === 'quit') setTimeout(() => app.quit(), 50);
+    // The controller asks the shell to show you a Session an agent could not use.
+    if (req.operation === 'attention' && req.id) onAttention(req.id);
     return {userDataDir: app.getPath('userData')};
   });
   atomicWrite(shellFile(), endpoint);
@@ -209,6 +220,7 @@ export class SessionManager {
   private pending = new Map<string, 'starting' | 'stopping'>();
   private errors = new Map<string, string>();
   private locks = new Map<string, Promise<unknown>>();
+  private attentionAt = new Map<string, number>();
   private readLease(id: string): RuntimeLease | undefined {
     const file = runtimeFile(id);
     if (!fs.existsSync(file)) return undefined;
@@ -255,10 +267,13 @@ export class SessionManager {
             error: pending
               ? undefined
               : 'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
+            hung: !pending,
           };
         if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
-        if (!pending)
+        if (!pending) {
           this.errors.set(id, 'Session process exited unexpectedly. Open to restart it.');
+          item = this.registry.update(id, {lastStop: {by: 'crash', at: new Date().toISOString()}});
+        }
         this.leases.release(lease.mcpPort);
         this.leases.release(lease.browserSyncPort);
       }
@@ -372,7 +387,7 @@ export class SessionManager {
         }
     }
   }
-  private async stop(id: string) {
+  private async stop(id: string, source: SessionStopSource) {
     await this.inspect(id);
     if (!this.readLease(id)) {
       this.errors.delete(id);
@@ -388,6 +403,7 @@ export class SessionManager {
         if (!this.readLease(id)) {
           this.errors.delete(id);
           this.pending.delete(id);
+          this.registry.update(id, {lastStop: {by: source, at: new Date().toISOString()}});
           return this.inspect(id);
         }
       }
@@ -395,6 +411,48 @@ export class SessionManager {
     } finally {
       this.pending.delete(id);
     }
+  }
+  /** An agent could not use this Session: show it to you, at most once per interval. */
+  private async attention(id: string) {
+    const info = await this.inspect(id);
+    if (info.status !== 'stopped' && info.status !== 'error') return info;
+    const now = Date.now();
+    if (now - (this.attentionAt.get(id) ?? -Infinity) < ATTENTION_INTERVAL_MS) return info;
+    this.attentionAt.set(id, now);
+    try {
+      await call(read<Endpoint>(shellFile()), {operation: 'attention', id}, 2000);
+    } catch {
+      /* No shell (agent-only): the agent still receives its error. */
+    }
+    return info;
+  }
+  /** Only a hung process that is provably this Session's runtime is signalled. */
+  private async forceStop(id: string, confirmed: boolean | undefined) {
+    if (confirmed !== true) throw new Error('Explicit force-quit confirmation is required');
+    const info = await this.inspect(id);
+    const lease = this.readLease(id);
+    if (!info.hung || !lease)
+      throw new Error('Only a Session whose process is alive but not responding can be force quit');
+    const proof = provesRuntime(
+      lease,
+      readProcess(lease.pid),
+      process.env.APPIMAGE || process.execPath
+    );
+    if (!proof.ok)
+      throw new Error(`Refusing to force quit: ${proof.reason}. No process was signalled.`);
+    process.kill(lease.pid, 'SIGTERM');
+    for (let i = 0; i < 50 && alive(lease.pid); i += 1) await pause(100);
+    if (alive(lease.pid)) {
+      process.kill(lease.pid, 'SIGKILL');
+      for (let i = 0; i < 20 && alive(lease.pid); i += 1) await pause(100);
+    }
+    if (alive(lease.pid)) throw new Error('The process did not exit; its data has been preserved');
+    if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
+    this.leases.release(lease.mcpPort);
+    this.leases.release(lease.browserSyncPort);
+    this.errors.delete(id);
+    this.registry.update(id, {lastStop: {by: 'user', at: new Date().toISOString()}});
+    return this.inspect(id);
   }
   async request(input: unknown): Promise<SessionInfo | SessionInfo[]> {
     const req = requestSchema.parse(input);
@@ -421,7 +479,11 @@ export class SessionManager {
             await this.control(id, 'focus');
             return this.inspect(id);
           case 'stop':
-            return this.stop(id);
+            return this.stop(id, req.source ?? 'user');
+          case 'attention':
+            return this.attention(id);
+          case 'force-stop':
+            return this.forceStop(id, req.confirmed);
           case 'rename': {
             if (!req.name) throw new Error('Name is required');
             this.registry.update(id, {name: req.name});

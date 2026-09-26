@@ -21,6 +21,9 @@ const definition = z.object({
   updatedAt: z.string(),
   lastOpenedAt: z.string().optional(),
   lastUrl: z.string().optional(),
+  lastStop: z
+    .object({by: z.enum(['user', 'window', 'quit', 'agent', 'crash']), at: z.string()})
+    .optional(),
 });
 export const requestSchema = z
   .object({
@@ -34,12 +37,15 @@ export const requestSchema = z
       'stop',
       'delete',
       'reset',
+      'attention',
+      'force-stop',
     ]),
     id: sessionId.optional(),
     name: sessionName.optional(),
     url: z.string().max(8192).optional(),
     open: z.boolean().optional(),
     confirmed: z.boolean().optional(),
+    source: z.enum(['user', 'window', 'quit', 'agent']).optional(),
   })
   .strict();
 
@@ -106,7 +112,7 @@ export class SessionRegistry {
   }
   update(
     id: string,
-    values: Partial<Pick<SessionDefinition, 'name' | 'lastOpenedAt' | 'lastUrl'>>
+    values: Partial<Pick<SessionDefinition, 'name' | 'lastOpenedAt' | 'lastUrl' | 'lastStop'>>
   ) {
     const item = definition.parse({
       ...this.get(id),
