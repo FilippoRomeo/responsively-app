@@ -7,6 +7,7 @@ import {SessionRegistry, atomicWrite, requestSchema} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
 import {provesRuntime, readProcess} from './process-proof';
+import log from '../logging';
 import {z} from 'zod';
 import {
   controllerClient,
@@ -44,6 +45,17 @@ export interface RuntimeReply extends SessionRuntime {
   devices: string[];
 }
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** One line per lifecycle action, so what happened to a Session can be read back later. */
+const audit = (
+  operation: string,
+  id: string,
+  name: string | undefined,
+  source: string | undefined,
+  outcome: string
+) =>
+  log.info(
+    `[sessions] ${operation} ${id}${name ? ` "${name}"` : ''} by ${source ?? 'unspecified'}: ${outcome}`
+  );
 /** At most one attention dialog per Session in this interval. */
 export const ATTENTION_INTERVAL_MS = 5 * 60_000;
 const read = <T>(file: string): T => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -235,6 +247,15 @@ export class SessionManager {
       throw new Error('Invalid session runtime lease');
     return lease;
   }
+  /** Whether the lease on disk is still exactly the one a caller observed. */
+  private sameLease(id: string, seen: RuntimeLease) {
+    try {
+      const current = this.readLease(id);
+      return current?.pid === seen.pid && current.startedAt === seen.startedAt;
+    } catch {
+      return false;
+    }
+  }
   async inspect(id: string): Promise<SessionInfo> {
     let item = this.registry.get(id);
     const lease = this.readLease(id);
@@ -269,11 +290,19 @@ export class SessionManager {
               : 'Runtime is not responding. Persistent data is protected; no unverified process will be stopped.',
             hung: !pending,
           };
-        if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
-        if (!pending) {
-          this.errors.set(id, 'Session process exited unexpectedly. Open to restart it.');
-          item = this.registry.update(id, {lastStop: {by: 'crash', at: new Date().toISOString()}});
-        }
+        // Decided now, not when this check began: a stop, force quit or parallel check
+        // may have handled this exit while the status call was in flight.
+        const busy = pending ?? this.pending.get(id);
+        if (this.sameLease(id, lease)) {
+          fs.unlinkSync(runtimeFile(id));
+          if (!busy) {
+            this.errors.set(id, 'Session process exited unexpectedly. Open to restart it.');
+            item = this.registry.update(id, {
+              lastStop: {by: 'crash', at: new Date().toISOString()},
+            });
+            log.warn(`[sessions] crash recorded ${id} "${item.name}": runtime ${lease.pid} exited`);
+          }
+        } else item = this.registry.get(id);
         this.leases.release(lease.mcpPort);
         this.leases.release(lease.browserSyncPort);
       }
@@ -421,6 +450,7 @@ export class SessionManager {
     this.attentionAt.set(id, now);
     try {
       await call(read<Endpoint>(shellFile()), {operation: 'attention', id}, 2000);
+      audit('attention', id, info.name, 'agent', `shown (${info.status})`);
     } catch {
       /* No shell (agent-only): the agent still receives its error. */
     }
@@ -443,9 +473,11 @@ export class SessionManager {
     // As in stop: a status check overlapping the kill must not record it as a crash.
     this.pending.set(id, 'stopping');
     try {
+      log.warn(`[sessions] force quit ${id}: SIGTERM to runtime ${lease.pid}`);
       process.kill(lease.pid, 'SIGTERM');
       for (let i = 0; i < 50 && alive(lease.pid); i += 1) await pause(100);
       if (alive(lease.pid)) {
+        log.warn(`[sessions] force quit ${id}: SIGKILL to runtime ${lease.pid}`);
         process.kill(lease.pid, 'SIGKILL');
         for (let i = 0; i < 20 && alive(lease.pid); i += 1) await pause(100);
       }
@@ -467,9 +499,10 @@ export class SessionManager {
     if (req.operation === 'create') {
       if (!req.name) throw new Error('Name is required');
       const item = this.registry.create(req.name, req.url ? normalizeUrl(req.url) : undefined);
+      audit('create', item.id, item.name, req.source, 'created');
       return req.open === false
         ? this.inspect(item.id)
-        : this.request({operation: 'open', id: item.id});
+        : this.request({operation: 'open', id: item.id, source: req.source});
     }
     const id = req.id;
     if (!id) throw new Error('Session ID is required');
@@ -524,6 +557,28 @@ export class SessionManager {
         }
       });
     this.locks.set(id, task);
+    if (req.operation !== 'attention')
+      task
+        .then((info) =>
+          audit(
+            req.operation,
+            id,
+            info.name,
+            req.source,
+            req.operation === 'delete' || req.operation === 'reset'
+              ? `${req.operation === 'delete' ? 'deleted' : 'reset'}; its profile, if any, moved to the Trash`
+              : info.status
+          )
+        )
+        .catch((error) => {
+          let name: string | undefined;
+          try {
+            name = this.registry.get(id).name;
+          } catch {
+            /* unknown or already deleted */
+          }
+          audit(req.operation, id, name, req.source, `failed: ${(error as Error)?.message}`);
+        });
     try {
       return await task;
     } finally {

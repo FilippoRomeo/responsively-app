@@ -10,6 +10,7 @@ vi.mock('electron', () => ({app: {getPath: () => os.tmpdir()}, shell: {trashItem
 import {ATTENTION_INTERVAL_MS, SessionManager, runtimeFile} from './service';
 import {atomicWrite, requestSchema} from './registry';
 import {serve, secret} from '../../common/session-rpc';
+import log from '../logging';
 import {SessionInfo} from '../../common/sessions';
 
 let root: string;
@@ -62,12 +63,85 @@ describe('who stopped a Session', () => {
     expect(new SessionManager().registry.get(s.id).lastStop?.by).toBe('crash');
   });
 
+  /** A runtime endpoint that accepts, then drops the connection once the caller has moved on. */
+  const vanishing = async (afterMs: number) => {
+    const server = net.createServer((socket) => {
+      setTimeout(() => socket.destroy(), afterMs);
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+    servers.push(server);
+    return (server.address() as net.AddressInfo).port;
+  };
+  const deadLease = (m: SessionManager, id: string, port: number) => {
+    const {pid} = spawnSync(process.execPath, ['-e', '']);
+    atomicWrite(runtimeFile(id), {
+      id,
+      pid,
+      port,
+      token: 'gone',
+      userDataDir: m.registry.dataDir(id),
+      mcpPort: 20001,
+      browserSyncPort: 20002,
+      startedAt: new Date().toISOString(),
+    });
+  };
+  const soon = () =>
+    new Promise((resolve) => {
+      setTimeout(resolve, 100);
+    });
+
+  it('keeps the recorded stop when the exit was handled during a slow status check', async () => {
+    const m = new SessionManager();
+    const s = await create(m, 'Handled');
+    deadLease(m, s.id, await vanishing(400));
+    const checking = m.inspect(s.id);
+    await soon();
+    // Meanwhile a stop (or force quit) saw the exit, removed the lease and recorded itself.
+    fs.unlinkSync(runtimeFile(s.id));
+    m.registry.update(s.id, {lastStop: {by: 'user', at: new Date().toISOString()}});
+    await checking;
+    expect(new SessionManager().registry.get(s.id).lastStop?.by).toBe('user');
+    expect((await m.inspect(s.id)).status).toBe('stopped');
+  });
+
+  it('records no crash when an operation began while the status check was in flight', async () => {
+    const m = new SessionManager();
+    const s = await create(m, 'Busy');
+    deadLease(m, s.id, await vanishing(400));
+    const checking = m.inspect(s.id);
+    await soon();
+    // A stop or force quit marks the Session busy before it signals the process.
+    (m as unknown as {pending: Map<string, string>}).pending.set(s.id, 'stopping');
+    await checking;
+    expect(m.registry.get(s.id).lastStop).toBeUndefined();
+  });
+
   it('accepts only real stop origins; a crash cannot be claimed', () => {
     const id = '8b6f2f0e-3c4d-4e5f-9a1b-2c3d4e5f6a7b';
     for (const source of ['user', 'window', 'quit', 'agent'])
       expect(() => requestSchema.parse({operation: 'stop', id, source})).not.toThrow();
     expect(() => requestSchema.parse({operation: 'stop', id, source: 'crash'})).toThrow();
     expect(() => requestSchema.parse({operation: 'stop', id, source: 'admin'})).toThrow();
+  });
+});
+
+describe('lifecycle log', () => {
+  it('writes one line per action with the Session, who asked and the outcome', async () => {
+    const info = vi.spyOn(log, 'info').mockImplementation(() => {});
+    const m = new SessionManager();
+    const s = await create(m, 'Logged');
+    await m.request({operation: 'rename', id: s.id, name: 'Logged 2', source: 'user'});
+    await m.request({operation: 'delete', id: s.id, confirmed: true, source: 'user'});
+    await expect(m.request({operation: 'focus', id: s.id, source: 'agent'})).rejects.toThrow();
+    const lines = info.mock.calls.map(([line]) => String(line));
+    expect(lines).toEqual([
+      `[sessions] create ${s.id} "Logged" by unspecified: created`,
+      `[sessions] rename ${s.id} "Logged 2" by user: stopped`,
+      `[sessions] delete ${s.id} "Logged 2" by user: deleted; its profile, if any, moved to the Trash`,
+      `[sessions] focus ${s.id} by agent: failed: Session not found`,
+    ]);
   });
 });
 

@@ -20,10 +20,10 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 ## 1. Baseline (✅ verified)
 
-- **App-code baseline:** `fe9d03be576381cf288e59f997b96aa0a88d9f3f` (merge of PR #11: the launch fallback opens the bridge's own `.app` before upstream's bundle ID), on Electron 43.1.1. Later docs-only commits on `main` don't change the installed application baseline, so the tip of `main` can be newer.
-- **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `fe9d03be`: `app.asar` SHA-256 `11ab5180b8f04eeadbc57015a954d21d0cc5b028c9e7139a5ed965c4121a5137` (unchanged since M1: M5 and PR #11 changed only the bridge), `mcp/cli.js` SHA-256 `70a2f8ef4b01c90f1c233627ef77613c70c6b04b5bc8f501f03a19c3b1849baf` (the bridge the PR #11 packaged launch test used); installed and smoke-tested 2026-09-26 (`list_sessions`, then `get_app_state` by UUID on a running Session).
-- **Rollback:** `desktop-app/.work/install-main-fe9d03be/install-backup-20260926T152208/` (the previous `ab639bd2` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of the app and both data folders). Older: `~/ResponsivelyGateF/install-ab639bd-001/backup-20260926T131759Z/` holds the `e484db9e` app; `.work/install-backup-20260923-122449/` holds the `b2cc6580` app.
-- **Gate C evidence:** M5: `~/ResponsivelyGateC/archive/gatec-m5-001-evidence.tgz`, SHA-256 `bc7384181ddd4d19304f289d13ec816fe2305a29fd03614b88cdbf93c91467e3`. PR #11: `desktop-app/.work/pr11-gatec-001/` (packaged bridge with a stubbed `open`: it opened the test `.app` by path and never ran `open -b app.responsively`).
+- **App-code baseline:** `55f30d85b65faa0c1da16b512929d3b3d6e2ac23` (merge of PR #16; includes the log fix #13, M2 #14, M6 #15 and the force-quit fix #16), on Electron 43.1.1. Later docs-only commits on `main` don't change the installed application baseline, so the tip of `main` can be newer.
+- **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `55f30d85`: `app.asar` SHA-256 `2509cebeb003bf85b7b3bb989bc3284e43c47ca8cab25a5c7fc2bc139bb71cea`, `mcp/cli.js` SHA-256 `204dc1ddfc8107c4b71e1e5e12bc4397e31adce4a68413326b5da3ff191320d4`, both byte-identical to the build Gate C `m6-004` tested. Installed 2026-09-26 and smoke-tested on the real registry: `list_sessions`, `get_app_state` by UUID on a running Session, and a stopped Session refused at once with its attention panel shown.
+- **Rollback:** `~/ResponsivelyGateF/install-55f30d8-001/backup-20260926T184943Z/` (the previous `fe9d03be` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of the app and both data folders). Older backups (the `ab639bd2`, `e484db9e` and `b2cc6580` apps) went to the Trash in the 2026-09-26 cleanup; their logs and hash lists are kept under `~/ResponsivelyGateC/archive/`.
+- **Gate C evidence:** M2, M6 and the force-quit fix: `~/ResponsivelyGateC/m6-004/gatec-m6-004-evidence.tgz`, SHA-256 `cb014d37217432bdde7d8440850efb0cd62426386b68b27f4f79a398160fab4b` (24/24). M5: `~/ResponsivelyGateC/archive/gatec-m5-001-evidence.tgz`, SHA-256 `bc7384181ddd4d19304f289d13ec816fe2305a29fd03614b88cdbf93c91467e3`. PR #11: logs only, `~/ResponsivelyGateC/archive/pr11-gatec-001-20260926T160528Z/`.
 - **Parked:** `refactor/sessions-process-roles` (validated, on GitHub, not merged).
 
 How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md).
@@ -48,19 +48,19 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 
 ## 3. Known problems, with evidence
 
-| ID     | Problem                                                                                                           | Evidence                                                                                   | Severity |
-| ------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------- |
-| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error"                                            | ✅ tested on 009; **fixed in M1**                                                          | High     |
-| **B2** | ⌘W or the red button leaves an invisible Session running, in front                                                | ✅ tested; **fixed in M1**                                                                 | High     |
-| **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                                 | Medium   |
-| **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                                    | Low      |
-| **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                                  | Low      |
-| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read; **fixed in M2** (unit tests; packaged check pending)                         | Medium   |
-| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read; **fixed in M2** (unit tests; packaged check pending)                         | Low      |
-| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                                 | Low      |
-| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured; **fixed in M2**                                           | Low      |
-| **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); M1 is installed, so observe in real use | ?        |
-| **R1** | Browser MCP tools use one fixed port, not the Session UUID; after a restart they miss the Session and wait 60 s   | ✅ Gate C 14/14 + installed smoke test; **fixed in M5**                                    | High     |
+| ID     | Problem                                                                                                           | Evidence                                                                                               | Severity |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------- |
+| **B1** | ⌘Q in a Session window quits only that Session and shows it as "error"                                            | ✅ tested on 009; **fixed in M1**                                                                      | High     |
+| **B2** | ⌘W or the red button leaves an invisible Session running, in front                                                | ✅ tested; **fixed in M1**                                                                             | High     |
+| **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                                             | Medium   |
+| **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                                                | Low      |
+| **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                                              | Low      |
+| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | ✅ CI e2e (manager in the window, no floating panel); seen in the packaged Gate C app; **fixed in M2** | Medium   |
+| **U2** | Toolbar doesn't show the current Session's name                                                                   | ✅ Gate C `m6-004`: you saw the name on the button; **fixed in M2**                                    | Low      |
+| **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                                             | Low      |
+| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured; **fixed in M2**                                                       | Low      |
+| **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); M1 is installed, so observe in real use             | ?        |
+| **R1** | Browser MCP tools use one fixed port, not the Session UUID; after a restart they miss the Session and wait 60 s   | ✅ Gate C 14/14 + installed smoke test; **fixed in M5**                                                | High     |
 
 ## 4. Roadmap (each milestone = one branch, one test package, one PR, one install)
 
@@ -72,7 +72,7 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 - No "What's new" card in Sessions.
 - **Done when:** a package passes today's exact tests (⌘W, red button, single and double ⌘Q, a new window on display 2, restore after Quit) plus the existing checks; then CI is green, your go-ahead, install and smoke test.
 
-### M2: "One manager, and you know where you are" (U1, U2, P1) — implemented on a branch; packaged validation pending
+### M2: "One manager, and you know where you are" (U1, U2, P1) — ✅ done: merged (PR #14), checked in Gate C `m6-004`, installed with M6 on 2026-09-26
 
 - ⌘⇧M in a Session window opens the same in-window manager as the toolbar button; no per-Session floating panel.
 - The toolbar button shows the Session's name.
@@ -99,11 +99,14 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 - Installed smoke test: `smoke-m5` stop and reopen changed the PID `36485 → 36627` and the port `65304 → 65426`; `get_app_state` with the same UUID returned the same page before and after.
 - Design: [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part R.
 
-### M6: "Session attention dialog" — implemented on a branch; packaged validation pending
+### M6: "Session attention dialog" — ✅ done: merged (PR #15, fix PR #16), Gate C `m6-004` 24/24, installed and smoke-tested 2026-09-26
 
 - When an agent addresses a Session that isn't usable, the Sessions panel shows you why, including who stopped it, with Open/Restart, Reset, Delete and a warned Force quit. Only you click.
 - At most one dialog per Session every 5 minutes; it never takes focus.
 - Design and decisions: [SESSIONS_MCP_DESIGN.md](SESSIONS_MCP_DESIGN.md), part D.
+- Gate C `m6-004`: the panel kept the front app unchanged (measured: iTerm2 before and after); you confirmed the panel, the `!` badge and the Session name on the toolbar; `ps` gave the full app path and a start time 0.6 s from the lease; a paused runtime was refused without confirmation, then force quit in 6.7 s and recorded as stopped by you.
+- PR #16 fixed a false "crash" after a force quit, found by Gate C `m6-003`: a status check already in flight when the runtime died recorded a crash after the force quit had recorded you.
+- **Stability follow-up** (lifecycle log; a crash is recorded only by the check that still finds the exact lease with no operation in progress, which closes the same race for stop and for parallel checks): implemented and unit-tested; packaged check pending.
 
 ### Not planned
 
