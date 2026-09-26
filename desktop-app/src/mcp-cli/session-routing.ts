@@ -56,6 +56,16 @@ export const hasSessionArgument = (params: ToolCallParams): boolean =>
 const isValidPort = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535;
 
+/** A Session that cannot serve browser tools; `needsAttention` when you should see it. */
+export class SessionUnavailableError extends Error {
+  constructor(
+    message: string,
+    readonly needsAttention: boolean
+  ) {
+    super(message);
+  }
+}
+
 /** Asks the controller where a Session's runtime serves MCP right now. */
 export const resolveSessionPort = async (
   manage: Manage,
@@ -76,11 +86,15 @@ export const resolveSessionPort = async (
     case 'stopping':
       throw new Error(`${label} is stopping. Call open_session once it has stopped, then retry.`);
     case 'stopped':
-      throw new Error(`${label} is stopped. Call open_session with this id first, then retry.`);
+      throw new SessionUnavailableError(
+        `${label} is stopped. Call open_session with this id first, then retry.`,
+        true
+      );
     default:
-      throw new Error(
+      throw new SessionUnavailableError(
         `${label} is in an error state: ${info.error ?? 'no details reported'} ` +
-          'Call open_session to restart it, or ask the user to check it in the Sessions manager.'
+          'Call open_session to restart it, or ask the user to check it in the Sessions manager.',
+        true
       );
   }
 };
@@ -116,7 +130,16 @@ export const createSessionRouter =
       );
     }
     // Resolved again on every call: the port is a temporary resource.
-    const {port, name} = await resolveSessionPort(manage, session);
+    let target: {port: number; name: string};
+    try {
+      target = await resolveSessionPort(manage, session);
+    } catch (error) {
+      // Show you the Session the agent could not use; the controller rate-limits it.
+      if (error instanceof SessionUnavailableError && error.needsAttention)
+        void manage({operation: 'attention', id: session}).catch(() => {});
+      throw error;
+    }
+    const {port, name} = target;
     const backend = backendFor(port, name);
     try {
       return await backend.callTool({...params, arguments: args});

@@ -111,7 +111,7 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
     manage({operation: 'focus', id})
   );
   server.registerTool('stop_session', toolDefs.stop_session, ({id}) =>
-    manage({operation: 'stop', id})
+    manage({operation: 'stop', id, source: 'agent'})
   );
   server.registerTool('get_app_state', toolDefs.get_app_state, async () => {
     try {

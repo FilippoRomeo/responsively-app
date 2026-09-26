@@ -49,6 +49,7 @@ import {
   initSessionsTray,
   showLauncher,
   showSessions,
+  showAttention,
   startSessionRuntime,
 } from './sessions/runtime';
 
@@ -447,7 +448,7 @@ app
     appUpdater = new AppUpdater();
     initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
-      await startShellOwner((message) => showSessions(false, message, true));
+      await startShellOwner((message) => showSessions(false, message, true), showAttention);
     if (
       process.platform === 'darwin' &&
       !process.env.RESPONSIVELY_SESSION_ID &&

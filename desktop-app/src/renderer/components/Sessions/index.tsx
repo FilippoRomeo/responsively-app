@@ -13,7 +13,7 @@ const request: SessionRequester = (value) =>
 const actionClass =
   'justify-center border border-line bg-card disabled:cursor-not-allowed disabled:opacity-40';
 
-export type SessionsShowRequest = {create: boolean; error: string};
+export type SessionsShowRequest = {create: boolean; error: string; attention?: string};
 
 /**
  * Receives the main process's SESSIONS_SHOW (⌘⇧M / ⌘⇧N in a Session window).
@@ -104,6 +104,7 @@ export default function SessionsManager({
   onClose,
   initialCreate = false,
   initialError = '',
+  initialAttention = '',
   active = true,
   showRequest,
   native = false,
@@ -113,8 +114,10 @@ export default function SessionsManager({
   onClose: () => void;
   initialCreate?: boolean;
   initialError?: string;
+  /** A Session an agent could not use: opens the attention view for it. */
+  initialAttention?: string;
   active?: boolean;
-  showRequest?: {create: boolean; error: string} | null;
+  showRequest?: SessionsShowRequest | null;
   native?: boolean;
   onHeight?: (height: number) => void;
 }) {
@@ -134,6 +137,8 @@ export default function SessionsManager({
   const [confirming, setConfirming] = useState<SessionInfo | null>(null);
   // The confirmation view serves Delete and Reset data; both act on a stopped Session.
   const [resetting, setResetting] = useState(false);
+  const [attention, setAttention] = useState<string | null>(initialAttention || null);
+  const [forcing, setForcing] = useState(false);
   const [filter, setFilter] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const refreshId = useRef(0);
@@ -182,6 +187,12 @@ export default function SessionsManager({
   useEffect(() => {
     if (!showRequest) return;
     if (showRequest.create) newSession();
+    if (showRequest.attention) {
+      setEditing(null);
+      setConfirming(null);
+      setForcing(false);
+      setAttention(showRequest.attention);
+    }
     setActionError(showRequest.error);
     panelRef.current?.focus();
   }, [showRequest]);
@@ -217,13 +228,15 @@ export default function SessionsManager({
         panelRef.current?.focus();
       setEditing(null);
       setConfirming(null);
+      setAttention(null);
+      setForcing(false);
       draft.current = null;
       // Discard any refresh that started before this change landed.
       refreshId.current += 1;
       refreshing.current = false;
       await refresh();
       setSuccess(
-        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : 'Session opened'}.`
+        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : value.operation === 'force-stop' ? 'Session force quit' : 'Session opened'}.`
       );
     } catch (error) {
       if (mounted.current)
@@ -251,6 +264,8 @@ export default function SessionsManager({
     draft.current = preserve && editing ? {id: editing, name, url, start} : null;
     setEditing(null);
     setConfirming(null);
+    setAttention(null);
+    setForcing(false);
     panelRef.current?.focus();
   };
 
@@ -264,7 +279,7 @@ export default function SessionsManager({
       data-testid="sessions-manager"
       onKeyDownCapture={(event) => {
         if (event.key !== 'Escape') return;
-        if (editing || confirming) {
+        if (editing || confirming || attention) {
           event.preventDefault();
           event.stopPropagation();
           closeSubview(true);
@@ -396,6 +411,30 @@ export default function SessionsManager({
             </ToolbarAction>
           </div>
         </div>
+      ) : attention ? (
+        <AttentionView
+          item={items.find((s) => s.id === attention)}
+          loading={loading}
+          forcing={forcing}
+          pending={Boolean(pending[attention])}
+          error={errors[attention]}
+          onOpen={(id) => void run({operation: 'open', id})}
+          onReset={(item) => {
+            setResetting(true);
+            setConfirming(item);
+          }}
+          onDelete={(item) => {
+            setResetting(false);
+            setConfirming(item);
+          }}
+          onForce={() => setForcing(true)}
+          onForceConfirm={(id) => void run({operation: 'force-stop', id, confirmed: true})}
+          onForceCancel={() => setForcing(false)}
+          onDismiss={() => {
+            closeSubview();
+            onClose();
+          }}
+        />
       ) : (
         <>
           <div className="shrink-0 px-3 pt-3">
@@ -524,6 +563,124 @@ export default function SessionsManager({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+const STOP_CAUSE: Record<NonNullable<SessionInfo['lastStop']>['by'], string> = {
+  user: 'Stopped by you',
+  window: 'Stopped when its window was closed',
+  quit: 'Stopped when Responsively quit',
+  agent: 'Stopped by an agent',
+  crash: 'Its process exited unexpectedly',
+};
+
+/** Why an agent could not use a Session, and what you can do about it. */
+function AttentionView({
+  item,
+  loading,
+  forcing,
+  pending,
+  error,
+  onOpen,
+  onReset,
+  onDelete,
+  onForce,
+  onForceConfirm,
+  onForceCancel,
+  onDismiss,
+}: {
+  item: SessionInfo | undefined;
+  loading: boolean;
+  forcing: boolean;
+  pending: boolean;
+  error?: string;
+  onOpen: (id: string) => void;
+  onReset: (item: SessionInfo) => void;
+  onDelete: (item: SessionInfo) => void;
+  onForce: () => void;
+  onForceConfirm: (id: string) => void;
+  onForceCancel: () => void;
+  onDismiss: () => void;
+}) {
+  if (!item)
+    return (
+      <div className="grid gap-3 p-3 text-sm" data-testid="session-attention">
+        <p role="status">{loading ? 'Loading Session…' : 'This Session no longer exists.'}</p>
+        <div className="flex justify-end">
+          <ToolbarAction onClick={onDismiss}>Dismiss</ToolbarAction>
+        </div>
+      </div>
+    );
+  if (forcing)
+    return (
+      <div className="grid gap-3 overflow-y-auto p-3 text-sm" data-testid="session-attention">
+        <h3 className="break-words font-semibold">Force quit “{item.name}”?</h3>
+        <p>
+          Responsively will end this Session&apos;s process, after checking it is really this
+          Session&apos;s. Unsaved page state in its window can be lost; its browser data stays.
+        </p>
+        {error && (
+          <p role="alert" className="break-words text-red-700 dark:text-red-300">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <ToolbarAction onClick={onForceCancel}>Cancel</ToolbarAction>
+          <ToolbarAction
+            disabled={pending}
+            className={actionClass}
+            onClick={() => onForceConfirm(item.id)}
+          >
+            {pending ? 'Force quitting…' : 'Force Quit'}
+          </ToolbarAction>
+        </div>
+      </div>
+    );
+  const stopped = item.status === 'stopped';
+  const crashed = item.status === 'error' && !item.hung;
+  const cause = item.lastStop
+    ? `${STOP_CAUSE[item.lastStop.by]} · ${new Date(item.lastStop.at).toLocaleString()}`
+    : '';
+  return (
+    <div className="grid gap-3 overflow-y-auto p-3 text-sm" data-testid="session-attention">
+      <h3 className="break-words font-semibold">“{item.name}” needs attention</h3>
+      <p>An agent tried to use this Session, but it is not available.</p>
+      <p role="alert" className="break-words text-red-700 dark:text-red-300">
+        {item.status === 'running'
+          ? 'It is running again.'
+          : item.hung
+            ? item.error
+            : [stopped ? 'It is stopped.' : item.error, cause].filter(Boolean).join(' ')}
+      </p>
+      {error && (
+        <p role="alert" className="break-words text-red-700 dark:text-red-300">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap justify-end gap-2">
+        <ToolbarAction onClick={onDismiss}>Dismiss</ToolbarAction>
+        {stopped && (
+          <>
+            <ToolbarAction className={actionClass} onClick={() => onDelete(item)}>
+              Delete…
+            </ToolbarAction>
+            <ToolbarAction className={actionClass} onClick={() => onReset(item)}>
+              Reset…
+            </ToolbarAction>
+          </>
+        )}
+        {item.hung && (
+          <ToolbarAction className={actionClass} onClick={onForce}>
+            Force Quit…
+          </ToolbarAction>
+        )}
+        {(stopped || crashed) && (
+          <ToolbarAction disabled={pending} className={actionClass} onClick={() => onOpen(item.id)}>
+            {pending ? 'Opening…' : crashed ? 'Restart' : 'Open'}
+          </ToolbarAction>
+        )}
+      </div>
     </div>
   );
 }
