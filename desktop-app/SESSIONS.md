@@ -2,6 +2,8 @@
 
 Use **Sessions → New Session…** or the toolbar's **Sessions** button. A Session is a saved project context with an immutable UUID, a name, its own browser data and device suites. Names must be unique. Ports and processes are temporary resources, not identities.
 
+In a Session window the toolbar button shows that Session's name, and ⌘⇧M (Manage) and ⌘⇧N (New) open the same toolbar manager; there is no separate floating panel there. The floating panel under the menu-bar icon belongs to the shell, and it stops refreshing while it is hidden.
+
 - **Open** starts a stopped Session; opening a running Session focuses it.
 - **Focus** brings a running Session's window to the front.
 - **Stop** quits that Session's process and preserves its data.

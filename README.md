@@ -254,9 +254,9 @@ Milestone M1 fixed the window and Quit behavior: `⌘W` / the red button now sto
 
 Remaining known issues include:
 
-- a Session window has two managers (the toolbar popover and the ⌘⇧M floating panel), and the toolbar does not show which Session you are in;
-- each new profile logs harmless migration errors once (upstream has a small fix, not yet cherry-picked);
-- the hidden manager panel and Session processes poll more often than necessary.
+- each new profile logs harmless migration errors once (upstream has a small fix, not yet cherry-picked).
+
+Milestone M2 gives a Session window one manager (⌘⇧M opens the toolbar manager), shows the Session's name on the toolbar button, and stops unnecessary background polling.
 
 The evidence, severity and planned milestones are tracked in [SESSIONS_ROADMAP.md](desktop-app/SESSIONS_ROADMAP.md).
 
