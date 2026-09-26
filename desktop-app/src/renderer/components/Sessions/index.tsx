@@ -145,6 +145,7 @@ export default function SessionsManager({
   const refreshing = useRef(false);
   const mounted = useRef(true);
   const draft = useRef<{id: string; name: string; url: string; start: boolean} | null>(null);
+  const closeSubviewRef = useRef<(preserve?: boolean) => void>(() => {});
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
@@ -187,6 +188,8 @@ export default function SessionsManager({
   useEffect(() => {
     if (!showRequest) return;
     if (showRequest.create) newSession();
+    // Manage Sessions: back to the list, even in a panel that was hidden mid-form; the draft is kept.
+    else if (!showRequest.attention) closeSubviewRef.current(true);
     if (showRequest.attention) {
       setEditing(null);
       setConfirming(null);
@@ -268,6 +271,8 @@ export default function SessionsManager({
     setForcing(false);
     panelRef.current?.focus();
   };
+  // The show-request effect runs only for new requests, but must see the current form.
+  closeSubviewRef.current = closeSubview;
 
   return (
     <div
