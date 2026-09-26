@@ -34,10 +34,10 @@ A single controller owns the Session registry and lifecycle. Session identity ne
 The current known-good application-code baseline is:
 
 ```text
-e484db9e553ea6311c9cbb211a5e647428087808
+79fa6216e6cc462c0f847a09cc0f31fa41d79402
 ```
 
-That commit (milestone M1: window close and ⌘Q behaviour, new windows on the current monitor) has been merged, installed and smoke-tested as a packaged macOS app. The tip of `main` can be newer because of documentation-only commits; those don't change the application. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
+That commit (milestones M1, M2, M5 and M6 plus their fixes; see [the roadmap](desktop-app/SESSIONS_ROADMAP.md)) has been merged, validated as a packaged test app (Gate C, 24/24), installed and smoke-tested on macOS. The tip of `main` can be newer because of documentation-only commits; those don't change the application. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
 
 ## Current product model
 
@@ -97,13 +97,14 @@ git checkout main
 For a reproducible install, confirm the expected baseline before building:
 
 ```bash
-git diff --quiet e484db9e553ea6311c9cbb211a5e647428087808 HEAD -- \
+git diff --quiet 79fa6216e6cc462c0f847a09cc0f31fa41d79402 HEAD -- \
   desktop-app \
   ':(exclude,glob)desktop-app/**/*.md' \
+  ':(exclude)desktop-app/scripts/gates' \
   && echo "desktop app non-doc files match the validated baseline"
 ```
 
-This compares every non-Markdown file under `desktop-app` (source, assets, build config, lockfiles, tests) with the validated baseline `e484db9e553ea6311c9cbb211a5e647428087808`, so documentation-only commits on `main` don't cause a mismatch. If it prints nothing, something that can affect the app differs from what was validated.
+This compares every non-Markdown file under `desktop-app` (source, assets, build config, lockfiles, tests) with the validated baseline `79fa6216e6cc462c0f847a09cc0f31fa41d79402`, so documentation-only commits on `main` don't cause a mismatch. The validation scripts in `desktop-app/scripts/gates/` are excluded too: they build and test the app but aren't part of it. If it prints nothing, something that can affect the app differs from what was validated.
 
 ### 2. Install dependencies
 
@@ -126,7 +127,30 @@ The packaging script:
 - ad-hoc signs and verifies the bundle;
 - installs it as `~/Applications/ResponsivelyMCP.app`.
 
-**Important:** use this script for a **first install**. If `~/Applications/ResponsivelyMCP.app` already exists with the expected bundle ID, the script deletes and replaces that app bundle without a backup. It does not remove the Application Support data directories, but to **update a working installation**, follow the backup-first install gate (Gate F) in [SESSIONS_PROCESS.md](desktop-app/SESSIONS_PROCESS.md) instead.
+**Important:** use this script for a **first install** only. If `~/Applications/ResponsivelyMCP.app` already exists with the expected bundle ID, the script deletes and replaces that app bundle without a backup. It does not remove the Application Support data directories, but to **update a working installation**, use the backup-first steps below.
+
+### Update an existing install (backup first)
+
+The commit must be pushed to this fork. Quit Responsively from its menu-bar icon first, and run each step in a normal Terminal window from the repository root:
+
+```bash
+git checkout main && git pull --ff-only
+SHA="$(git rev-parse HEAD)"
+
+# 1. Test a separate copy of that exact commit (~20 minutes; it asks you 3 yes/no questions).
+bash desktop-app/scripts/gates/gatec.sh "$SHA"
+
+# 2. Build the same commit with the installed app's identity (safe while the app runs).
+bash desktop-app/scripts/gates/gatef.sh prepare "c-${SHA:0:7}-001" "install-${SHA:0:7}-001"
+
+# 3. Quit Responsively, then back up the app and both data folders (verified by SHA-256).
+bash desktop-app/scripts/gates/gatef.sh backup "install-${SHA:0:7}-001"
+
+# 4. Swap the app in; the old one is kept in the backup and a rollback command is printed.
+bash desktop-app/scripts/gates/gatef.sh replace "install-${SHA:0:7}-001"
+```
+
+Each step stops at the first failure and never deletes anything. `prepare` refuses a commit whose Gate C run didn't pass, and `replace` installs only a bridge byte-identical to the one Gate C tested. Test runs live in `~/ResponsivelyGateC/<run>/` and installs, with their backups, in `~/ResponsivelyGateF/<install-run>/`. If the bridge changed, restart Claude Desktop afterwards so it loads the new one. Details: Gates C and F in [SESSIONS_PROCESS.md](desktop-app/SESSIONS_PROCESS.md).
 
 ### 4. Launch it
 
@@ -233,7 +257,7 @@ navigate   {"session": "<UUID>", "url": "http://localhost:3000"}
 screenshot {"session": "<UUID>"}
 ```
 
-A stopped Session is never opened implicitly: the call returns an error naming the Session and telling the agent to call `open_session`. Without `session`, browser tools use the configured port as before.
+A stopped Session is never opened implicitly: the call returns an error naming the Session and telling the agent to call `open_session`. The app also shows you that Session in the menu-bar panel, with why it is unavailable and who stopped it, without taking keyboard focus (at most once per Session every 5 minutes). Without `session`, browser tools use the configured port as before.
 
 Session lifecycle tools include:
 
@@ -257,6 +281,8 @@ Remaining known issues include:
 - each new profile logs harmless migration errors once (upstream has a small fix, not yet cherry-picked).
 
 Milestone M2 gives a Session window one manager (⌘⇧M opens the toolbar manager), shows the Session's name on the toolbar button, and stops unnecessary background polling.
+
+Milestone M6 shows you a Session an agent could not use, with who stopped it (you, closing its window, Quit, an agent or a crash) and Open/Restart, Reset, Delete, and Force quit for a hung process behind a second warning. Every lifecycle action is written as one `[sessions]` line to `~/Library/Logs/ResponsivelyApp/main.log`, and **Manage Sessions…** always opens the list.
 
 The evidence, severity and planned milestones are tracked in [SESSIONS_ROADMAP.md](desktop-app/SESSIONS_ROADMAP.md).
 
