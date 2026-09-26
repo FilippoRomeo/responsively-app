@@ -20,10 +20,10 @@ This is the working product roadmap for the Sessions fork. Every item is tagged 
 
 ## 1. Baseline (✅ verified)
 
-- **App-code baseline:** `ab639bd2a2966d0d9e7d9241b2b73d5f14796280` (merge of PR #9, milestone M5), on Electron 43.1.1. Later docs-only commits on `main` don't change the installed application baseline, so the tip of `main` can be newer.
-- **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `ab639bd2`: `app.asar` SHA-256 `11ab5180b8f04eeadbc57015a954d21d0cc5b028c9e7139a5ed965c4121a5137` (unchanged since M1: M5 changed only the bridge), `mcp/cli.js` SHA-256 `eb1d3b76c0d63fc4540f8cd8cb43fbc93da897f758fb3f6b3b61c0794c07a3d1` (the bridge Gate C tested); installed and smoke-tested 2026-09-26.
-- **Rollback:** `~/ResponsivelyGateF/install-ab639bd-001/backup-20260926T131759Z/` (the previous `e484db9e` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of the app and both data folders). The older `.work/install-backup-20260923-122449/` still holds the `b2cc6580` app.
-- **Gate C evidence (M5):** `~/ResponsivelyGateC/archive/gatec-m5-001-evidence.tgz`, SHA-256 `bc7384181ddd4d19304f289d13ec816fe2305a29fd03614b88cdbf93c91467e3`.
+- **App-code baseline:** `fe9d03be576381cf288e59f997b96aa0a88d9f3f` (merge of PR #11: the launch fallback opens the bridge's own `.app` before upstream's bundle ID), on Electron 43.1.1. Later docs-only commits on `main` don't change the installed application baseline, so the tip of `main` can be newer.
+- **Installed:** `~/Applications/ResponsivelyMCP.app`, built from `fe9d03be`: `app.asar` SHA-256 `11ab5180b8f04eeadbc57015a954d21d0cc5b028c9e7139a5ed965c4121a5137` (unchanged since M1: M5 and PR #11 changed only the bridge), `mcp/cli.js` SHA-256 `70a2f8ef4b01c90f1c233627ef77613c70c6b04b5bc8f501f03a19c3b1849baf` (the bridge the PR #11 packaged launch test used); installed and smoke-tested 2026-09-26 (`list_sessions`, then `get_app_state` by UUID on a running Session).
+- **Rollback:** `desktop-app/.work/install-main-fe9d03be/install-backup-20260926T152208/` (the previous `ab639bd2` app as `ResponsivelyMCP.app.replaced`, plus hash-verified copies of the app and both data folders). Older: `~/ResponsivelyGateF/install-ab639bd-001/backup-20260926T131759Z/` holds the `e484db9e` app; `.work/install-backup-20260923-122449/` holds the `b2cc6580` app.
+- **Gate C evidence:** M5: `~/ResponsivelyGateC/archive/gatec-m5-001-evidence.tgz`, SHA-256 `bc7384181ddd4d19304f289d13ec816fe2305a29fd03614b88cdbf93c91467e3`. PR #11: `desktop-app/.work/pr11-gatec-001/` (packaged bridge with a stubbed `open`: it opened the test `.app` by path and never ran `open -b app.responsively`).
 - **Parked:** `refactor/sessions-process-roles` (validated, on GitHub, not merged).
 
 How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESSIONS_PROCESS.md).
