@@ -1,6 +1,6 @@
 # Sessions and MCP: design
 
-Status: **R (routing)** is merged (PR #9), packaged-validated and installed (M5). **D (attention dialog)** is design only, planned as its own milestone (M6).
+Status: **R (routing)** is merged (PR #9), packaged-validated and installed (M5). **D (attention dialog)** is implemented (M6); packaged validation is pending.
 
 ## Problem (verified in code)
 
@@ -59,7 +59,7 @@ Errors are returned as tool results with `isError: true` and carry the Session n
 - Existing bridge tests stay green: sessionless behaviour is unchanged.
 - Packaged (Gate C, on macOS): two running Sessions, `navigate` + `screenshot` against each by UUID; stop and reopen one, then call again with the same UUID and no config change.
 
-## D: Session attention dialog (next milestone, design only)
+## D: Session attention dialog (M6)
 
 ### Goal
 
@@ -85,20 +85,20 @@ When an agent addresses a Session that isn't usable, **you** see why, in the app
 
 1. A routed browser call resolves to a non-usable state (table above).
 2. The bridge returns the error to the agent and sends the controller an `attention` request with the UUID only.
-3. The controller forwards it to the macOS shell's authenticated endpoint (`shell.json`, which today serves `status` and `quit`). With no shell running (agent-only), nothing is shown.
-4. The shell opens the Sessions panel in the attention view. At most one dialog per Session per rate-limit window, so an agent's retry loop can't spam you.
+3. The controller forwards it to the macOS shell's authenticated endpoint (`shell.json`: `status`, `quit`, `attention`). With no shell running (agent-only), nothing is shown.
+4. The shell opens the Sessions panel in the attention view, at most once per Session every 5 minutes (`ATTENTION_INTERVAL_MS`), so an agent's retry loop can't spam you. It never takes focus: the panel is shown inactive and floating, and the menu-bar icon gets a `!` until you use or dismiss the panel.
 
-This amends roadmap principle 5 as **proposed decision D4**: MCP may _ask for your attention_; Reset, Delete and Force quit stay human-only actions in the UI.
+This amends roadmap principle 5 as **decision D4**: MCP may _ask for your attention_; Reset, Delete and Force quit stay human-only actions in the UI.
 
-### Open questions (need your decision before D starts)
+### Decisions (answered 2026-09-26)
 
-1. **Who stopped it:** the controller doesn't record whether a stop came from you, ⌘W, Quit, an agent or a crash. Recording it means new state (in memory or in the registry).
-2. **Proof for Force quit:** today a saved PID never authorizes a kill (`service.ts`). One option: compare the process's OS start time and executable with the runtime lease before signalling. This needs a design review.
-3. **Rate-limit window** and whether the dialog may steal focus while you're typing in another app.
-4. **Non-macOS:** the shell endpoint is macOS-only today.
+1. **Who stopped it: stored in the registry** as `lastStop {by, at}`. The origin is set by the component that stops the Session, never taken from the caller's arguments: Sessions UI requests are forced to `user` in the main process, bridge and runtime MCP lifecycle calls to `agent`, ⌘W sends `window`, Quit sends `quit`, and the controller records `crash` when a runtime vanishes without a stop. A caller cannot claim `crash`. Older app versions ignore the field, so rollback stays safe.
+2. **Force quit proof: PID + start time + executable.** `force-stop` needs `confirmed: true` and a hung Session (process alive, endpoint silent). The process's macOS `ps` start time must match the lease's `startedAt` (±10 s) and its executable must be the app binary; otherwise nothing is signalled. Then SIGTERM, and SIGKILL after 5 s. On other platforms nothing can be proven, so force quit is refused.
+3. **Intrusion: once per Session per 5 minutes, no focus steal** (above).
+4. **Non-macOS:** unchanged. The attention panel needs the macOS shell; elsewhere the agent only receives its error.
 
 ## Implementation order
 
-1. R: bridge-only change, unit tests, docs (this branch).
-2. R: packaged validation and install through `SESSIONS_PROCESS.md` gates C–F.
-3. D: settle the open questions, then its own branch and milestone.
+1. R: bridge-only change, unit tests, docs. ✅ (PR #9)
+2. R: packaged validation and install through `SESSIONS_PROCESS.md` gates C–F. ✅
+3. D: implemented as M6 with unit tests; packaged validation (a real attention panel, and force quit of a hung runtime) pending.
