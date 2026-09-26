@@ -11,6 +11,8 @@ export interface BackendOptions {
   launchTimeoutMs?: number;
   pollIntervalMs?: number;
   launcher?: (port: number) => Promise<void>;
+  /** Logged before the launcher runs; a launcher that never launches says what really happens. */
+  unreachableNotice?: string;
 }
 
 const sleep = (ms: number) =>
@@ -72,6 +74,7 @@ export const createBackend = (options: BackendOptions) => {
     launchTimeoutMs = 60_000,
     pollIntervalMs = 500,
     launcher = launchApp,
+    unreachableNotice = `Responsively App is not running — launching it (port ${port})`,
   } = options;
 
   let cached: Client | null = null;
@@ -115,7 +118,7 @@ export const createBackend = (options: BackendOptions) => {
       launching = (async () => {
         launchGeneration += 1;
         lastLaunchStartedAt = Date.now();
-        log(`Responsively App is not running — launching it (port ${port})`);
+        log(unreachableNotice);
         await launcher(port);
         const deadline = Date.now() + launchTimeoutMs;
         while (Date.now() < deadline) {

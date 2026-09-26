@@ -97,6 +97,7 @@ export interface SessionRouterOptions {
 const routedBackend = (port: number, name: string) =>
   createBackend({
     port,
+    unreachableNotice: `Session "${name}" is not answering on port ${port}`,
     launcher: async () => {
       throw new Error(
         `Session "${name}" stopped answering on its MCP port during this call. ` +
