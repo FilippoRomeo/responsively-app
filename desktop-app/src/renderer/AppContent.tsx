@@ -1,4 +1,4 @@
-import {Provider, useSelector} from 'react-redux';
+import {Provider, useDispatch, useSelector} from 'react-redux';
 
 import ToolBar from './components/ToolBar';
 import Previewer from './components/Previewer';
@@ -12,7 +12,8 @@ import StatusBar from './components/StatusBar';
 import KeyboardShortcutsManager from './components/KeyboardShortcutsManager';
 import {PREVIEW_LAYOUTS} from '../common/constants';
 import {selectLayout} from './store/features/renderer';
-import {selectIsPresenting} from './store/features/ui';
+import {selectIsPresenting, setPresenting} from './store/features/ui';
+import {useSessionsShowRequest} from './components/Sessions';
 import McpBridge from './components/McpBridge';
 import AnnouncementCard from './components/AnnouncementCard';
 import {AboutDialog} from './components/AboutDialog';
@@ -26,9 +27,16 @@ const usePresenting = (): boolean => {
 
 const Browser = () => {
   const presenting = usePresenting();
+  const dispatch = useDispatch();
+  // ⌘⇧M / ⌘⇧N in a Session window open the toolbar manager, so leave presentation first.
+  const [sessionsRequest, sessionsShown] = useSessionsShowRequest(() =>
+    dispatch(setPresenting(false))
+  );
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {presenting ? null : <ToolBar />}
+      {presenting ? null : (
+        <ToolBar sessionsRequest={sessionsRequest} onSessionsShown={sessionsShown} />
+      )}
       <div className="min-h-0 flex-1">
         <Previewer />
       </div>

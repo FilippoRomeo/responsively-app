@@ -29,10 +29,16 @@ import useKeyboardShortcut, {
   SHORTCUT_CHANNEL,
 } from '../KeyboardShortcutsManager/useKeyboardShortcut';
 import McpPanel from './McpPanel';
-import {SessionsButton} from '../Sessions';
+import {SessionsButton, SessionsShowRequest} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
 
-const ToolBar = () => {
+const ToolBar = ({
+  sessionsRequest = null,
+  onSessionsShown,
+}: {
+  sessionsRequest?: SessionsShowRequest | null;
+  onSessionsShown?: () => void;
+}) => {
   const rotateDevices = useSelector(selectRotate);
   const isInspecting = useSelector(selectIsInspecting);
   const isCapturingScreenshot = useSelector(selectIsCapturingScreenshot);
@@ -137,7 +143,7 @@ const ToolBar = () => {
         <ColorSchemeToggle />
       </ToolbarGroup>
       <ToolbarDivider />
-      <SessionsButton />
+      <SessionsButton showRequest={sessionsRequest} onShown={onSessionsShown} />
       <McpPanel />
       <PreviewSuiteSelector />
       <IconButton

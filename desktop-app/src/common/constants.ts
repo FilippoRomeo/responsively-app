@@ -34,6 +34,7 @@ export const IPC_MAIN_CHANNELS = {
   SESSIONS_PANEL_SHOW: 'sessions-panel-show',
   SESSIONS_PANEL_RESIZE: 'sessions-panel-resize',
   SESSION_CONTEXT: 'session-context',
+  SESSION_RENAMED: 'session-renamed',
   APP_META: 'app-meta',
   PERMISSION_REQUEST: 'permission-request',
   PERMISSION_RESPONSE: 'permission-response',
