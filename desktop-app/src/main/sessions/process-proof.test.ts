@@ -22,10 +22,18 @@ describe('parsePs', () => {
     });
   });
 
+  it('also reads the day-first order some locales print (seen on en_GB macOS)', () => {
+    expect(parsePs(`Mon 14 Sep 06:09:51 2026     ${EXE}`)).toEqual({
+      startedAt: local(2026, 8, 14, 6, 9, 51),
+      executable: EXE,
+    });
+  });
+
   it('rejects anything it cannot parse', () => {
     expect(parsePs('')).toBeNull();
     expect(parsePs('garbage')).toBeNull();
     expect(parsePs(`Sat Foo 26 15:22:08 2026 ${EXE}`)).toBeNull();
+    expect(parsePs(`Sat 26 Foo 15:22:08 2026 ${EXE}`)).toBeNull();
   });
 });
 
@@ -73,6 +81,6 @@ describe('readProcess', () => {
       calls.push([file, ...args]);
       return `Sat Sep 26 15:22:08 2026 ${EXE}`;
     });
-    expect(calls).toEqual([['/bin/ps', '-o', 'lstart=', '-o', 'comm=', '-p', '4242']]);
+    expect(calls).toEqual([['/bin/ps', '-ww', '-o', 'lstart=', '-o', 'comm=', '-p', '4242']]);
   });
 });

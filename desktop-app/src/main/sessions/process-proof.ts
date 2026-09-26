@@ -8,14 +8,21 @@ export interface ProcessFacts {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
- * Parses macOS `ps -o lstart= -o comm= -p PID`: a fixed-width local start time
- * ("Sat Sep 26 15:22:08 2026", 24 characters), then the executable path.
+ * Parses macOS `ps -o lstart= -o comm= -p PID`: a local start time, then the
+ * executable path. The C locale prints "Sat Sep 26 15:22:08 2026"; locales such
+ * as en_GB print the day first ("Sat 26 Sep 15:22:08 2026"), so both are read.
  */
 export const parsePs = (output: string): ProcessFacts | null => {
   const line = output.trim();
-  const match = /^\w{3} (\w{3}) +(\d{1,2}) (\d{2}):(\d{2}):(\d{2}) (\d{4}) +(.+)$/.exec(line);
+  const match =
+    /^\w{3} (?:(\w{3}) +(\d{1,2})|(\d{1,2}) (\w{3})) (\d{2}):(\d{2}):(\d{2}) (\d{4}) +(.+)$/.exec(
+      line
+    );
   if (!match) return null;
-  const [, month, day, hours, minutes, seconds, year, executable] = match;
+  const [, monthFirst, dayAfter, dayFirst, monthAfter, hours, minutes, seconds, year, executable] =
+    match;
+  const month = monthFirst ?? monthAfter;
+  const day = dayAfter ?? dayFirst;
   const monthIndex = MONTHS.indexOf(month);
   if (monthIndex < 0) return null;
   const startedAt = new Date(
@@ -34,12 +41,14 @@ export const readProcess = (
   pid: number,
   platform: NodeJS.Platform = process.platform,
   run: (file: string, args: string[]) => string = (file, args) =>
-    execFileSync(file, args, {encoding: 'utf8', timeout: 3000})
+    // ps formats lstart with the user's locale; C gives the same text everywhere.
+    execFileSync(file, args, {encoding: 'utf8', timeout: 3000, env: {...process.env, LC_ALL: 'C'}})
 ): ProcessFacts | null => {
   // Only macOS ps output is known and parsed; elsewhere nothing is proven.
   if (platform !== 'darwin' || !Number.isInteger(pid) || pid < 1) return null;
   try {
-    return parsePs(run('/bin/ps', ['-o', 'lstart=', '-o', 'comm=', '-p', String(pid)]));
+    // -ww: never cut the executable path at a terminal width.
+    return parsePs(run('/bin/ps', ['-ww', '-o', 'lstart=', '-o', 'comm=', '-p', String(pid)]));
   } catch {
     return null;
   }
