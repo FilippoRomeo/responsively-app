@@ -440,18 +440,25 @@ export class SessionManager {
     );
     if (!proof.ok)
       throw new Error(`Refusing to force quit: ${proof.reason}. No process was signalled.`);
-    process.kill(lease.pid, 'SIGTERM');
-    for (let i = 0; i < 50 && alive(lease.pid); i += 1) await pause(100);
-    if (alive(lease.pid)) {
-      process.kill(lease.pid, 'SIGKILL');
-      for (let i = 0; i < 20 && alive(lease.pid); i += 1) await pause(100);
+    // As in stop: a status check overlapping the kill must not record it as a crash.
+    this.pending.set(id, 'stopping');
+    try {
+      process.kill(lease.pid, 'SIGTERM');
+      for (let i = 0; i < 50 && alive(lease.pid); i += 1) await pause(100);
+      if (alive(lease.pid)) {
+        process.kill(lease.pid, 'SIGKILL');
+        for (let i = 0; i < 20 && alive(lease.pid); i += 1) await pause(100);
+      }
+      if (alive(lease.pid))
+        throw new Error('The process did not exit; its data has been preserved');
+      if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
+      this.leases.release(lease.mcpPort);
+      this.leases.release(lease.browserSyncPort);
+      this.errors.delete(id);
+      this.registry.update(id, {lastStop: {by: 'user', at: new Date().toISOString()}});
+    } finally {
+      this.pending.delete(id);
     }
-    if (alive(lease.pid)) throw new Error('The process did not exit; its data has been preserved');
-    if (fs.existsSync(runtimeFile(id))) fs.unlinkSync(runtimeFile(id));
-    this.leases.release(lease.mcpPort);
-    this.leases.release(lease.browserSyncPort);
-    this.errors.delete(id);
-    this.registry.update(id, {lastStop: {by: 'user', at: new Date().toISOString()}});
     return this.inspect(id);
   }
   async request(input: unknown): Promise<SessionInfo | SessionInfo[]> {
