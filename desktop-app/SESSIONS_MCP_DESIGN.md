@@ -1,6 +1,6 @@
 # Sessions and MCP: design
 
-Status: **R (routing)** is implemented on this branch. **D (attention dialog)** is design only, planned as its own milestone after R is installed and used.
+Status: **R (routing)** is merged (PR #9), packaged-validated and installed (M5). **D (attention dialog)** is design only, planned as its own milestone (M6).
 
 ## Problem (verified in code)
 
