@@ -28,12 +28,22 @@ let panel: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let panelCreate = false;
 let panelError = '';
+/** A Session window manages Sessions in its own toolbar manager; only the shell uses the panel. */
+const showInSessionWindow = (create: boolean, error: string) => {
+  const win = process.env.RESPONSIVELY_SESSION_ID ? getWindow() : null;
+  if (!win || win.isDestroyed()) return false;
+  win.show();
+  win.focus();
+  win.webContents.send(IPC_MAIN_CHANNELS.SESSIONS_SHOW, {create, error});
+  return true;
+};
 export const showSessions = (
   create = false,
   error = '',
   keyboard = false,
   anchor?: Electron.Rectangle
 ) => {
+  if (showInSessionWindow(create, error)) return;
   // In the shell, management always appears under the menu-bar icon, never beside the Dock.
   if (!anchor && tray && !tray.isDestroyed()) anchor = tray.getBounds();
   const owner = getWindow();
@@ -288,6 +298,8 @@ export const initSessions = (
       return {id: process.env.RESPONSIVELY_SESSION_ID, name};
     }
   );
+  // macOS Session processes are accessory apps: no menu bar, Dock menu or menu-bar icon to refresh.
+  if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID) return;
   // Refresh menus only if the controller has been used. Ordinary legacy windows
   // don't need a controller until a human or MCP asks for session management.
   let refreshing = false;
@@ -342,11 +354,18 @@ export const startSessionRuntime = async () => {
         showSessions();
         return {visible: true};
       }
+      const win = getWindow();
       return {
         visible: Boolean(panel?.isVisible()),
         content: panel?.isDestroyed()
           ? ''
           : await panel?.webContents.executeJavaScript('document.body?.innerText ?? ""'),
+        inWindow:
+          win && !win.isDestroyed()
+            ? await win.webContents.executeJavaScript(
+                'document.querySelector("[data-testid=sessions-manager]")?.innerText ?? ""'
+              )
+            : '',
         hosts: BrowserWindow.getAllWindows().filter((w) =>
           w.webContents.getURL().includes('sessionsPanel=1')
         ).length,
@@ -363,6 +382,7 @@ export const startSessionRuntime = async () => {
       if (!req.name) throw new Error('Name is required');
       name = req.name;
       getWindow()?.setTitle(name);
+      getWindow()?.webContents.send(IPC_MAIN_CHANNELS.SESSION_RENAMED, name);
     }
     if (req.operation === 'stop') setTimeout(() => app.quit(), 50);
     const mcp = getMcpServerStatus();

@@ -55,10 +55,10 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 | **B3** | New Session windows open on the laptop screen, not your current one                                               | ✅ tested; **fixed in M1**                                                                 | Medium   |
 | **B4** | "What's new" card in every new Session                                                                            | ✅ seen in screenshots; **fixed in M1**                                                    | Low      |
 | **B5** | Migration error logs on every new profile                                                                         | ✅ seen in logs; upstream has a small fix                                                  | Low      |
-| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read                                                                               | Medium   |
-| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read                                                                               | Low      |
+| **U1** | Two different managers inside a Session window (toolbar popover and ⌘⇧M floating panel)                           | 🔍 code-read; **fixed in M2** (unit tests; packaged check pending)                         | Medium   |
+| **U2** | Toolbar doesn't show the current Session's name                                                                   | 🔍 code-read; **fixed in M2** (unit tests; packaged check pending)                         | Low      |
 | **U3** | Busy rows, search always shown, Sessions menu with submenus, success message lingers, custom devices shown as IDs | 🔍 code-read + screenshots                                                                 | Low      |
-| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured                                                            | Low      |
+| **P1** | Hidden panel keeps polling; Session processes refresh a menu bar they never show                                  | 🔍 code-read, cost not measured; **fixed in M2**                                           | Low      |
 | **Q1** | "Odd behaviour switching between Responsively and iTerm"                                                          | ❓ probably B2 (the invisible app stays in front); M1 is installed, so observe in real use | ?        |
 | **R1** | Browser MCP tools use one fixed port, not the Session UUID; after a restart they miss the Session and wait 60 s   | ✅ Gate C 14/14 + installed smoke test; **fixed in M5**                                    | High     |
 
@@ -72,7 +72,7 @@ How milestones are executed, validated and installed: [SESSIONS_PROCESS.md](SESS
 - No "What's new" card in Sessions.
 - **Done when:** a package passes today's exact tests (⌘W, red button, single and double ⌘Q, a new window on display 2, restore after Quit) plus the existing checks; then CI is green, your go-ahead, install and smoke test.
 
-### M2: "One manager, and you know where you are" (U1, U2, P1)
+### M2: "One manager, and you know where you are" (U1, U2, P1) — implemented on a branch; packaged validation pending
 
 - ⌘⇧M in a Session window opens the same in-window manager as the toolbar button; no per-Session floating panel.
 - The toolbar button shows the Session's name.

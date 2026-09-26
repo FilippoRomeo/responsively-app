@@ -13,22 +13,91 @@ const request: SessionRequester = (value) =>
 const actionClass =
   'justify-center border border-line bg-card disabled:cursor-not-allowed disabled:opacity-40';
 
-export const SessionsButton = () => (
-  <Popover
-    trigger={
-      <span className="flex items-center gap-[7px]">
-        <Icon icon="lucide:panels-top-left" />
-        Sessions
-      </span>
-    }
-    triggerClassName="flex h-[30px] items-center rounded-[7px] px-[11px] text-[12.5px] text-fg hover:bg-hover"
-    triggerTitle="Manage Sessions"
-    className="w-[420px] max-w-[calc(100vw-24px)] overflow-hidden"
-    keepMounted
-  >
-    {({close, open}) => <SessionsManager request={request} onClose={close} active={open} />}
-  </Popover>
-);
+export type SessionsShowRequest = {create: boolean; error: string};
+
+/**
+ * Receives the main process's SESSIONS_SHOW (⌘⇧M / ⌘⇧N in a Session window).
+ * Mounted above the toolbar, which presentation mode unmounts, so a request is
+ * never lost: it leaves presentation mode and is kept until the toolbar shows it.
+ */
+export const useSessionsShowRequest = (onShow: () => void) => {
+  const [showRequest, setShowRequest] = useState<SessionsShowRequest | null>(null);
+  const onShowRef = useRef(onShow);
+  onShowRef.current = onShow;
+  useEffect(
+    () =>
+      window.electron.ipcRenderer.on<{create?: boolean; error?: string}>(
+        IPC_MAIN_CHANNELS.SESSIONS_SHOW,
+        (value) => {
+          onShowRef.current();
+          setShowRequest({create: Boolean(value?.create), error: value?.error ?? ''});
+        }
+      ),
+    []
+  );
+  const consumed = useCallback(() => setShowRequest(null), []);
+  return [showRequest, consumed] as const;
+};
+
+/**
+ * The toolbar's Sessions manager. In a Session window it names the Session, and
+ * a show request opens it here instead of a separate floating panel.
+ */
+export const SessionsButton = ({
+  showRequest = null,
+  onShown,
+}: {
+  showRequest?: SessionsShowRequest | null;
+  /** Called once the request is shown, so a later remount does not reopen the manager. */
+  onShown?: () => void;
+}) => {
+  const trigger = useRef<HTMLSpanElement>(null);
+  const isOpen = useRef(false);
+  const [sessionName, setSessionName] = useState<string>();
+  const refreshName = useCallback(() => {
+    Promise.resolve(
+      window.electron.ipcRenderer.invoke<never, {name?: string}>(IPC_MAIN_CHANNELS.SESSION_CONTEXT)
+    )
+      .then((value) => setSessionName(value?.name))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    refreshName();
+    return window.electron.ipcRenderer.on(IPC_MAIN_CHANNELS.SESSION_RENAMED, refreshName);
+  }, [refreshName]);
+  // Kept locally for the manager, then consumed upstream so a remount does not replay it.
+  const [shown, setShown] = useState<SessionsShowRequest | null>(null);
+  useEffect(() => {
+    if (!showRequest) return;
+    if (!isOpen.current) trigger.current?.closest('button')?.click();
+    setShown(showRequest);
+    onShown?.();
+  }, [showRequest, onShown]);
+  return (
+    <Popover
+      trigger={
+        <span ref={trigger} className="flex min-w-0 items-center gap-[7px]">
+          <Icon icon="lucide:panels-top-left" />
+          <span className="max-w-[180px] truncate" data-testid="sessions-button-label">
+            {sessionName || 'Sessions'}
+          </span>
+        </span>
+      }
+      triggerClassName="flex h-[30px] items-center rounded-[7px] px-[11px] text-[12.5px] text-fg hover:bg-hover"
+      triggerTitle="Manage Sessions"
+      className="w-[420px] max-w-[calc(100vw-24px)] overflow-hidden"
+      keepMounted
+      onOpenChange={(open) => {
+        isOpen.current = open;
+        if (!open) refreshName();
+      }}
+    >
+      {({close, open}) => (
+        <SessionsManager request={request} onClose={close} active={open} showRequest={shown} />
+      )}
+    </Popover>
+  );
+};
 
 export default function SessionsManager({
   request: send,

@@ -211,12 +211,13 @@ test('both processes retain manager content after creating an open Session', asy
     const endpoint = JSON.parse(
       fs.readFileSync(path.join(root, 'runtimes', `${id}.json`), 'utf8')
     ) as Endpoint;
+    // A Session window opens its own toolbar manager; it creates no floating panel.
     await call(endpoint, {operation: 'e2e-show-panel'});
     await expect
       .poll(async () =>
-        call<{content: string; hosts: number}>(endpoint, {operation: 'e2e-panel-state'})
+        call<{inWindow: string; hosts: number}>(endpoint, {operation: 'e2e-panel-state'})
       )
-      .toMatchObject({content: expect.stringContaining('Regression B'), hosts: 1});
+      .toMatchObject({inWindow: expect.stringContaining('Regression B'), hosts: 0});
     expect(
       ((await request({operation: 'list'})) as SessionInfo[]).find((s) => s.id === id)?.id
     ).toBe(id);
