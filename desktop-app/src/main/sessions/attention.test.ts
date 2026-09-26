@@ -1,7 +1,8 @@
 // @vitest-environment node
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {spawnSync} from 'child_process';
+import {spawn, spawnSync} from 'child_process';
 import fs from 'fs';
+import net from 'net';
 import os from 'os';
 import path from 'path';
 
@@ -134,4 +135,54 @@ describe('force quit', () => {
     expect(kill.mock.calls.filter(([, signal]) => signal !== 0)).toEqual([]);
     expect(fs.existsSync(runtimeFile(s.id))).toBe(true);
   });
+
+  // The process proof reads macOS ps; elsewhere force quit is always refused.
+  it.runIf(process.platform === 'darwin')(
+    'is not recorded as a crash by a status check that overlaps the force quit',
+    async () => {
+      const m = new SessionManager();
+      const s = await create(m, 'Frozen');
+      // Like Electron, it handles SIGTERM, so while paused only SIGKILL ends it.
+      const child = spawn(
+        process.execPath,
+        ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1e9); console.log("ready")'],
+        {stdio: ['ignore', 'pipe', 'ignore']}
+      );
+      await new Promise((resolve) => {
+        child.stdout!.once('data', resolve);
+      });
+      process.kill(child.pid!, 'SIGSTOP');
+      // An endpoint that accepts and never answers, like a frozen runtime.
+      const frozen = net.createServer(() => {});
+      await new Promise<void>((resolve) => {
+        frozen.listen(0, '127.0.0.1', () => resolve());
+      });
+      servers.push(frozen);
+      atomicWrite(runtimeFile(s.id), {
+        id: s.id,
+        pid: child.pid,
+        port: (frozen.address() as net.AddressInfo).port,
+        token: 'frozen',
+        userDataDir: m.registry.dataDir(s.id),
+        mcpPort: 20001,
+        browserSyncPort: 20002,
+        startedAt: new Date().toISOString(),
+      });
+      try {
+        const forcing = m.request({operation: 'force-stop', id: s.id, confirmed: true});
+        // In flight across the kill: ~1.5 s first inspect + 5 s SIGTERM grace, 1.5 s status timeout.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5500);
+        });
+        const overlapping = m.inspect(s.id);
+        await expect(forcing).resolves.toMatchObject({status: 'stopped'});
+        await overlapping;
+        expect(new SessionManager().registry.get(s.id).lastStop?.by).toBe('user');
+        expect((await m.inspect(s.id)).status).toBe('stopped');
+      } finally {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      }
+    },
+    20_000
+  );
 });
