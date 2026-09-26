@@ -17,6 +17,7 @@ import {
 } from '../common/session-controller';
 import {launchController} from './launch';
 import {SessionRequest} from '../common/sessions';
+import {createSessionRouter, hasSessionArgument, withSessionArgument} from './session-routing';
 
 export const startBridge = async () => {
   const manifest = loadManifest();
@@ -24,6 +25,7 @@ export const startBridge = async () => {
   const backend = createBackend({port});
   const root = controllerRoot();
   const manage = controllerClient(root, () => launchController(root));
+  const routeToSession = createSessionRouter({manage});
 
   const server = new Server(
     {name: MCP_SERVER_NAME, version: manifest.version},
@@ -39,17 +41,17 @@ export const startBridge = async () => {
       // Lifecycle tools belong to this bridge/controller, even if an older
       // browser runtime is already listening on the configured browser port.
       return {
-        tools: [
+        tools: withSessionArgument([
           ...live.tools.filter(
             (tool) => !Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
           ),
           ...manifest.tools.filter((tool) =>
             Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
           ),
-        ],
+        ]),
       };
     }
-    return {tools: manifest.tools};
+    return {tools: withSessionArgument(manifest.tools)};
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -59,6 +61,9 @@ export const startBridge = async () => {
       if (Object.prototype.hasOwnProperty.call(sessionToolOperations, request.params.name)) {
         const value = await manage({...request.params.arguments, operation} as SessionRequest);
         return {content: [{type: 'text' as const, text: JSON.stringify(value, null, 2)}]};
+      }
+      if (hasSessionArgument(request.params)) {
+        return await routeToSession(request.params);
       }
       return await backend.callTool(request.params);
     } catch (error) {
