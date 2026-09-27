@@ -10,6 +10,8 @@ import {execFileSync, spawn} from 'child_process';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
+import readline from 'readline';
+import {ReadStream as TtyReadStream} from 'tty';
 
 const arg = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -67,11 +69,22 @@ const child = spawn(process.execPath, [CLI], {env, stdio: ['pipe', 'pipe', 'pipe
 const stderrLog = fs.createWriteStream(path.join(OUT, 'bridge-stderr.log'));
 child.stderr.pipe(stderrLog);
 let exited = null;
+const pending = new Map();
 child.on('exit', (code, signal) => {
   exited = {code, signal};
 });
+// After its output is fully read, nothing will answer: fail every open request at once.
+let closed = false;
+child.on('close', () => {
+  closed = true;
+  for (const resolve of pending.values()) resolve({error: {code: -1, message: 'bridge exited'}});
+});
+// Writing to a bridge that has exited raises EPIPE; record it instead of crashing.
+let stdinError = null;
+child.stdin.on('error', (error) => {
+  stdinError = error.message;
+});
 
-const pending = new Map();
 let buffer = '';
 child.stdout.on('data', (chunk) => {
   buffer += chunk;
@@ -92,6 +105,10 @@ child.stdout.on('data', (chunk) => {
 let nextId = 1;
 const rpc = (method, params, timeoutMs = 30_000) =>
   new Promise((resolve) => {
+    if (exited !== null || !child.stdin.writable) {
+      resolve({error: {code: -1, message: 'bridge exited'}});
+      return;
+    }
     const id = nextId++;
     const timer = setTimeout(() => {
       pending.delete(id);
@@ -131,46 +148,60 @@ const json = (text) => {
 };
 
 // Questions and progress go to the terminal you started the gate from.
+// Answers are read asynchronously, so Ctrl-C is handled even while a question waits.
 let tty = null;
+let ttyIn = null;
 try {
-  tty = fs.openSync('/dev/tty', 'r+');
+  tty = fs.openSync('/dev/tty', 'w');
+  ttyIn = new TtyReadStream(fs.openSync('/dev/tty', 'r'));
 } catch {
   tty = null;
+  ttyIn = null;
 }
 const say = (text) => {
   if (tty !== null) fs.writeSync(tty, `${text}\n`);
 };
+const typed = [];
+let waiting = null;
+let ttyClosed = ttyIn === null;
+if (ttyIn !== null) {
+  const lines = readline.createInterface({input: ttyIn, terminal: false});
+  lines.on('line', (line) => {
+    if (waiting) {
+      const resolve = waiting;
+      waiting = null;
+      resolve(line.trim());
+    } else typed.push(line.trim());
+  });
+  lines.on('close', () => {
+    ttyClosed = true;
+    waiting?.(null);
+    waiting = null;
+  });
+}
 const readTtyLine = () => {
-  const buf = Buffer.alloc(1);
-  let line = '';
-  for (;;) {
-    let n = 0;
-    try {
-      n = fs.readSync(tty, buf, 0, 1, null);
-    } catch (error) {
-      if (error.code === 'EAGAIN') continue;
-      return null;
-    }
-    if (n === 0) return null;
-    const ch = buf.toString('utf8');
-    if (ch === '\n') return line.trim();
-    line += ch;
-  }
+  if (typed.length > 0) return Promise.resolve(typed.shift());
+  if (ttyClosed) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    waiting = resolve;
+  });
 };
 /** Free text you type, recorded as evidence. */
-const askText = (question) => {
+const askText = async (question) => {
   if (tty === null) return 'not asked (no terminal)';
+  if (interrupted) return 'not asked (interrupted)';
   say(`\n>>> ${question}`);
   say('    Type your answer, then Return:');
-  return readTtyLine() ?? 'no answer';
+  return (await readTtyLine()) ?? 'no answer';
 };
 /** A yes/no question you answer; never a pass by itself unless you say yes. */
-const ask = (question) => {
+const ask = async (question) => {
   if (tty === null) return 'not asked (no terminal)';
+  if (interrupted) return 'not asked (interrupted)';
   say(`\n>>> ${question}`);
   for (;;) {
     say('    Type y or n, then Return:');
-    const answer = readTtyLine();
+    const answer = await readTtyLine();
     if (answer === null) return 'no answer';
     if (/^y(es)?$/i.test(answer)) return 'yes';
     if (/^no?$/i.test(answer)) return 'no';
@@ -186,6 +217,7 @@ const record = (step, pass, detail) => {
 
 // The test controller's own authenticated endpoint (only inside the test root).
 const controllerCall = async (payload, timeoutMs = 60_000) => {
+  if (interrupted) return {ok: false, error: 'interrupted'};
   try {
     const endpoint = JSON.parse(fs.readFileSync(path.join(ROOT, 'controller.json'), 'utf8'));
     return await new Promise((resolve) => {
@@ -474,7 +506,7 @@ try {
     say(
       '    Click in this Terminal window, press Return, then do not touch the mouse or keyboard until asked.'
     );
-    readTtyLine();
+    await readTtyLine();
   }
   await sleep(1500);
   const frontBefore = frontApp();
@@ -494,11 +526,11 @@ try {
     {frontBefore, frontAfter}
   );
   say('Do not click anything yet.');
-  const q3 = ask(
+  const q3 = await ask(
     'Without clicking anything: is there a "!" next to the test app\'s icon in the menu bar (look on every monitor)?'
   );
   record('Q3 M6: menu-bar attention badge (your answer)', q3 === 'yes', {answer: q3});
-  const q1 = ask(
+  const q1 = await ask(
     'Did a Sessions panel appear by itself, saying "gatec-m6-A" needs attention and "Stopped by an agent", with Open, Reset… and Delete… buttons? (It may be on another monitor.)'
   );
   record(
@@ -507,15 +539,15 @@ try {
     {answer: q1}
   );
   say('Now click Dismiss in that panel (not Open). Then find the window titled "gatec-m6-B".');
-  const q4 = ask(
+  const q4 = await ask(
     'In the "gatec-m6-B" window, look at the toolbar row with Rotate, Inspect and Capture. After the colour controls and a thin divider there is a button with a small panels icon, just left of the MCP button. Does that button read "gatec-m6-B"?'
   );
   const q4detail = {answer: q4};
   if (q4 !== 'yes') {
-    q4detail.saw = askText(
+    q4detail.saw = await askText(
       'What does that button read instead, or what is there? (for example: "Sessions", "no button", "cut off")'
     );
-    const shot = askText(
+    const shot = await askText(
       'To save a picture of that window: type y, then click the "gatec-m6-B" window. macOS may ask to allow Screen Recording for Terminal; allowing it is optional. Type n to skip.'
     );
     if (/^y/i.test(shot)) {
@@ -578,7 +610,8 @@ try {
   );
 
   // Pause only a PID proven to be test Session B: an unproven one may be any process of yours.
-  if (provenB && Number.isInteger(pidB) && alive(pidB)) {
+  // Never after Ctrl-C: cleanup has already passed its resume step.
+  if (!interrupted && provenB && Number.isInteger(pidB) && alive(pidB)) {
     process.kill(pidB, 'SIGSTOP'); // Paused: alive but not answering, exactly a hang.
     frozenPid = pidB;
   }
@@ -658,6 +691,7 @@ async function finish() {
   child.stdin.end();
   await sleep(1000);
   if (exited === null) child.kill();
+  for (let i = 0; i < 30 && !closed; i += 1) await sleep(100);
   for (const p of [pageA, pageA2, pageB]) p.server.close();
   const summary = {
     passed: results.filter((r) => r.pass).length,
@@ -666,10 +700,18 @@ async function finish() {
   };
   fs.writeFileSync(
     path.join(OUT, 'results.json'),
-    JSON.stringify({summary, ids, cleanup, bridgeExit: exited, results}, null, 2)
+    JSON.stringify({summary, ids, cleanup, bridgeExit: exited, stdinError, results}, null, 2)
   );
   process.stderr.write(`[gatec] ${summary.passed}/${summary.total} passed\n`);
-  stderrLog.end();
+  // Let the bridge's last stderr lines reach the log before exiting (at most 3 s).
+  await new Promise((resolve) => {
+    if (stderrLog.writableFinished) return resolve();
+    stderrLog.once('finish', resolve);
+    setTimeout(resolve, 3000);
+    child.stderr.unpipe(stderrLog);
+    if (!stderrLog.writableEnded) stderrLog.end();
+  });
+  ttyIn?.destroy();
   if (tty !== null) fs.closeSync(tty);
   process.exit(summary.failed === 0 && summary.total > 0 ? 0 : 1);
 }
