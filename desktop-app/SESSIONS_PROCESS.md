@@ -15,7 +15,7 @@ Work in gated steps and stop at every gate. Separate **VERIFIED** (checked now) 
 3. [SESSIONS_ROADMAP.md](SESSIONS_ROADMAP.md): what we intend to build, and decisions made.
 4. Conversational memory or pasted summaries: hints only, never proof.
 
-Re-derive the installed baseline from `~/Applications/ResponsivelyMCP.app` itself (bundle ID, version, `app.asar` SHA-256) plus the newest relevant `desktop-app/.work/install-*` evidence. A merged, installed and smoke-tested build is the only thing that becomes the new baseline.
+Re-derive the installed baseline from `~/Applications/ResponsivelyMCP.app` itself (bundle ID, version, `app.asar` SHA-256) plus the newest `~/ResponsivelyGateF/<install-run>/` evidence. A merged, installed and smoke-tested build is the only thing that becomes the new baseline.
 
 ## Fixed policy
 
@@ -46,6 +46,8 @@ Milestone text describes desired behaviour, not current file or module ownership
   - `./node_modules/.bin/vitest run`
 
 ## Gate C: packaged validation (a test package, never the installed app)
+
+- **Script:** `bash desktop-app/scripts/gates/gatec.sh <full commit SHA> [run-name]` does the build and the packaged Sessions/MCP checks below for one pushed commit, entirely under `~/ResponsivelyGateC/<run>/`. It covers routing by UUID (also after a restart), who stopped a Session, the attention panel (focus measured; you confirm the panel, the `!` badge and the Session name), `ps` process proof and force quit, and it proves your installed app and registry were untouched. It writes `<run>/tested.env` with the commit, tree, hashes and verdict. It does **not** cover the core regression list (⌘W, ⌘Q, restore, Reset, displays): run those by hand when the change can affect them.
 
 - **Build:** clear `release/app/dist`, run `npx -y yarn@1.22.22 build`, then `electron-builder --mac --arm64 --dir --publish never` with a unique `-c.appId` (`…validation-NNN`) and output under `desktop-app/.work/<name>-NNN/`. Do not use `yarn package:mcp-local` here: its install step deletes and replaces the installed app.
 - **Launch** with its own `RESPONSIVELY_USER_DATA_DIR`, `RESPONSIVELY_SESSIONS_ROOT` and ports. On a fresh data folder, open the launcher once so the controller starts.
@@ -79,9 +81,11 @@ Milestone text describes desired behaviour, not current file or module ownership
 
 ## Gate F: install (after approval)
 
-- **Build** from clean `main` with `-c.appId=app.responsively.mcp.local` into `desktop-app/.work/install-main-<sha>/`. Verify bundle ID, version, arm64, `codesign --verify --deep --strict`, the MCP CLI and manifest, and that the new code is present in `app.asar`. Record the hashes.
+- **Script:** `bash desktop-app/scripts/gates/gatef.sh prepare <gatec-run> <install-run>`, then `backup <install-run>`, then `replace <install-run>`, each only after approval. Prepare refuses unless that Gate C run passed and the new bridge is byte-identical to the one it tested; backup refuses unless the app is fully quit and unchanged since prepare. Everything, including the backup, lives under `~/ResponsivelyGateF/<install-run>/`. The steps below describe what the script does.
+
+- **Build** from clean `main` with `-c.appId=app.responsively.mcp.local` (the script builds in `~/ResponsivelyGateF/<install-run>/repo/`). Verify bundle ID, version, arm64, `codesign --verify --deep --strict`, the MCP CLI and manifest, and that the new code is present in `app.asar`. Record the hashes.
 - **Quit** the installed app fully, from the menu-bar icon (**Quit Responsively**). Confirm 0 processes from the bundle, no live runtime leases or endpoints belonging to running processes (tell stale files apart from live state), and no open files in the data folders.
-- **Back up** by copying (`ditto`) the app and both data folders (`~/Library/Application Support/ResponsivelyMCP` and `~/Library/Application Support/ResponsivelySessions`) into `desktop-app/.work/install-backup-<timestamp>/`. Verify every file with SHA-256. **Stop for approval.**
+- **Back up** by copying (`ditto`) the app and both data folders (`~/Library/Application Support/ResponsivelyMCP` and `~/Library/Application Support/ResponsivelySessions`) into `~/ResponsivelyGateF/<install-run>/backup-<timestamp>/`. Verify every file with SHA-256. **Stop for approval.**
 - **Replace:** stage to `~/Applications/.ResponsivelyMCP.app.new` and verify it; move the old app into the backup as `ResponsivelyMCP.app.replaced` (never delete it); move the new app into place; verify its hash.
 - **Smoke test** with one disposable Session: the user's data is unchanged, the user's own Sessions are untouched (Sessions that were open at the last Quit reopen), and MCP `list_sessions` matches.
 - **Roll back** only on a material regression: capture evidence first, move the new bundle aside, restore `.replaced`, and restore data only if data was actually damaged.
