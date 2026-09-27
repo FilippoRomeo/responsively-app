@@ -569,13 +569,16 @@ try {
   const facts = raw.appCommand.startsWith('ps failed') ? null : parsePs(raw.appCommand);
   const skewMs =
     facts && leaseB ? Math.abs(Date.parse(facts.startedAt) - Date.parse(leaseB.startedAt)) : null;
+  const provenB =
+    Boolean(facts) && facts.executable === EXPECTED_EXE && skewMs !== null && skewMs <= 10_000;
   record(
     'T10a M6: ps from a non-terminal process gives the full app path and a start time within 10 s of the lease',
-    Boolean(facts) && facts.executable === EXPECTED_EXE && skewMs !== null && skewMs <= 10_000,
+    provenB,
     {pid: pidB, leaseStartedAt: leaseB?.startedAt, facts, expectedExe: EXPECTED_EXE, skewMs, raw}
   );
 
-  if (Number.isInteger(pidB) && alive(pidB)) {
+  // Pause only a PID proven to be test Session B: an unproven one may be any process of yours.
+  if (provenB && Number.isInteger(pidB) && alive(pidB)) {
     process.kill(pidB, 'SIGSTOP'); // Paused: alive but not answering, exactly a hang.
     frozenPid = pidB;
   }

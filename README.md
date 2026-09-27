@@ -136,18 +136,21 @@ The commit must be pushed to this fork. Quit Responsively from its menu-bar icon
 ```bash
 git checkout main && git pull --ff-only
 SHA="$(git rev-parse HEAD)"
+# Run folders are never reused: to retry a step, give it a new name (-002, -003, ...).
+GATEC_RUN="c-${SHA:0:7}-001"
+INSTALL_RUN="install-${SHA:0:7}-001"
 
 # 1. Test a separate copy of that exact commit (~20 minutes; it asks you 3 yes/no questions).
-bash desktop-app/scripts/gates/gatec.sh "$SHA"
+bash desktop-app/scripts/gates/gatec.sh "$SHA" "$GATEC_RUN"
 
 # 2. Build the same commit with the installed app's identity (safe while the app runs).
-bash desktop-app/scripts/gates/gatef.sh prepare "c-${SHA:0:7}-001" "install-${SHA:0:7}-001"
+bash desktop-app/scripts/gates/gatef.sh prepare "$GATEC_RUN" "$INSTALL_RUN"
 
 # 3. Quit Responsively, then back up the app and both data folders (verified by SHA-256).
-bash desktop-app/scripts/gates/gatef.sh backup "install-${SHA:0:7}-001"
+bash desktop-app/scripts/gates/gatef.sh backup "$INSTALL_RUN"
 
 # 4. Swap the app in; the old one is kept in the backup and a rollback command is printed.
-bash desktop-app/scripts/gates/gatef.sh replace "install-${SHA:0:7}-001"
+bash desktop-app/scripts/gates/gatef.sh replace "$INSTALL_RUN"
 ```
 
 Each step stops at the first failure and never deletes anything. `prepare` refuses a commit whose Gate C run didn't pass, and `replace` installs only a bridge byte-identical to the one Gate C tested. Test runs live in `~/ResponsivelyGateC/<run>/` and installs, with their backups, in `~/ResponsivelyGateF/<install-run>/`. If the bridge changed, restart Claude Desktop afterwards so it loads the new one. Details: Gates C and F in [SESSIONS_PROCESS.md](desktop-app/SESSIONS_PROCESS.md).

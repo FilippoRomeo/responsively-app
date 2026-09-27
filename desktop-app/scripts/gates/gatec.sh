@@ -10,7 +10,8 @@
 # name; those are recorded in evidence/outside-tree.txt, never deleted.
 # Reads (never writes) ~/Applications/ResponsivelyMCP.app and your real
 # Sessions registry, to prove they are unchanged. Refuses to reuse a run folder.
-# On completion it writes <run>/tested.env (commit, tree, hashes, verdict),
+# On completion it writes <run>/tested.env (commit, tree, hashes, verdict: PASS
+# only if every check and the isolation check passed),
 # which gatef.sh requires before it installs that commit.
 #
 # Usage: bash gatec.sh <full-commit-sha> [run-name]   (default run-name: c-<sha7>-001)
@@ -57,6 +58,7 @@ export npm_config_devdir="$CACHES/node-gyp"
 
 STEP="start"
 DRIVER_EXIT="not run"
+ISOLATION="not run"
 APP=""
 log() { printf '%s [%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$STEP" "$*" | tee -a "$EV/steps.log"; }
 
@@ -110,9 +112,32 @@ finish() {
   if [ ! -f "$EV/real-before.txt" ]; then
     log "ISOLATION CHECK: not run (stopped before the first snapshot)"
   elif cmp -s "$EV/real-before.txt" "$EV/real-after.txt"; then
+    ISOLATION=PASS
     log "ISOLATION PASS: installed app, your Sessions registry and runtime leases unchanged"
   else
     log "ISOLATION CHECK: DIFFERS (compare real-before.txt and real-after.txt)"
+  fi
+
+  # The verdict comes after the isolation check: a run that changed your real
+  # app, registry or leases fails even if every driver check passed.
+  if [ "$DRIVER_EXIT" != "not run" ]; then
+    STEP="result"
+    if [ "$DRIVER_EXIT" -eq 0 ] && [ "$ISOLATION" = PASS ]; then
+      VERDICT=PASS; log "GATE C: ALL CHECKS PASSED"
+    elif [ "$DRIVER_EXIT" -eq 0 ]; then
+      VERDICT=FAIL; log "GATE C: FAILED (isolation check did not pass)"
+    else
+      VERDICT=FAIL; log "GATE C: FAILED (see results.json)"
+    fi
+    # What gatef.sh reads: it installs only a commit whose Gate C run passed.
+    {
+      echo "COMMIT=$HEAD_SHA"
+      echo "TREE=$HEAD_TREE"
+      echo "ASAR_SHA=$(shasum -a 256 "$APP/Contents/Resources/app.asar" | awk '{print $1}')"
+      echo "CLI_SHA=$(shasum -a 256 "$CLI" | awk '{print $1}')"
+      echo "RESULT=$VERDICT"
+    } | tee "$RUN/tested.env" > "$EV/tested.env"
+    STEP="finish"
   fi
 
   # Lines the test controller/shell appended to the shared app-name log.
@@ -149,6 +174,8 @@ finish() {
   log "evidence package: $PACKAGE"
   shasum -a 256 "$PACKAGE" | tee -a "$EV/steps.log"
   echo "Return this file: $PACKAGE"
+  [ "${VERDICT:-}" = FAIL ] && [ "$code" -eq 0 ] && exit 1
+  exit "$code"
 }
 trap finish EXIT
 trap 'exit 130' INT TERM
@@ -225,14 +252,4 @@ DRIVER_EXIT=$?
 set -e
 grep '^\[gatec\]' "$EV/driver.log" | tee -a "$EV/steps.log" || true
 
-STEP="result"
-if [ "$DRIVER_EXIT" -eq 0 ]; then VERDICT=PASS; log "GATE C: ALL CHECKS PASSED"; else VERDICT=FAIL; log "GATE C: FAILED (see results.json)"; fi
-# What gatef.sh reads: it installs only a commit whose Gate C run passed.
-{
-  echo "COMMIT=$HEAD_SHA"
-  echo "TREE=$HEAD_TREE"
-  echo "ASAR_SHA=$(shasum -a 256 "$APP/Contents/Resources/app.asar" | awk '{print $1}')"
-  echo "CLI_SHA=$(shasum -a 256 "$CLI" | awk '{print $1}')"
-  echo "RESULT=$VERDICT"
-} | tee "$RUN/tested.env" > "$EV/tested.env"
 exit "$DRIVER_EXIT"
