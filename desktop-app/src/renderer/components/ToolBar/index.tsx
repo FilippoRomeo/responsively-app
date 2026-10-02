@@ -23,6 +23,7 @@ import Menu from './Menu';
 import AddressBar from './AddressBar';
 import {IconButton, ToolbarAction, ToolbarDivider, ToolbarGroup} from './primitives';
 import ColorSchemeToggle from './ColorSchemeToggle';
+import AudioMuteToggle from './AudioMuteToggle';
 import ModalLoader from '../ModalLoader';
 import {PreviewSuiteSelector} from './PreviewSuiteSelector';
 import useKeyboardShortcut, {
@@ -141,6 +142,7 @@ const ToolBar = ({
         </ToolbarAction>
         <ColorBlindnessControls />
         <ColorSchemeToggle />
+        <AudioMuteToggle />
       </ToolbarGroup>
       <ToolbarDivider />
       <SessionsButton showRequest={sessionsRequest} onShown={onSessionsShown} />

@@ -30,6 +30,7 @@ const testOrder = [
   'preview-layout.spec.ts',
   'menu-flyout.spec.ts',
   'sessions.spec.ts',
+  'audio-mute.spec.ts',
   'url-navigation.spec.ts',
   'popup-policy.spec.ts',
   'title-bar.spec.ts',

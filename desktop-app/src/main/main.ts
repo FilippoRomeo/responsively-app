@@ -25,6 +25,7 @@ import store from '../store';
 import {initWebviewContextMenu} from './webview-context-menu/register';
 import {initScreenshotHandlers} from './screenshot';
 import {initDevtoolsHandlers} from './devtools';
+import {initAudioMute} from './audio-mute';
 import {initWebviewStorageManagerHandlers} from './webview-storage-manager';
 import {initNativeFunctionHandlers} from './native-functions';
 import {WebPermissionHandlers} from './web-permissions';
@@ -447,6 +448,7 @@ app
     wireSessionOnce();
     appUpdater = new AppUpdater();
     initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
+    initAudioMute(getMainWindow);
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
       await startShellOwner((message) => showSessions(false, message, true), showAttention);
     if (
