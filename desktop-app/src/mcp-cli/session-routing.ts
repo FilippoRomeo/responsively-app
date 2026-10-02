@@ -14,7 +14,7 @@ const SESSION_PROPERTY = {
   type: 'string',
   format: 'uuid',
   description:
-    'Optional Session UUID (from list_sessions or create_session). Routes this call to that ' +
+    'Optional Session UUID (from list_sessions). Routes this call to that ' +
     "Session's current runtime; omit to use the bridge's configured app.",
 };
 
@@ -125,9 +125,7 @@ export const createSessionRouter =
   async (params: ToolCallParams) => {
     const {[SESSION_ARGUMENT]: session, ...args} = params.arguments ?? {};
     if (typeof session !== 'string' || session.length === 0) {
-      throw new Error(
-        `"${SESSION_ARGUMENT}" must be a Session UUID from list_sessions or create_session.`
-      );
+      throw new Error(`"${SESSION_ARGUMENT}" must be a Session UUID from list_sessions.`);
     }
     // Resolved again on every call: the port is a temporary resource.
     let target: {port: number; name: string};

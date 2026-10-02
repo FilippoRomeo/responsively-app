@@ -62,6 +62,8 @@ Object.assign(env, {
   RESPONSIVELY_SESSIONS_ROOT: ROOT,
   RESPONSIVELY_USER_DATA_DIR: SHELL_DATA,
   RESPONSIVELY_MCP_PORT: STALE_PORT,
+  // T3 creates its test Sessions; agents' bridges never get this.
+  RESPONSIVELY_MCP_ALLOW_CREATE_SESSION: '1',
   RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
   CI: 'true',
 });

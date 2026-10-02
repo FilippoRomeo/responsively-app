@@ -20,7 +20,7 @@ Existing unmanaged windows and their data remain unchanged; this version does no
 
 ## MCP
 
-The npm bootstrap is unchanged. Its bundled bridge adds `list_sessions`, `create_session`, `get_session`, `open_session`, `focus_session` and `stop_session`. `create_session` takes `name`, optional `url`, and optional `open` (default true). Other lifecycle calls use the stable `id`. No request accepts paths, PIDs or ports. Reset and Delete through MCP are intentionally not exposed.
+The npm bootstrap is unchanged. Its bundled bridge adds `list_sessions`, `get_session`, `open_session`, `focus_session` and `stop_session`. Agents work in Sessions you created: `create_session` (`name`, optional `url`, optional `open`, default true) is hidden from the bridge unless it runs with `RESPONSIVELY_MCP_ALLOW_CREATE_SESSION=1`, which only the Gate C driver sets. Other lifecycle calls use the stable `id`. No request accepts paths, PIDs or ports. Reset and Delete through MCP are intentionally not exposed.
 
 Lifecycle calls work with no browser runtime running: the bridge starts/discovers the controller directly.
 

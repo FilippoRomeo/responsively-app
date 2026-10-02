@@ -25,7 +25,17 @@ export const agentLifecycleRequest = (
   operation: SessionRequest['operation']
 ): SessionRequest => ({...args, operation, source: 'agent'}) as SessionRequest;
 
+/**
+ * Agents work in the Sessions you made: creating one is hidden from them
+ * unless the bridge is explicitly started with the opt-in (Gate C does).
+ */
+export const hiddenTools = (env: NodeJS.ProcessEnv): Set<string> =>
+  env.RESPONSIVELY_MCP_ALLOW_CREATE_SESSION === '1' ? new Set() : new Set(['create_session']);
+
 export const startBridge = async () => {
+  const hidden = hiddenTools(process.env);
+  const visible = <T extends {name: string}>(tools: T[]) =>
+    tools.filter((tool) => !hidden.has(tool.name));
   const manifest = loadManifest();
   const port = resolveTargetPort(process.env, readBeacon());
   const backend = createBackend({port});
@@ -47,20 +57,35 @@ export const startBridge = async () => {
       // Lifecycle tools belong to this bridge/controller, even if an older
       // browser runtime is already listening on the configured browser port.
       return {
-        tools: withSessionArgument([
-          ...live.tools.filter(
-            (tool) => !Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
-          ),
-          ...manifest.tools.filter((tool) =>
-            Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
-          ),
-        ]),
+        tools: withSessionArgument(
+          visible([
+            ...live.tools.filter(
+              (tool) => !Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
+            ),
+            ...manifest.tools.filter((tool) =>
+              Object.prototype.hasOwnProperty.call(sessionToolOperations, tool.name)
+            ),
+          ])
+        ),
       };
     }
-    return {tools: withSessionArgument(manifest.tools)};
+    return {tools: withSessionArgument(visible(manifest.tools))};
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (hidden.has(request.params.name)) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text:
+              `${request.params.name} is not available to agents. Use a running Session from ` +
+              'list_sessions (pass its id as "session"), or ask the user to create one.',
+          },
+        ],
+        isError: true,
+      };
+    }
     try {
       const operation =
         sessionToolOperations[request.params.name as keyof typeof sessionToolOperations];

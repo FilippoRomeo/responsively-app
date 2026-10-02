@@ -253,7 +253,7 @@ Browser tools include:
 - `click`
 - `type_text`
 
-Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions` or `create_session`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
+Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
 
 ```text
 navigate   {"session": "<UUID>", "url": "http://localhost:3000"}
@@ -265,13 +265,12 @@ A stopped Session is never opened implicitly: the call returns an error naming t
 Session lifecycle tools include:
 
 - `list_sessions`
-- `create_session`
 - `get_session`
 - `open_session`
 - `focus_session`
 - `stop_session`
 
-Reset and Delete are deliberately **not exposed to MCP**.
+Reset and Delete are deliberately **not exposed to MCP**. Agents also cannot create Sessions: they work in the ones you made (`create_session` is hidden unless the bridge runs with `RESPONSIVELY_MCP_ALLOW_CREATE_SESSION=1`, which only the Gate C driver sets).
 
 ## Known limitations and roadmap
 
