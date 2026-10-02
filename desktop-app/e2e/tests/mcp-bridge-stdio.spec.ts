@@ -7,7 +7,6 @@ const CLI_PATH = path.join(__dirname, '..', '..', 'release', 'app', 'dist', 'mcp
 
 const EXPECTED_TOOLS = [
   'click',
-  'create_session',
   'focus_session',
   'get_app_state',
   'get_session',
@@ -49,6 +48,11 @@ test.describe('MCP stdio bridge', () => {
   test('proxies tools/list from the running app', async () => {
     const {tools} = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(EXPECTED_TOOLS);
+  });
+
+  test('refuses create_session: agents use existing Sessions', async () => {
+    const result = await client.callTool({name: 'create_session', arguments: {name: 'x'}});
+    expect(result.isError).toBe(true);
   });
 
   test('proxies tool calls end-to-end', async () => {
