@@ -156,6 +156,11 @@ const openDevtools = async (_: any, arg: OpenDevtoolsArgs): Promise<OpenDevtools
   if (mainWindow == null || optionalWebview === undefined) {
     return {status: false};
   }
+  // One docked panel at a time: a second open (another device, Open Console)
+  // replaces the current one in its place instead of orphaning it on screen.
+  // Undocked devtools are separate windows and are left alone.
+  const previousBounds = devtoolsBounds;
+  if (devtoolsView != null) await closeDevTools();
   devtoolsWebview = optionalWebview;
   if (dockPosition === DOCK_POSITION.UNDOCKED) {
     devtoolsWebview.openDevTools({mode: 'detach'});
@@ -191,6 +196,11 @@ const openDevtools = async (_: any, arg: OpenDevtoolsArgs): Promise<OpenDevtools
       log.warn('Error removing the native inspect button', err);
     });
 
+  // The renderer only resends bounds when the panel's size changes.
+  if (previousBounds !== undefined) {
+    devtoolsBounds = previousBounds;
+    applyDevtoolsPlacement();
+  }
   return {status: true};
 };
 
@@ -229,15 +239,16 @@ const setOverlayOpen = async (_: any, arg: {isOpen: boolean}) => {
 };
 
 const closeDevTools = async () => {
-  if (devtoolsWebview == null) {
-    return;
+  // The inspected page may be gone (device removed or reloaded); the panel
+  // must still come off the window.
+  if (devtoolsWebview != null && !devtoolsWebview.isDestroyed()) {
+    devtoolsWebview.closeDevTools();
   }
-  devtoolsWebview.closeDevTools();
   if (devtoolsView == null) {
     return;
   }
   mainWindow?.contentView.removeChildView(devtoolsView);
-  devtoolsView.webContents.close();
+  if (!devtoolsView.webContents.isDestroyed()) devtoolsView.webContents.close();
   devtoolsView = undefined;
   devtoolsBounds = undefined;
 };
