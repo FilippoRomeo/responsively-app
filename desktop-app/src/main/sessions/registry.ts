@@ -41,6 +41,7 @@ export const requestSchema = z
       'attention',
       'force-stop',
       'mute',
+      'agents',
     ]),
     id: sessionId.optional(),
     name: sessionName.optional(),
@@ -49,6 +50,7 @@ export const requestSchema = z
     confirmed: z.boolean().optional(),
     source: z.enum(['user', 'window', 'quit', 'agent']).optional(),
     muted: z.boolean().optional(),
+    enabled: z.boolean().optional(),
   })
   .strict();
 

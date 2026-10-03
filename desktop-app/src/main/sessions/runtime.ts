@@ -17,7 +17,7 @@ import {atomicWrite, sessionName} from './registry';
 import {RuntimeLease, RuntimeReply, runtimeFile, sessionRequest, sessionsRoot} from './service';
 import {serve} from '../../common/session-rpc';
 import store from '../../store';
-import {getMcpServerStatus} from '../mcp';
+import {getMcpServerStatus, setMcpServerEnabled} from '../mcp';
 import {getBrowserSyncPort, isBrowserSyncReady} from '../browser-sync';
 import {normalizeUrl} from '../mcp/utils';
 import {resolveHtmlPath} from '../util';
@@ -240,6 +240,29 @@ const statusMenu = (items: SessionInfo[]) =>
             click: menuAction(s.id, s.status === 'running' ? 'focus' : 'open'),
           }))
       : [{label: 'No Sessions', enabled: false}]),
+    // Connect or disconnect AI agents per running Session.
+    ...(items.some((s) => s.status === 'running')
+      ? [
+          {type: 'separator' as const},
+          ...items
+            .filter((s) => s.status === 'running')
+            .map((s): MenuItemConstructorOptions => ({
+              label: `Agents — ${s.name.slice(0, 60)}`,
+              type: 'checkbox',
+              checked: s.runtime?.mcpPort != null,
+              click: () => {
+                sessionRequest({
+                  operation: 'agents',
+                  id: s.id,
+                  enabled: s.runtime?.mcpPort == null,
+                  source: 'user',
+                }).catch((cause) =>
+                  showSessions(false, cause instanceof Error ? cause.message : String(cause))
+                );
+              },
+            })),
+        ]
+      : []),
     {type: 'separator'},
     {label: 'New Session…', click: () => showSessions(true)},
     {label: 'Manage Sessions…', click: () => showSessions()},
@@ -422,6 +445,7 @@ export const startSessionRuntime = async () => {
         'stop',
         'rename',
         'mute',
+        'agents',
         'e2e-show-panel',
         'e2e-panel-state',
         'e2e-audio-state',
@@ -429,6 +453,7 @@ export const startSessionRuntime = async () => {
       ]),
       name: sessionName.optional(),
       muted: z.boolean().optional(),
+      enabled: z.boolean().optional(),
     })
     .strict();
   const {server, endpoint} = await serve(token, async (body) => {
@@ -490,6 +515,16 @@ export const startSessionRuntime = async () => {
     if (req.operation === 'mute') {
       if (req.muted === undefined) throw new Error('muted is required');
       applyAudioMuted(req.muted);
+    }
+    if (req.operation === 'agents') {
+      if (req.enabled === undefined) throw new Error('enabled is required');
+      setMcpServerEnabled(req.enabled);
+      // Reply with the real state: listening starts asynchronously.
+      for (let i = 0; req.enabled && i < 40; i += 1) {
+        const s = getMcpServerStatus();
+        if (s.running || s.error) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
     }
     if (req.operation === 'stop') setTimeout(() => app.quit(), 50);
     const mcp = getMcpServerStatus();

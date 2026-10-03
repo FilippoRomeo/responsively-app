@@ -79,7 +79,7 @@ export const resolveSessionPort = async (
         return {port: info.runtime.mcpPort, name: info.name};
       }
       throw new Error(
-        `${label} is running with MCP turned off. Turn MCP on in that Session's window, then retry.`
+        `${label} is running with agents disconnected. Ask the user to connect agents for it (Manage Sessions, the menu-bar menu or the window's Agents button), then retry.`
       );
     case 'starting':
       throw new Error(`${label} is starting. Retry in a few seconds.`);

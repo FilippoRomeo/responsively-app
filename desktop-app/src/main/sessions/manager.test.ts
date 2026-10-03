@@ -15,6 +15,15 @@ describe('SessionManager safety', () => {
       path.join(os.tmpdir(), 'session-manager-test-')
     );
   });
+  it('changes agent access only on a running Session and needs an explicit value', async () => {
+    const m = new SessionManager();
+    const s = (await m.request({operation: 'create', name: 'Agents', open: false})) as SessionInfo;
+    await expect(m.request({operation: 'agents', id: s.id, enabled: false})).rejects.toThrow(
+      /Open the Session/
+    );
+    await expect(m.request({operation: 'agents', id: s.id})).rejects.toThrow(/enabled/);
+    await expect(m.request({operation: 'agents', id: s.id, enabled: 'no'})).rejects.toThrow();
+  });
   it('saves mute with the Session, also while stopped, and survives a registry reload', async () => {
     const m = new SessionManager();
     const s = (await m.request({operation: 'create', name: 'Quiet', open: false})) as SessionInfo;

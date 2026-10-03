@@ -31,6 +31,7 @@ const testOrder = [
   'menu-flyout.spec.ts',
   'sessions.spec.ts',
   'audio-mute.spec.ts',
+  'agents-toggle.spec.ts',
   'url-navigation.spec.ts',
   'popup-policy.spec.ts',
   'title-bar.spec.ts',
