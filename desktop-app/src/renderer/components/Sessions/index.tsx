@@ -239,7 +239,7 @@ export default function SessionsManager({
       refreshing.current = false;
       await refresh();
       setSuccess(
-        `${value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : value.operation === 'force-stop' ? 'Session force quit' : 'Session opened'}.`
+        `${value.operation === 'mute' ? (value.muted ? 'Session muted' : 'Session unmuted') : value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : value.operation === 'force-stop' ? 'Session force quit' : 'Session opened'}.`
       );
     } catch (error) {
       if (mounted.current)
@@ -507,6 +507,18 @@ export default function SessionsManager({
                     </p>
                   )}
                   <div className="mt-2 flex flex-wrap justify-end gap-1">
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={Boolean(pending[item.id])}
+                      isActive={item.muted === true}
+                      title={
+                        item.muted ? "Unmute this Session's sound" : "Mute this Session's sound"
+                      }
+                      onClick={() => void run({operation: 'mute', id: item.id, muted: !item.muted})}
+                    >
+                      <Icon icon={item.muted ? 'lucide:volume-x' : 'lucide:volume-2'} />
+                      {item.muted ? 'Unmute' : 'Mute'}
+                    </ToolbarAction>
                     <ToolbarAction
                       className={actionClass}
                       disabled={Boolean(pending[item.id])}

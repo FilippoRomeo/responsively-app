@@ -10,6 +10,8 @@ export interface SessionDefinition {
   lastOpenedAt?: string;
   lastUrl?: string;
   lastStop?: {by: SessionStopCause; at: string};
+  /** Page sound of every preview in this Session is muted. */
+  muted?: boolean;
 }
 export type SessionStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
 export interface SessionRuntime {
@@ -38,7 +40,8 @@ export type SessionOperation =
   | 'delete'
   | 'reset'
   | 'attention'
-  | 'force-stop';
+  | 'force-stop'
+  | 'mute';
 export interface SessionRequest {
   operation: SessionOperation;
   id?: string;
@@ -47,4 +50,5 @@ export interface SessionRequest {
   open?: boolean;
   confirmed?: boolean;
   source?: SessionStopSource;
+  muted?: boolean;
 }

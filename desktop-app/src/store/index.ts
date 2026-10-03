@@ -287,6 +287,11 @@ const schema = {
     type: 'string',
     default: 'https://www.google.com/',
   },
+  // Main window only; a Session's mute lives in the Sessions registry.
+  audioMuted: {
+    type: 'boolean',
+    default: false,
+  },
   windowState: {
     type: 'object',
     properties: {
@@ -341,8 +346,10 @@ const store = new Store({
 });
 
 // Keys the renderer may touch through the electron-store IPC bridge.
-// windowState is main-process-only.
-const RENDERER_STORE_ROOTS = new Set(Object.keys(schema).filter((key) => key !== 'windowState'));
+// windowState and audioMuted are main-process-only.
+const RENDERER_STORE_ROOTS = new Set(
+  Object.keys(schema).filter((key) => key !== 'windowState' && key !== 'audioMuted')
+);
 
 export const isRendererStoreKey = (property: unknown): property is string =>
   typeof property === 'string' && RENDERER_STORE_ROOTS.has(property.split('.')[0]);
