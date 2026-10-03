@@ -158,7 +158,16 @@ export const showLauncher = async () => {
       setTimeout(() => resolve(cached), 1500);
     }),
   ]);
-  if (tray && !tray.isDestroyed()) tray.popUpContextMenu(statusMenu(items));
+  if (!tray || tray.isDestroyed()) {
+    launcherOpen = false;
+    return;
+  }
+  const menu = statusMenu(items);
+  launcherOpen = true;
+  menu.once('menu-will-close', () => {
+    launcherOpen = false;
+  });
+  tray.popUpContextMenu(menu);
 };
 export const initSessionsTray = () => {
   if (
@@ -173,8 +182,12 @@ export const initSessionsTray = () => {
     : path.join(__dirname, '../../assets');
   tray = new Tray(path.join(assets, 'sessionsTemplate.png'));
   tray.setToolTip('Responsively Sessions');
-  tray.on('click', () => void showLauncher());
-  tray.on('right-click', () => void showLauncher());
+  const openLauncher = () => {
+    launcherOpen = true;
+    void showLauncher();
+  };
+  tray.on('click', openLauncher);
+  tray.on('right-click', openLauncher);
   app.on('will-quit', () => tray?.destroy());
   return tray;
 };
@@ -184,6 +197,37 @@ const menuAction = (id: string, operation: 'open' | 'focus' | 'stop') => () => {
   );
 };
 let cached: SessionInfo[] = [];
+let lastFocused: string | undefined;
+let launcherOpen = false;
+export const noteSessionFocused = (id: string) => {
+  lastFocused = id;
+};
+/**
+ * Switching to Responsively (Cmd-Tab, Dock) brings back the Session window you
+ * used last, else the most recently opened one. False when none is running.
+ */
+export const bringSessionForward = async () => {
+  const running = ((await sessionRequest({operation: 'list'})) as SessionInfo[]).filter(
+    (s) => s.status === 'running'
+  );
+  const target =
+    running.find((s) => s.id === lastFocused) ??
+    [...running].sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? ''))[0];
+  if (!target) return false;
+  await sessionRequest({operation: 'focus', id: target.id, source: 'user'});
+  return true;
+};
+/** A Dock click: the Session you used last, or the launcher when none is running. */
+export const onShellActivated = async () => {
+  if (!(await bringSessionForward().catch(() => false))) await showLauncher();
+};
+/** Cmd-Tab only: never pull a Session window over the shell's own menu or windows. */
+export const onShellBecameActive = () => {
+  setTimeout(() => {
+    if (launcherOpen || BrowserWindow.getAllWindows().some((w) => w.isVisible())) return;
+    void bringSessionForward().catch(() => {});
+  }, 300);
+};
 /** The menu-bar launcher: Sessions to open or focus, then management and Quit. */
 const statusMenu = (items: SessionInfo[]) =>
   Menu.buildFromTemplate([

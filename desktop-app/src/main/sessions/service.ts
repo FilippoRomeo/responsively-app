@@ -105,11 +105,15 @@ const childEnv = (): NodeJS.ProcessEnv => {
 
 // A capability-protected presence beacon, not a second Sessions authority.
 const shellRequest = z
-  .object({operation: z.enum(['status', 'quit', 'attention']), id: z.string().uuid().optional()})
+  .object({
+    operation: z.enum(['status', 'quit', 'attention', 'focused']),
+    id: z.string().uuid().optional(),
+  })
   .strict();
 export const startShellOwner = async (
   onQuitBlocked: (message: string) => void,
-  onAttention: (id: string) => void = () => {}
+  onAttention: (id: string) => void = () => {},
+  onFocused: (id: string) => void = () => {}
 ) => {
   const {server, endpoint} = await serve(secret(), async (body) => {
     const req = shellRequest.parse(body);
@@ -117,6 +121,8 @@ export const startShellOwner = async (
     if (req.operation === 'quit') setTimeout(() => app.quit(), 50);
     // The controller asks the shell to show you a Session an agent could not use.
     if (req.operation === 'attention' && req.id) onAttention(req.id);
+    // A Session window tells the shell it was the last one you used.
+    if (req.operation === 'focused' && req.id) onFocused(req.id);
     return {userDataDir: app.getPath('userData')};
   });
   atomicWrite(shellFile(), endpoint);
@@ -183,6 +189,15 @@ export const restoreSessions = async () => {
   }
   fs.rmSync(restoreFile(), {force: true});
   await reopenSessions(sessionRequest, ids);
+};
+
+/** Tell the shell this Session's window has focus; nothing to do without a shell. */
+export const reportSessionFocused = async (id: string) => {
+  try {
+    await call(read<Endpoint>(shellFile()), {operation: 'focused', id}, 1000);
+  } catch {
+    /* No shell (agent-only Sessions) */
+  }
 };
 
 /** Ask the shell to quit the whole app; false when no shell is running (agent-only Sessions). */
