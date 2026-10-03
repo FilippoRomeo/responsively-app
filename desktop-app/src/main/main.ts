@@ -42,11 +42,19 @@ import {wireWebviewSecurity} from './webview-registry';
 import {getTitleBarOptions} from './titlebar';
 import {shouldRegisterProtocol} from './runtime-isolation';
 
-import {restoreSessions, startController, startShellOwner} from './sessions/service';
+import {
+  reportSessionFocused,
+  restoreSessions,
+  startController,
+  startShellOwner,
+} from './sessions/service';
 import {stopSessionWhenWindowsClose} from './sessions/window-lifecycle';
 import {
   initSessions,
   initSessionsTray,
+  noteSessionFocused,
+  onShellBecameActive,
+  onShellActivated,
   showLauncher,
   showSessions,
   showAttention,
@@ -315,6 +323,8 @@ const createWindow = async () => {
     mainWindow.maximize();
   }
   trackWindowState(mainWindow);
+  const sessionId = process.env.RESPONSIVELY_SESSION_ID;
+  if (sessionId) mainWindow.on('focus', () => void reportSessionFocused(sessionId));
   initDevtoolsHandlers(mainWindow);
   wireWebviewSecurity(mainWindow.webContents, {
     openInPreview: (url) => openUrl(url, getMainWindow()),
@@ -448,7 +458,11 @@ app
     appUpdater = new AppUpdater();
     initSessions(getMainWindow, createWindow, () => menuBuilder?.buildMenu());
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
-      await startShellOwner((message) => showSessions(false, message, true), showAttention);
+      await startShellOwner(
+        (message) => showSessions(false, message, true),
+        showAttention,
+        noteSessionFocused
+      );
     if (
       process.platform === 'darwin' &&
       !process.env.RESPONSIVELY_SESSION_ID &&
@@ -457,6 +471,8 @@ app
       menuBuilder = new MenuBuilder(null, appUpdater);
       menuBuilder.buildMenu();
       initSessionsTray();
+      // Cmd-Tab fires only did-become-active; a Dock click also fires activate.
+      app.on('did-become-active', onShellBecameActive);
       // No manager on launch: the menu-bar icon is the launcher.
       if (!process.env.RESPONSIVELY_SHELL_SPAWNED) void restoreSessions();
     } else {
@@ -466,7 +482,7 @@ app
     app.on('activate', () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
       else if (process.env.RESPONSIVELY_SESSION_ID) void createWindow();
-      else void showLauncher();
+      else void onShellActivated();
     });
   })
   .catch((error) => {
