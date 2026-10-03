@@ -82,6 +82,7 @@ const childEnv = (): NodeJS.ProcessEnv => {
     'RESPONSIVELY_SESSION_TOKEN',
     'RESPONSIVELY_SESSION_NAME',
     'RESPONSIVELY_SESSION_URL',
+    'RESPONSIVELY_SESSION_MUTED',
     'RESPONSIVELY_SESSION_CONTROLLER',
     'RESPONSIVELY_MCP_PORT',
     'RESPONSIVELY_BROWSER_SYNC_PORT',
@@ -331,14 +332,18 @@ export class SessionManager {
   async list() {
     return Promise.all(this.registry.list().map((s) => this.inspect(s.id)));
   }
-  private async control(id: string, operation: 'focus' | 'stop' | 'rename', name?: string) {
+  private async control(
+    id: string,
+    operation: 'focus' | 'stop' | 'rename' | 'mute',
+    args: {name?: string; muted?: boolean} = {}
+  ) {
     const lease = this.readLease(id);
     if (!lease) throw new Error('Session is stopped');
     // An authenticated endpoint inside the target runtime performs its own actions.
     // Never signal a persisted PID: it may have been reused after a crash.
     const proof = await call<RuntimeReply>(lease, {operation: 'status'});
     if (proof.id !== id || proof.pid !== lease.pid) throw new Error('Session identity mismatch');
-    return call(lease, {operation, name});
+    return call(lease, {operation, ...args});
   }
   private async open(id: string) {
     if (process.platform === 'darwin') await ensureShellOwner();
@@ -367,6 +372,7 @@ export class SessionManager {
         RESPONSIVELY_SESSION_URL: fs.existsSync(path.join(dir, 'config.json'))
           ? ''
           : (current.lastUrl ?? ''),
+        RESPONSIVELY_SESSION_MUTED: current.muted ? 'true' : '',
         RESPONSIVELY_USER_DATA_DIR: dir,
         RESPONSIVELY_MCP_PORT: String(mcp.port),
         RESPONSIVELY_BROWSER_SYNC_PORT: String(bs.port),
@@ -543,7 +549,14 @@ export class SessionManager {
             if (!req.name) throw new Error('Name is required');
             this.registry.update(id, {name: req.name});
             if ((await this.inspect(id)).status === 'running')
-              await this.control(id, 'rename', req.name);
+              await this.control(id, 'rename', {name: req.name});
+            return this.inspect(id);
+          }
+          case 'mute': {
+            if (req.muted === undefined) throw new Error('muted is required');
+            this.registry.update(id, {muted: req.muted});
+            if ((await this.inspect(id)).status === 'running')
+              await this.control(id, 'mute', {muted: req.muted});
             return this.inspect(id);
           }
           case 'delete': {
@@ -582,7 +595,9 @@ export class SessionManager {
             req.source,
             req.operation === 'delete' || req.operation === 'reset'
               ? `${req.operation === 'delete' ? 'deleted' : 'reset'}; its profile, if any, moved to the Trash`
-              : info.status
+              : req.operation === 'mute'
+                ? `${info.muted ? 'muted' : 'unmuted'} (${info.status})`
+                : info.status
           )
         )
         .catch((error) => {

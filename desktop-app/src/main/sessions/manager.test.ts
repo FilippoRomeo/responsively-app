@@ -15,6 +15,18 @@ describe('SessionManager safety', () => {
       path.join(os.tmpdir(), 'session-manager-test-')
     );
   });
+  it('saves mute with the Session, also while stopped, and survives a registry reload', async () => {
+    const m = new SessionManager();
+    const s = (await m.request({operation: 'create', name: 'Quiet', open: false})) as SessionInfo;
+    expect(s.muted).toBeUndefined();
+    const muted = (await m.request({operation: 'mute', id: s.id, muted: true})) as SessionInfo;
+    expect(muted).toMatchObject({muted: true, status: 'stopped'});
+    expect(new SessionManager().registry.get(s.id).muted).toBe(true);
+    await m.request({operation: 'mute', id: s.id, muted: false});
+    expect(m.registry.get(s.id).muted).toBe(false);
+    await expect(m.request({operation: 'mute', id: s.id})).rejects.toThrow(/muted/);
+    await expect(m.request({operation: 'mute', id: s.id, muted: 'yes'})).rejects.toThrow();
+  });
   it('never deletes or stops a live PID without an authenticated runtime', async () => {
     const m = new SessionManager();
     const s = (await m.request({

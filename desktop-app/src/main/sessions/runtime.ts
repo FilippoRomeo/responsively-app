@@ -6,6 +6,7 @@ import {
   MenuItemConstructorOptions,
   screen,
   Tray,
+  webContents,
 } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -20,6 +21,7 @@ import {getMcpServerStatus} from '../mcp';
 import {getBrowserSyncPort, isBrowserSyncReady} from '../browser-sync';
 import {normalizeUrl} from '../mcp/utils';
 import {resolveHtmlPath} from '../util';
+import {applyAudioMuted} from '../audio-mute';
 
 let name = process.env.RESPONSIVELY_SESSION_NAME;
 let getWindow: () => BrowserWindow | null;
@@ -414,12 +416,41 @@ export const startSessionRuntime = async () => {
     throw new Error('Invalid session launch identity');
   const schema = z
     .object({
-      operation: z.enum(['status', 'focus', 'stop', 'rename', 'e2e-show-panel', 'e2e-panel-state']),
+      operation: z.enum([
+        'status',
+        'focus',
+        'stop',
+        'rename',
+        'mute',
+        'e2e-show-panel',
+        'e2e-panel-state',
+        'e2e-audio-state',
+        'e2e-audio-toggle',
+      ]),
       name: sessionName.optional(),
+      muted: z.boolean().optional(),
     })
     .strict();
   const {server, endpoint} = await serve(token, async (body) => {
     const req = schema.parse(body);
+    if (req.operation === 'e2e-audio-state' || req.operation === 'e2e-audio-toggle') {
+      if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
+      const win = getWindow();
+      if (!win || win.isDestroyed()) throw new Error('No Session window');
+      const button = 'document.querySelector(\'button[title$="ute sound"]\')';
+      if (req.operation === 'e2e-audio-toggle') {
+        await win.webContents.executeJavaScript(`${button}?.click()`);
+        return {clicked: true};
+      }
+      const pages = webContents.getAllWebContents().filter((c) => c.getType() === 'webview');
+      return {
+        pages: pages.length,
+        allMuted: pages.length > 0 && pages.every((c) => c.isAudioMuted()),
+        button: await win.webContents.executeJavaScript(
+          `${button}?.getAttribute('aria-pressed') ?? null`
+        ),
+      };
+    }
     if (req.operation === 'e2e-show-panel' || req.operation === 'e2e-panel-state') {
       if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
       if (req.operation === 'e2e-show-panel') {
@@ -455,6 +486,10 @@ export const startSessionRuntime = async () => {
       name = req.name;
       getWindow()?.setTitle(name);
       getWindow()?.webContents.send(IPC_MAIN_CHANNELS.SESSION_RENAMED, name);
+    }
+    if (req.operation === 'mute') {
+      if (req.muted === undefined) throw new Error('muted is required');
+      applyAudioMuted(req.muted);
     }
     if (req.operation === 'stop') setTimeout(() => app.quit(), 50);
     const mcp = getMcpServerStatus();
