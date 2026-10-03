@@ -41,7 +41,8 @@ export type SessionOperation =
   | 'reset'
   | 'attention'
   | 'force-stop'
-  | 'mute';
+  | 'mute'
+  | 'agents';
 export interface SessionRequest {
   operation: SessionOperation;
   id?: string;
@@ -51,4 +52,6 @@ export interface SessionRequest {
   confirmed?: boolean;
   source?: SessionStopSource;
   muted?: boolean;
+  /** agents: whether AI agents may use this Session (its MCP server). */
+  enabled?: boolean;
 }

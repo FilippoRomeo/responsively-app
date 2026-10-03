@@ -53,6 +53,15 @@ const McpPanel = () => {
   useEffect(() => {
     refresh();
   }, [refresh]);
+  // Agents connected/disconnected from the toolbar, Manage Sessions or the menu bar.
+  useEffect(
+    () =>
+      window.electron.ipcRenderer.on<McpServerStatus>(
+        IPC_MAIN_CHANNELS.MCP_STATUS_CHANGED,
+        setStatus
+      ),
+    []
+  );
 
   const setTool = async (toolId: string, add: boolean) => {
     setToolError(null);

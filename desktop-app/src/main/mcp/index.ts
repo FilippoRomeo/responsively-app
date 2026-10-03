@@ -5,6 +5,7 @@ import http from 'http';
 import store from '../../store';
 import log from '../logging';
 import {MCP_SERVER_NAME} from '../../common/mcp';
+import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import {writeMcpBeacon} from './beacon';
 import {GetMainWindow, initMcpBridge} from './bridge';
 import {registerTools} from './tools';
@@ -92,10 +93,12 @@ const startServer = (getMainWindow: GetMainWindow): void => {
     lastError = error.code ?? error.message;
     httpServer = null;
     activePort = null;
+    notifyStatus();
   });
 
   server.listen(port, '127.0.0.1', () => {
     activePort = port;
+    notifyStatus();
     // The beacon is how the npm bootstrap finds a running app, so it must
     // only exist while the server is actually listening.
     writeMcpBeacon(port);
@@ -122,6 +125,13 @@ export const getMcpServerStatus = (): McpServerStatus => {
   };
 };
 
+/** The window's MCP panel and Agents button follow changes made from elsewhere. */
+function notifyStatus() {
+  const win = getMainWindowRef?.();
+  if (win && !win.isDestroyed())
+    win.webContents.send(IPC_MAIN_CHANNELS.MCP_STATUS_CHANGED, getMcpServerStatus());
+}
+
 /** Turns the server on or off and remembers the choice across launches. */
 export const setMcpServerEnabled = (enabled: boolean): McpServerStatus => {
   store.set('userPreferences.mcpEnabled', enabled);
@@ -132,6 +142,7 @@ export const setMcpServerEnabled = (enabled: boolean): McpServerStatus => {
   } else {
     stopServer();
   }
+  notifyStatus();
   return getMcpServerStatus();
 };
 

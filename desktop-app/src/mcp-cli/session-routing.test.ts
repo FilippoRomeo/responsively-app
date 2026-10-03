@@ -130,7 +130,7 @@ describe('resolveSessionPort', () => {
   });
 
   it.each([
-    [runningOn(null), /is running with MCP turned off/],
+    [runningOn(null), /is running with agents disconnected/],
     [session({status: 'starting'}), /is starting\. Retry/],
     [session({status: 'stopping'}), /is stopping/],
     [session({status: 'stopped'}), /is stopped\. Call open_session/],

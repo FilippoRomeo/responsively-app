@@ -74,6 +74,7 @@ export const IPC_MAIN_CHANNELS = {
   SET_OVERLAY_OPEN: 'set-overlay-open',
   MCP_STATUS: 'mcp-status',
   MCP_SET_ENABLED: 'mcp-set-enabled',
+  MCP_STATUS_CHANGED: 'mcp-status-changed',
   MCP_LIST_TOOLS: 'mcp-list-tools',
   MCP_SET_TOOL: 'mcp-set-tool',
 } as const;

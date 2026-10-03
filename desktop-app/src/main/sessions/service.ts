@@ -334,8 +334,8 @@ export class SessionManager {
   }
   private async control(
     id: string,
-    operation: 'focus' | 'stop' | 'rename' | 'mute',
-    args: {name?: string; muted?: boolean} = {}
+    operation: 'focus' | 'stop' | 'rename' | 'mute' | 'agents',
+    args: {name?: string; muted?: boolean; enabled?: boolean} = {}
   ) {
     const lease = this.readLease(id);
     if (!lease) throw new Error('Session is stopped');
@@ -559,6 +559,14 @@ export class SessionManager {
               await this.control(id, 'mute', {muted: req.muted});
             return this.inspect(id);
           }
+          case 'agents': {
+            // The switch lives in the Session's own profile; only its runtime changes it.
+            if (req.enabled === undefined) throw new Error('enabled is required');
+            if ((await this.inspect(id)).status !== 'running')
+              throw new Error('Open the Session to change whether agents can use it.');
+            await this.control(id, 'agents', {enabled: req.enabled});
+            return this.inspect(id);
+          }
           case 'delete': {
             if (req.confirmed !== true) throw new Error('Explicit delete confirmation is required');
             await this.inspect(id);
@@ -597,7 +605,9 @@ export class SessionManager {
               ? `${req.operation === 'delete' ? 'deleted' : 'reset'}; its profile, if any, moved to the Trash`
               : req.operation === 'mute'
                 ? `${info.muted ? 'muted' : 'unmuted'} (${info.status})`
-                : info.status
+                : req.operation === 'agents'
+                  ? `agents ${info.runtime?.mcpPort == null ? 'off' : 'on'}`
+                  : info.status
           )
         )
         .catch((error) => {

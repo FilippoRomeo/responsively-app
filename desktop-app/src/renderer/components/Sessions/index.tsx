@@ -239,7 +239,7 @@ export default function SessionsManager({
       refreshing.current = false;
       await refresh();
       setSuccess(
-        `${value.operation === 'mute' ? (value.muted ? 'Session muted' : 'Session unmuted') : value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : value.operation === 'force-stop' ? 'Session force quit' : 'Session opened'}.`
+        `${value.operation === 'agents' ? (value.enabled ? 'Agents connected' : 'Agents disconnected') : value.operation === 'mute' ? (value.muted ? 'Session muted' : 'Session unmuted') : value.operation === 'create' ? 'Session created' : value.operation === 'rename' ? 'Session renamed' : value.operation === 'delete' ? 'Session moved to Trash' : value.operation === 'reset' ? 'Session data moved to Trash' : value.operation === 'stop' ? 'Session stopped' : value.operation === 'focus' ? 'Session focused' : value.operation === 'force-stop' ? 'Session force quit' : 'Session opened'}.`
       );
     } catch (error) {
       if (mounted.current)
@@ -507,6 +507,36 @@ export default function SessionsManager({
                     </p>
                   )}
                   <div className="mt-2 flex flex-wrap justify-end gap-1">
+                    <ToolbarAction
+                      className={actionClass}
+                      disabled={Boolean(pending[item.id]) || item.status !== 'running'}
+                      isActive={item.status === 'running' && item.runtime?.mcpPort != null}
+                      title={
+                        item.status !== 'running'
+                          ? 'Open the Session to connect or disconnect AI agents'
+                          : item.runtime?.mcpPort != null
+                            ? 'Disconnect AI agents from this Session'
+                            : 'Connect AI agents to this Session'
+                      }
+                      onClick={() =>
+                        void run({
+                          operation: 'agents',
+                          id: item.id,
+                          enabled: item.runtime?.mcpPort == null,
+                        })
+                      }
+                    >
+                      <Icon
+                        icon={
+                          item.status === 'running' && item.runtime?.mcpPort != null
+                            ? 'lucide:bot'
+                            : 'lucide:bot-off'
+                        }
+                      />
+                      {item.status === 'running' && item.runtime?.mcpPort != null
+                        ? 'Agents on'
+                        : 'Agents off'}
+                    </ToolbarAction>
                     <ToolbarAction
                       className={actionClass}
                       disabled={Boolean(pending[item.id])}
