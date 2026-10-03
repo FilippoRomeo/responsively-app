@@ -37,6 +37,15 @@ describe('matchShortcut', () => {
     expect(matchShortcut(press({code: 'KeyR', control: true}), 'darwin')).toBeNull();
   });
 
+  it('tells reload from reload-and-clear-cache by shift', () => {
+    expect(matchShortcut(press({code: 'KeyR', meta: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.RELOAD
+    );
+    expect(matchShortcut(press({code: 'KeyR', meta: true, shift: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.RELOAD_CLEAR_CACHE
+    );
+  });
+
   it('matches zoom in with and without shift', () => {
     expect(matchShortcut(press({code: 'Equal', meta: true}), 'darwin')).toBe(
       SHORTCUT_CHANNEL.ZOOM_IN

@@ -1,5 +1,4 @@
 import {IPC_MAIN_CHANNELS} from 'common/constants';
-import {ReloadArgs} from 'main/menu';
 import {LoadURLInWebviewArgs, LoadURLInWebviewResult} from 'main/native-functions';
 import {DeleteStorageArgs, DeleteStorageResult} from 'main/webview-storage-manager';
 import {RefObject, useCallback, useEffect, useReducer, useRef} from 'react';
@@ -121,29 +120,6 @@ const useDeviceNavigation = ({ref, isPrimary, webviewReady, address}: Params): N
       });
     };
   }, [ref, dispatch, isPrimary]);
-
-  // Menu-driven reloads arrive over IPC.
-  useEffect(() => {
-    if (!ref.current) {
-      return undefined;
-    }
-    const webview = ref.current as Electron.WebviewTag;
-
-    const reloadHandler = (args: ReloadArgs) => {
-      const {ignoreCache} = args;
-      if (ignoreCache === true) {
-        webview.reloadIgnoringCache();
-      } else {
-        webview.reload();
-      }
-    };
-
-    window.electron.ipcRenderer.on<ReloadArgs>('reload', reloadHandler);
-
-    return () => {
-      window.electron.ipcRenderer.removeListener('reload', reloadHandler);
-    };
-  }, [ref]);
 
   // Toolbar pub/sub: reload for everyone; back/forward/storage only on the
   // primary device.

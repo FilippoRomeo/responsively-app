@@ -10,10 +10,6 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   submenu?: DarwinMenuItemConstructorOptions[] | Menu;
 }
 
-export interface ReloadArgs {
-  ignoreCache?: boolean;
-}
-
 export default class MenuBuilder {
   mainWindow: BrowserWindow | null;
 
