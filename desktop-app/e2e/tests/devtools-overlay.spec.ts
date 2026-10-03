@@ -51,4 +51,36 @@ test.describe('Devtools overlay coordination', () => {
     await app.page.keyboard.press('Escape');
     await expect.poll(() => devtoolsAttached(app), {timeout: 10_000}).toBe(true);
   });
+
+  test('close removes devtools after it was reopened on another device', async ({app}) => {
+    await app.dismissModals();
+    // The previous test's Site tools popover can outlive its Escape and cover the pills.
+    const siteToolsItem = app.page.locator('button[title="Delete Storage"]');
+    if (await siteToolsItem.isVisible()) {
+      await app.page.locator('button[title="Site tools"]').click();
+    }
+    await expect(siteToolsItem).toBeHidden();
+    const childViews = () =>
+      app.electronApp.evaluate(
+        ({BrowserWindow}) => BrowserWindow.getAllWindows()[0].contentView.children.length
+      );
+    const openOn = async (index: number) => {
+      await app.revealDevicePill(index);
+      await app.page
+        .locator('[data-testid="device-pill"]:visible')
+        .nth(index)
+        .locator('button[title="Open devtools"]')
+        .click();
+    };
+
+    await openOn(0);
+    await expect.poll(childViews, {timeout: 15_000}).toBe(1);
+    // Opening on a second device must replace the panel, not stack a second one.
+    await openOn(1);
+    await app.page.waitForTimeout(1000);
+    expect(await childViews()).toBe(1);
+
+    await app.page.locator('[data-testid="devtools-resizer"]').locator('button').last().click();
+    await expect.poll(childViews, {timeout: 10_000}).toBe(0);
+  });
 });
