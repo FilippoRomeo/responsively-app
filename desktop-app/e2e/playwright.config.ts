@@ -39,6 +39,7 @@ const testOrder = [
   'announcements.spec.ts',
   'devtools-overlay.spec.ts',
   'shortcut-forwarding.spec.ts',
+  'reload-shortcuts.spec.ts',
   'address-bar-features.spec.ts',
   'device-toolbar.spec.ts',
   'zoom-controls.spec.ts',

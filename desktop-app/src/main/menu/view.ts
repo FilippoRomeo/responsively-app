@@ -1,4 +1,6 @@
 import {BrowserWindow, MenuItemConstructorOptions} from 'electron';
+import {IPC_MAIN_CHANNELS} from '../../common/constants';
+import {SHORTCUT_CHANNEL} from '../../common/shortcuts';
 
 const isMac = process.platform === 'darwin';
 const isDev = process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
@@ -19,23 +21,30 @@ const getToggleDevTools = (mainWindow: BrowserWindow): MenuItemConstructorOption
   },
 });
 
+// The window's own shortcuts handle ⌘R / ⌘⇧R everywhere, including Session
+// windows that have no menu; the menu only shows them and runs the same path.
 const getReloadMenu = (mainWindow: BrowserWindow): MenuItemConstructorOptions => ({
   label: '&Reload',
   accelerator: 'CommandOrControl+R',
+  registerAccelerator: isDev,
   click: () => {
     if (isDev) {
       mainWindow.webContents.reload();
       return;
     }
-    mainWindow.webContents.send('reload', {});
+    mainWindow.webContents.send(IPC_MAIN_CHANNELS.SHORTCUT_TRIGGERED, SHORTCUT_CHANNEL.RELOAD);
   },
 });
 
 const getReloadIgnoringCacheMenu = (mainWindow: BrowserWindow): MenuItemConstructorOptions => ({
-  label: 'Reload Ignoring Cache',
+  label: 'Reload and Clear Cache',
   accelerator: 'CommandOrControl+Shift+R',
+  registerAccelerator: false,
   click: () => {
-    mainWindow.webContents.send('reload', {ignoreCache: true});
+    mainWindow.webContents.send(
+      IPC_MAIN_CHANNELS.SHORTCUT_TRIGGERED,
+      SHORTCUT_CHANNEL.RELOAD_CLEAR_CACHE
+    );
   },
 });
 
