@@ -11,9 +11,21 @@ const electronApp = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => ({app: electronApp, BrowserWindow: vi.fn(), shell: {}}));
 
-const {createQuitGate} = await import('./window-lifecycle');
+const {createQuitGate, neighbourTab} = await import('./window-lifecycle');
 const {requestShellQuit, startShellOwner} = await import('./service');
 const {call} = await import('../../common/session-rpc');
+
+describe('closing a Session tab', () => {
+  const tab = (id: string, status = 'running') => ({id, status}) as any;
+  it('hands its place to the tab on the right, else the one on the left', () => {
+    const tabs = [tab('a'), tab('b'), tab('stopped', 'stopped'), tab('c')];
+    expect(neighbourTab(tabs, 'a')?.id).toBe('b');
+    expect(neighbourTab(tabs, 'b')?.id).toBe('c');
+    expect(neighbourTab(tabs, 'c')?.id).toBe('b');
+    expect(neighbourTab([tab('a')], 'a')).toBeUndefined();
+    expect(neighbourTab(tabs, 'unknown')).toBeUndefined();
+  });
+});
 
 describe('⌘Q in a Session window asks twice', () => {
   it('arms on the first press and quits only on a second press in time', () => {

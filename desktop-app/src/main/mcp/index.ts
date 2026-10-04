@@ -2,6 +2,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {app} from 'electron';
 import http from 'http';
+import {AddressInfo} from 'net';
 import store from '../../store';
 import log from '../logging';
 import {MCP_SERVER_NAME} from '../../common/mcp';
@@ -45,25 +46,73 @@ const handleMcpRequest = async (
   await transport.handleRequest(req, res);
 };
 
-const startServer = (getMainWindow: GetMainWindow): void => {
+/** The agent app behind a request: the bridge forwards its MCP client name. */
+const AGENT_HEADER = 'x-responsively-agent';
+const agentOf = (req: http.IncomingMessage): string => {
+  const raw = req.headers[AGENT_HEADER];
+  const name = (Array.isArray(raw) ? raw[0] : (raw ?? '')).replace(/[^\x20-\x7e]/g, '').trim();
+  return name.slice(0, 80) || 'unidentified client';
+};
+const agents = (): Record<string, boolean> =>
+  (store.get('mcpAgents') as Record<string, boolean> | undefined) ?? {};
+
+/** Agent apps seen by this window, and whether each may use it. */
+export const listMcpAgents = () =>
+  Object.entries(agents()).map(([name, allowed]) => ({name, allowed}));
+
+export const setMcpAgentAllowed = (name: string, allowed: boolean) => {
+  if (!Object.prototype.hasOwnProperty.call(agents(), name)) throw new Error('Unknown agent');
+  store.set('mcpAgents', {...agents(), [name]: allowed});
+  return listMcpAgents();
+};
+
+/** First contact registers the agent as allowed, so you can block it afterwards. */
+const admitAgent = (name: string): boolean => {
+  const known = agents();
+  if (Object.prototype.hasOwnProperty.call(known, name)) return known[name];
+  store.set('mcpAgents', {...known, [name]: true});
+  const win = getMainWindowRef?.();
+  if (win && !win.isDestroyed())
+    win.webContents.send(IPC_MAIN_CHANNELS.MCP_AGENTS_CHANGED, listMcpAgents());
+  return true;
+};
+
+const startServer = (getMainWindow: GetMainWindow, portOverride?: number): void => {
   if (httpServer !== null) {
     return;
   }
-  const port = resolveMcpPort();
+  // 0 asks the OS for a fresh port (a Session's hard reset).
+  const port = portOverride ?? resolveMcpPort();
   lastError = null;
 
   const server = http.createServer(async (req, res) => {
     try {
-      const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
+      const listening = activePort ?? port;
+      const url = new URL(req.url ?? '/', `http://127.0.0.1:${listening}`);
       if (url.pathname !== '/mcp') {
         res.writeHead(404, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({error: 'Not found — the MCP endpoint is /mcp'}));
         return;
       }
       // Reject non-loopback Host headers to block DNS-rebinding attacks.
-      if (!isAllowedHostHeader(req.headers.host, port)) {
+      if (!isAllowedHostHeader(req.headers.host, listening)) {
         res.writeHead(403, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({error: 'Forbidden'}));
+        return;
+      }
+      const agent = agentOf(req);
+      if (!admitAgent(agent)) {
+        res.writeHead(403, {'Content-Type': 'application/json'});
+        res.end(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            error: {
+              code: -32001,
+              message: `"${agent}" is not allowed to use this window. Ask the user to allow it in the MCP panel.`,
+            },
+            id: null,
+          })
+        );
         return;
       }
       await handleMcpRequest(req, res, getMainWindow);
@@ -97,18 +146,19 @@ const startServer = (getMainWindow: GetMainWindow): void => {
   });
 
   server.listen(port, '127.0.0.1', () => {
-    activePort = port;
+    activePort = (server.address() as AddressInfo).port;
     notifyStatus();
     // The beacon is how the npm bootstrap finds a running app, so it must
     // only exist while the server is actually listening.
-    writeMcpBeacon(port);
-    log.info(`[mcp] MCP server listening on http://127.0.0.1:${port}/mcp`);
+    writeMcpBeacon(activePort);
+    log.info(`[mcp] MCP server listening on http://127.0.0.1:${activePort}/mcp`);
   });
 
   httpServer = server;
 };
 
 const stopServer = (): void => {
+  httpServer?.closeAllConnections();
   httpServer?.close();
   httpServer = null;
   activePort = null;
@@ -131,6 +181,31 @@ function notifyStatus() {
   if (win && !win.isDestroyed())
     win.webContents.send(IPC_MAIN_CHANNELS.MCP_STATUS_CHANGED, getMcpServerStatus());
 }
+
+/**
+ * Hard reset: drop every connection and start again. A Session gets a fresh
+ * port (agents find it through the controller); the main window keeps its
+ * configured port, which agent configs point at.
+ */
+export const hardResetMcpServer = async (): Promise<McpServerStatus> => {
+  const closing = httpServer;
+  httpServer = null;
+  activePort = null;
+  if (closing) {
+    closing.closeAllConnections();
+    // The same port is free only once the old socket has fully closed.
+    await new Promise((resolve) => {
+      closing.close(resolve);
+    });
+  }
+  if (store.get('userPreferences.mcpEnabled') !== false && getMainWindowRef !== null) {
+    startServer(getMainWindowRef, process.env.RESPONSIVELY_SESSION_ID ? 0 : undefined);
+    for (let i = 0; i < 40 && activePort === null && lastError === null; i += 1)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  notifyStatus();
+  return getMcpServerStatus();
+};
 
 /** Turns the server on or off and remembers the choice across launches. */
 export const setMcpServerEnabled = (enabled: boolean): McpServerStatus => {

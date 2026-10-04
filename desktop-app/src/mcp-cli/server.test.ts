@@ -2,6 +2,15 @@
 import {expect, it} from 'vitest';
 import {agentLifecycleRequest, hiddenTools} from './server';
 
+it('drops window placement and UI-only switches from agent calls', () => {
+  expect(
+    agentLifecycleRequest(
+      {id: 'x', bounds: {x: 0, y: 0, width: 900, height: 600}, enabled: true, muted: true},
+      'focus'
+    )
+  ).toEqual({id: 'x', operation: 'focus', source: 'agent'});
+});
+
 it('hides create_session from agents unless the bridge opts in', () => {
   expect(hiddenTools({}).has('create_session')).toBe(true);
   expect(hiddenTools({RESPONSIVELY_MCP_ALLOW_CREATE_SESSION: 'true'}).has('create_session')).toBe(

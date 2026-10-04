@@ -21,6 +21,15 @@ export const SHORTCUT_CHANNEL = {
   NEW_SESSION_WINDOW: 'NEW_SESSION_WINDOW',
   NEXT_SESSION: 'NEXT_SESSION',
   PREVIOUS_SESSION: 'PREVIOUS_SESSION',
+  SESSION_TAB_1: 'SESSION_TAB_1',
+  SESSION_TAB_2: 'SESSION_TAB_2',
+  SESSION_TAB_3: 'SESSION_TAB_3',
+  SESSION_TAB_4: 'SESSION_TAB_4',
+  SESSION_TAB_5: 'SESSION_TAB_5',
+  SESSION_TAB_6: 'SESSION_TAB_6',
+  SESSION_TAB_7: 'SESSION_TAB_7',
+  SESSION_TAB_8: 'SESSION_TAB_8',
+  SESSION_TAB_LAST: 'SESSION_TAB_LAST',
 } as const;
 
 export type ShortcutChannel = (typeof SHORTCUT_CHANNEL)[keyof typeof SHORTCUT_CHANNEL];
@@ -48,8 +57,18 @@ export const SHORTCUT_KEYS: {[key in ShortcutChannel]: string[]} = {
   [SHORTCUT_CHANNEL.NEW_SESSION_TAB]: ['mod+t'],
   [SHORTCUT_CHANNEL.NEW_SESSION_WINDOW]: ['mod+n'],
   // `ctrl` is Control on every platform; `mod` is Cmd on macOS.
-  [SHORTCUT_CHANNEL.NEXT_SESSION]: ['ctrl+tab'],
-  [SHORTCUT_CHANNEL.PREVIOUS_SESSION]: ['ctrl+shift+tab'],
+  // Browser tab keys: Ctrl+Tab and ⌘⇧] / ⌘⇧[, ⌘1…⌘8, ⌘9 for the last tab.
+  [SHORTCUT_CHANNEL.NEXT_SESSION]: ['ctrl+tab', 'mod+shift+]'],
+  [SHORTCUT_CHANNEL.PREVIOUS_SESSION]: ['ctrl+shift+tab', 'mod+shift+['],
+  [SHORTCUT_CHANNEL.SESSION_TAB_1]: ['mod+1'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_2]: ['mod+2'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_3]: ['mod+3'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_4]: ['mod+4'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_5]: ['mod+5'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_6]: ['mod+6'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_7]: ['mod+7'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_8]: ['mod+8'],
+  [SHORTCUT_CHANNEL.SESSION_TAB_LAST]: ['mod+9'],
 };
 
 interface ParsedCombo {
@@ -67,6 +86,8 @@ const CODE_BY_KEY_NAME: Record<string, string> = {
   del: 'Delete',
   backspace: 'Backspace',
   tab: 'Tab',
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
   left: 'ArrowLeft',
   right: 'ArrowRight',
   '=': 'Equal',

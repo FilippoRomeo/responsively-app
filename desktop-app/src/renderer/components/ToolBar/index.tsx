@@ -21,10 +21,9 @@ import {APP_VIEWS, setAppView} from 'renderer/store/features/ui';
 import NavigationControls from './NavigationControls';
 import Menu from './Menu';
 import AddressBar from './AddressBar';
-import {IconButton, ToolbarAction, ToolbarDivider, ToolbarGroup} from './primitives';
+import {IconButton, ToolbarAction} from './primitives';
 import ColorSchemeToggle from './ColorSchemeToggle';
 import AudioMuteToggle from './AudioMuteToggle';
-import AgentsToggle from './AgentsToggle';
 import ModalLoader from '../ModalLoader';
 import {PreviewSuiteSelector} from './PreviewSuiteSelector';
 import useKeyboardShortcut, {
@@ -117,47 +116,66 @@ const ToolBar = ({
         <AddressBar />
       </div>
       <div className="flex-1" />
-      <ToolbarGroup>
-        <ToolbarAction onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
-          <Icon
-            icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
-            fontSize={16}
-          />
-          Rotate
-        </ToolbarAction>
-        <ToolbarAction
-          onClick={() => dispatch(setIsInspecting(!isInspecting))}
-          isActive={isInspecting}
-          title="Inspect Elements"
-        >
-          <Icon icon="lucide:inspect" fontSize={15} />
-          Inspect
-        </ToolbarAction>
-        <ToolbarAction
-          onClick={screenshotCaptureHandler}
-          isActive={isCapturingScreenshot}
-          title="Screenshot All WebViews"
-        >
-          <Icon icon="lucide:camera" fontSize={15} />
-          Capture
-        </ToolbarAction>
-        <ColorBlindnessControls />
-        <ColorSchemeToggle />
-        <AudioMuteToggle />
-        <AgentsToggle />
-      </ToolbarGroup>
-      <ToolbarDivider />
-      <SessionsButton showRequest={sessionsRequest} onShown={onSessionsShown} />
-      <McpPanel />
-      <PreviewSuiteSelector />
-      <IconButton
-        onClick={() => {
-          dispatch(setAppView(APP_VIEWS.DEVICE_MANAGER));
+      {/* Slides sideways when the window is too narrow (trackpad or mouse
+          wheel); every dropdown in here is anchored outside it, so none is
+          clipped. ⋮ stays pinned on the right. */}
+      <div
+        data-testid="toolbar-slider"
+        className="flex min-w-0 items-center gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:flex-shrink-0"
+        onWheel={(event) => {
+          if (
+            event.deltaY !== 0 &&
+            event.currentTarget.scrollWidth > event.currentTarget.clientWidth
+          )
+            event.currentTarget.scrollLeft += event.deltaY;
         }}
-        title="Device Manager"
       >
-        <Icon icon="lucide:plus" width={16} />
-      </IconButton>
+        <AudioMuteToggle compact />
+        <SessionsButton
+          showRequest={sessionsRequest}
+          onShown={onSessionsShown}
+          tools={
+            <>
+              <ToolbarAction onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
+                <Icon
+                  icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
+                  fontSize={16}
+                />
+                Rotate
+              </ToolbarAction>
+              <ToolbarAction
+                onClick={() => dispatch(setIsInspecting(!isInspecting))}
+                isActive={isInspecting}
+                title="Inspect Elements"
+              >
+                <Icon icon="lucide:inspect" fontSize={15} />
+                Inspect
+              </ToolbarAction>
+              <ToolbarAction
+                onClick={screenshotCaptureHandler}
+                isActive={isCapturingScreenshot}
+                title="Screenshot All WebViews"
+              >
+                <Icon icon="lucide:camera" fontSize={15} />
+                Capture
+              </ToolbarAction>
+              <ColorBlindnessControls />
+              <ColorSchemeToggle />
+              <AudioMuteToggle />
+            </>
+          }
+        />
+        <McpPanel />
+        <PreviewSuiteSelector />
+        <IconButton
+          onClick={() => {
+            dispatch(setAppView(APP_VIEWS.DEVICE_MANAGER));
+          }}
+          title="Device Manager"
+        >
+          <Icon icon="lucide:plus" width={16} />
+        </IconButton>
+      </div>
       <Menu />
       <ModalLoader isOpen={isCapturingScreenshot} onClose={handleClose} title="Screenshot" />
     </div>

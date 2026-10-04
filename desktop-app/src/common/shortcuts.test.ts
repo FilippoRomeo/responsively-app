@@ -63,6 +63,24 @@ describe('matchShortcut', () => {
     );
   });
 
+  it('uses the browser tab keys: ⌘⇧] / ⌘⇧[, ⌘1…⌘8 and ⌘9 for the last tab', () => {
+    expect(matchShortcut(press({code: 'BracketRight', meta: true, shift: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.NEXT_SESSION
+    );
+    expect(matchShortcut(press({code: 'BracketLeft', meta: true, shift: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.PREVIOUS_SESSION
+    );
+    expect(matchShortcut(press({code: 'Digit1', meta: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.SESSION_TAB_1
+    );
+    expect(matchShortcut(press({code: 'Digit9', meta: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.SESSION_TAB_LAST
+    );
+    expect(matchShortcut(press({code: 'Digit1', control: true}), 'win32')).toBe(
+      SHORTCUT_CHANNEL.SESSION_TAB_1
+    );
+  });
+
   it('gives Cmd+T and Cmd+N to new Sessions and Cmd+Shift+T to the theme', () => {
     expect(matchShortcut(press({code: 'KeyT', meta: true}), 'darwin')).toBe(
       SHORTCUT_CHANNEL.NEW_SESSION_TAB

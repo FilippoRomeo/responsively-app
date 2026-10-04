@@ -13,6 +13,8 @@ export interface BackendOptions {
   launcher?: (port: number) => Promise<void>;
   /** Logged before the launcher runs; a launcher that never launches says what really happens. */
   unreachableNotice?: string;
+  /** The agent app (its MCP client name), forwarded so a window can allow or block it. */
+  agentName?: () => string | undefined;
 }
 
 const sleep = (ms: number) =>
@@ -75,6 +77,7 @@ export const createBackend = (options: BackendOptions) => {
     pollIntervalMs = 500,
     launcher = launchApp,
     unreachableNotice = `Responsively App is not running — launching it (port ${port})`,
+    agentName,
   } = options;
 
   let cached: Client | null = null;
@@ -86,7 +89,10 @@ export const createBackend = (options: BackendOptions) => {
   // `Accept: application/json, text/event-stream` headers on every POST.
   const connectOnce = async (): Promise<Client | null> => {
     const client = new Client({name: 'responsively-mcp-bridge', version: '0.0.0'});
-    const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`));
+    const agent = agentName?.();
+    const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
+      requestInit: agent ? {headers: {'x-responsively-agent': agent}} : undefined,
+    });
     try {
       await withTimeout(client.connect(transport), probeTimeoutMs);
       if (client.getServerVersion()?.name !== MCP_SERVER_NAME) {

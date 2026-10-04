@@ -37,6 +37,7 @@ export const IPC_MAIN_CHANNELS = {
   SESSION_RENAMED: 'session-renamed',
   SESSION_SWITCH: 'session-switch',
   SESSION_NEW: 'session-new',
+  SESSION_CLOSE_TAB: 'session-close-tab',
   AUDIO_MUTED_GET: 'audio-muted-get',
   AUDIO_MUTED_SET: 'audio-muted-set',
   AUDIO_MUTED_CHANGED: 'audio-muted-changed',
@@ -77,6 +78,10 @@ export const IPC_MAIN_CHANNELS = {
   MCP_STATUS: 'mcp-status',
   MCP_SET_ENABLED: 'mcp-set-enabled',
   MCP_STATUS_CHANGED: 'mcp-status-changed',
+  MCP_AGENTS: 'mcp-agents',
+  MCP_SET_AGENT: 'mcp-set-agent',
+  MCP_AGENTS_CHANGED: 'mcp-agents-changed',
+  MCP_HARD_RESET: 'mcp-hard-reset',
   MCP_LIST_TOOLS: 'mcp-list-tools',
   MCP_SET_TOOL: 'mcp-set-tool',
 } as const;

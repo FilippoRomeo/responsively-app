@@ -50,6 +50,7 @@ test.describe('Device Color Scheme', () => {
     await app.dismissModals();
 
     const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
+    await app.openSessionMenu();
     await expect(colorSchemeBtn).toBeVisible();
   });
 
@@ -57,9 +58,11 @@ test.describe('Device Color Scheme', () => {
     await app.dismissModals();
 
     const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
+    await app.openSessionMenu();
     await colorSchemeBtn.click();
     await app.page.waitForTimeout(300);
 
+    await app.openSessionMenu();
     await expect(colorSchemeBtn).toBeVisible();
   });
 
@@ -67,9 +70,11 @@ test.describe('Device Color Scheme', () => {
     await app.dismissModals();
 
     const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
+    await app.openSessionMenu();
     await colorSchemeBtn.click();
     await app.page.waitForTimeout(300);
 
+    await app.openSessionMenu();
     await expect(colorSchemeBtn).toBeVisible();
   });
 
@@ -77,6 +82,7 @@ test.describe('Device Color Scheme', () => {
     await app.dismissModals();
 
     const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
+    await app.openSessionMenu();
     await colorSchemeBtn.click();
     await app.page.waitForTimeout(5000);
 
@@ -86,6 +92,7 @@ test.describe('Device Color Scheme', () => {
     expect(shouldUseDark).toBe(true);
 
     // Toggle back
+    await app.openSessionMenu();
     await colorSchemeBtn.click();
     await app.page.waitForTimeout(300);
 

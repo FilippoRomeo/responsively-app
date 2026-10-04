@@ -1,4 +1,5 @@
 import {app, BrowserWindow} from 'electron';
+import {SessionInfo, WindowBounds} from '../../common/sessions';
 import {requestShellQuit, sessionRequest} from './service';
 
 /** ⌘Q in a Session window: the first press arms and shows a hint, a second press quits. */
@@ -87,13 +88,43 @@ export const quitFromSessionWindow = async (parent: BrowserWindow | null) => {
   await stopThisSession();
 };
 
-/** Closing a Session's last window (⌘W, red button) stops that Session; its data is kept. */
-export const stopSessionWhenWindowsClose = () => {
+/** Browser rule: the tab to the right takes a closed tab's place, else the one to its left. */
+export const neighbourTab = (tabs: SessionInfo[], closedId: string | undefined) => {
+  const running = tabs.filter((s) => s.status === 'running');
+  const index = running.findIndex((s) => s.id === closedId);
+  if (index === -1) return undefined;
+  return running[index + 1] ?? running[index - 1];
+};
+
+/**
+ * Closing a Session's last window (⌘W, red button, tab ✕) stops that Session;
+ * its data is kept. Like closing a browser tab, the neighbouring Session tab
+ * comes forward in the same spot.
+ */
+export const stopSessionWhenWindowsClose = (lastBounds: () => WindowBounds | undefined) => {
   let quitting = false;
   app.on('before-quit', () => {
     quitting = true;
   });
   app.on('window-all-closed', () => {
-    if (!quitting) void stopThisSession();
+    if (quitting) return;
+    void (async () => {
+      try {
+        const next = neighbourTab(
+          (await sessionRequest({operation: 'list'})) as SessionInfo[],
+          process.env.RESPONSIVELY_SESSION_ID
+        );
+        if (next)
+          await sessionRequest({
+            operation: 'focus',
+            id: next.id,
+            bounds: lastBounds(),
+            source: 'user',
+          });
+      } catch {
+        /* the stop below still runs */
+      }
+      await stopThisSession();
+    })();
   });
 };

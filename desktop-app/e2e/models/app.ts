@@ -159,7 +159,25 @@ export class ResponsivelyApp {
     });
   }
 
+  /** The window's tools (rotate, inspect, capture…) live in the Session-name menu. */
+  async openSessionMenu() {
+    const menu = this.page.getByTestId('session-menu');
+    // Open in the manager view, the first click closes it; the second opens the menu.
+    for (let i = 0; i < 2 && !(await menu.isVisible().catch(() => false)); i += 1) {
+      await this.page.locator('button[title="Session menu"]').click();
+      await this.page.waitForTimeout(200);
+    }
+    await menu.waitFor({state: 'visible'});
+  }
+
+  /** The Sessions manager, behind "Manage Sessions…" in the Session-name menu. */
+  async openManageSessions() {
+    await this.openSessionMenu();
+    await this.page.getByTestId('session-menu').locator('button[title="Manage Sessions"]').click();
+  }
+
   async openColorBlindnessDropdown() {
+    await this.openSessionMenu();
     const colorBlindControls = this.page.locator('[data-testid="color-blindness-controls"]');
     const dropdownBtn = colorBlindControls.locator('button').first();
     await dropdownBtn.click();

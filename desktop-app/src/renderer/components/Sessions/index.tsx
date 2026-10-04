@@ -1,5 +1,6 @@
 import {Icon} from '@iconify/react';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import cx from 'classnames';
+import {ReactNode, useCallback, useEffect, useRef, useState} from 'react';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {SessionInfo, SessionRequest} from 'common/sessions';
 import {getDevicesMap} from 'common/deviceList';
@@ -46,11 +47,16 @@ export const useSessionsShowRequest = (onShow: () => void) => {
 export const SessionsButton = ({
   showRequest = null,
   onShown,
+  tools,
 }: {
   showRequest?: SessionsShowRequest | null;
   /** Called once the request is shown, so a later remount does not reopen the manager. */
   onShown?: () => void;
+  /** The window's tools (rotate, inspect, capture…), listed above "Manage Sessions…". */
+  tools?: ReactNode;
 }) => {
+  // The name opens the tools menu; Manage Sessions… (or ⌘⇧M) switches to the manager.
+  const [view, setView] = useState<'menu' | 'manager'>('menu');
   const trigger = useRef<HTMLSpanElement>(null);
   const isOpen = useRef(false);
   const [sessionName, setSessionName] = useState<string>();
@@ -69,6 +75,7 @@ export const SessionsButton = ({
   const [shown, setShown] = useState<SessionsShowRequest | null>(null);
   useEffect(() => {
     if (!showRequest) return;
+    setView('manager');
     if (!isOpen.current) trigger.current?.closest('button')?.click();
     setShown(showRequest);
     onShown?.();
@@ -81,19 +88,48 @@ export const SessionsButton = ({
           <span className="max-w-[180px] truncate" data-testid="sessions-button-label">
             {sessionName || 'Sessions'}
           </span>
+          <Icon icon="lucide:chevron-down" fontSize={13} className="text-muted" />
         </span>
       }
       triggerClassName="flex h-[30px] items-center rounded-[7px] px-[11px] text-[12.5px] text-fg hover:bg-hover"
-      triggerTitle="Manage Sessions"
-      className="w-[420px] max-w-[calc(100vw-24px)] overflow-hidden"
+      triggerTitle="Session menu"
+      className={cx(
+        'max-w-[calc(100vw-24px)] overflow-hidden',
+        view === 'manager' ? 'w-[420px]' : 'w-[250px]'
+      )}
+      // Kept mounted: the tools hold state (an active vision simulation) while closed.
       keepMounted
       onOpenChange={(open) => {
         isOpen.current = open;
-        if (!open) refreshName();
+        if (!open) {
+          refreshName();
+          setView('menu');
+        }
       }}
     >
       {({close, open}) => (
-        <SessionsManager request={request} onClose={close} active={open} showRequest={shown} />
+        <>
+          {view === 'manager' ? (
+            <SessionsManager request={request} onClose={close} active={open} showRequest={shown} />
+          ) : null}
+          {/* Always rendered, hidden behind the manager: the tools keep their state. */}
+          <div data-testid="session-menu" className={cx('p-[6px]', {hidden: view === 'manager'})}>
+            <div className="flex flex-col gap-[2px] [&_button]:w-full [&_button]:justify-start">
+              {tools}
+            </div>
+            <div className="mx-1 my-[6px] border-t border-line-soft" />
+            <button
+              type="button"
+              title="Manage Sessions"
+              onClick={() => setView('manager')}
+              className="flex w-full items-center gap-[7px] rounded-[7px] px-[11px] py-[7px] text-[12.5px] text-fg hover:bg-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            >
+              <Icon icon="lucide:panels-top-left" fontSize={15} />
+              Manage Sessions…
+              <span className="ml-auto text-[11px] text-muted">⌘⇧M</span>
+            </button>
+          </div>
+        </>
       )}
     </Popover>
   );
