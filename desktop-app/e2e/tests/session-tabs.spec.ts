@@ -54,6 +54,8 @@ test.describe('Session tabs', () => {
       await expect
         .poll(async () => (await request({operation: 'get', id})).status, {timeout: 70_000})
         .toBe('running');
+    // The strip polls only while its window has focus (hidden in E2E): focus it.
+    await app.page.evaluate(() => window.dispatchEvent(new Event('focus')));
     const strip = app.page.getByTestId('session-tabs');
     await expect(strip.getByRole('tab')).toHaveCount(2, {timeout: 10_000});
 

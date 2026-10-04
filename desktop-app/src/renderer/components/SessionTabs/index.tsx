@@ -24,7 +24,6 @@ const SessionTabs = () => {
   state.current = {tabs, currentId};
 
   const refresh = useCallback(async () => {
-    if (document.visibilityState !== 'visible') return;
     try {
       const [list, context] = await Promise.all([
         window.electron.ipcRenderer.invoke<{operation: 'list'}, SessionInfo[]>(
@@ -42,7 +41,10 @@ const SessionTabs = () => {
 
   useEffect(() => {
     void refresh();
-    const timer = setInterval(refresh, 2000);
+    // Each refresh asks every Session for its status: only the window you are in polls.
+    const timer = setInterval(() => {
+      if (document.hasFocus()) void refresh();
+    }, 2000);
     window.addEventListener('focus', refresh);
     return () => {
       clearInterval(timer);

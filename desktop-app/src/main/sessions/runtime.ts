@@ -177,6 +177,8 @@ export const showNewSessionPlaceholder = (bounds: WindowBounds) => {
     },
   });
   placeholder = win;
+  // Keep "New Session" rather than the page's own title.
+  win.on('page-title-updated', (event) => event.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.on('ready-to-show', () => {
@@ -481,7 +483,9 @@ export const initSessions = (
     const win = getWindow();
     if (!win || event.sender !== win.webContents) throw new Error('Invalid application window');
     if (typeof id !== 'string' || id === process.env.RESPONSIVELY_SESSION_ID) return;
-    await sessionRequest({operation: 'focus', id, bounds: win.getBounds(), source: 'user'});
+    // A full-screen window has its own Space: just bring the other Session forward.
+    const bounds = win.isFullScreen() ? undefined : win.getBounds();
+    await sessionRequest({operation: 'focus', id, bounds, source: 'user'});
   });
   ipcMain.handle(
     IPC_MAIN_CHANNELS.SESSION_CONTEXT,
@@ -620,7 +624,7 @@ export const startSessionRuntime = async () => {
       const win = getWindow();
       win?.restore();
       // Switching tabs keeps one spot on screen: take the previous tab's place.
-      if (req.bounds) win?.setBounds(req.bounds);
+      if (req.bounds && !win?.isFullScreen()) win?.setBounds(req.bounds);
       win?.show();
       win?.focus();
     }
