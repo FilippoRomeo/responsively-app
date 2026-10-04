@@ -34,6 +34,7 @@ const testOrder = [
   'agents-toggle.spec.ts',
   'mcp-agents.spec.ts',
   'session-tabs.spec.ts',
+  'toolbar-slider.spec.ts',
   'url-navigation.spec.ts',
   'popup-policy.spec.ts',
   'title-bar.spec.ts',
