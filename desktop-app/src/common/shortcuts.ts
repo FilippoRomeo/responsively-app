@@ -17,6 +17,10 @@ export const SHORTCUT_CHANNEL = {
   TOGGLE_RULERS: 'TOGGLE_RULERS',
   ZOOM_IN: 'ZOOM_IN',
   ZOOM_OUT: 'ZOOM_OUT',
+  NEW_SESSION_TAB: 'NEW_SESSION_TAB',
+  NEW_SESSION_WINDOW: 'NEW_SESSION_WINDOW',
+  NEXT_SESSION: 'NEXT_SESSION',
+  PREVIOUS_SESSION: 'PREVIOUS_SESSION',
 } as const;
 
 export type ShortcutChannel = (typeof SHORTCUT_CHANNEL)[keyof typeof SHORTCUT_CHANNEL];
@@ -37,14 +41,20 @@ export const SHORTCUT_KEYS: {[key in ShortcutChannel]: string[]} = {
   [SHORTCUT_CHANNEL.RELOAD_CLEAR_CACHE]: ['mod+shift+r'],
   [SHORTCUT_CHANNEL.ROTATE_ALL]: ['mod+alt+r'],
   [SHORTCUT_CHANNEL.SCREENSHOT_ALL]: ['mod+s'],
-  [SHORTCUT_CHANNEL.THEME]: ['mod+t'],
+  [SHORTCUT_CHANNEL.THEME]: ['mod+shift+t'],
   [SHORTCUT_CHANNEL.TOGGLE_RULERS]: ['alt+r'],
   [SHORTCUT_CHANNEL.ZOOM_IN]: ['mod+=', 'mod++', 'mod+shift+='],
   [SHORTCUT_CHANNEL.ZOOM_OUT]: ['mod+-'],
+  [SHORTCUT_CHANNEL.NEW_SESSION_TAB]: ['mod+t'],
+  [SHORTCUT_CHANNEL.NEW_SESSION_WINDOW]: ['mod+n'],
+  // `ctrl` is Control on every platform; `mod` is Cmd on macOS.
+  [SHORTCUT_CHANNEL.NEXT_SESSION]: ['ctrl+tab'],
+  [SHORTCUT_CHANNEL.PREVIOUS_SESSION]: ['ctrl+shift+tab'],
 };
 
 interface ParsedCombo {
   mod: boolean;
+  ctrl: boolean;
   alt: boolean;
   shift: boolean;
   /** KeyboardEvent.code of the non-modifier key. */
@@ -56,6 +66,7 @@ interface ParsedCombo {
 const CODE_BY_KEY_NAME: Record<string, string> = {
   del: 'Delete',
   backspace: 'Backspace',
+  tab: 'Tab',
   left: 'ArrowLeft',
   right: 'ArrowRight',
   '=': 'Equal',
@@ -95,6 +106,7 @@ export const parseCombo = (combo: string): ParsedCombo => {
   const modifiers = rest.split('+').filter(Boolean);
   return {
     mod: modifiers.includes('mod'),
+    ctrl: modifiers.includes('ctrl'),
     alt: modifiers.includes('alt'),
     shift: modifiers.includes('shift'),
     code: codeForKeyName(keyName),
@@ -118,14 +130,17 @@ export const matchShortcut = (
   input: ShortcutInput,
   platform: NodeJS.Platform
 ): ShortcutChannel | null => {
-  const modPressed = platform === 'darwin' ? input.meta : input.control;
+  const isMac = platform === 'darwin';
+  const modPressed = isMac ? input.meta : input.control;
 
   for (const [channel, combos] of Object.entries(SHORTCUT_KEYS)) {
     for (const combo of combos) {
       const parsed = parseCombo(combo);
       if (
         parsed.code === input.code &&
-        parsed.mod === modPressed &&
+        // Off macOS, Control is the mod key, so `ctrl` and `mod` mean the same.
+        (parsed.mod || (!isMac && parsed.ctrl)) === modPressed &&
+        (!isMac || parsed.ctrl === input.control) &&
         parsed.alt === input.alt &&
         parsed.shift === input.shift
       ) {

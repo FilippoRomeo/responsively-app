@@ -57,14 +57,14 @@ test.describe('UI Theme', () => {
     expect(isDark).not.toBe(wasDark);
   });
 
-  test('keyboard shortcut Cmd/Ctrl+T toggles theme', async ({app}) => {
+  test('keyboard shortcut Cmd/Ctrl+Shift+T toggles theme', async ({app}) => {
     await app.dismissModals();
 
     const beforeToggle = await app.page.evaluate(() => {
       return document.documentElement.classList.contains('dark');
     });
 
-    await app.pressShortcut('t');
+    await app.pressShortcut('Shift+t');
     await app.page.waitForTimeout(300);
 
     const afterToggle = await app.page.evaluate(() => {
@@ -73,7 +73,7 @@ test.describe('UI Theme', () => {
     expect(afterToggle).not.toBe(beforeToggle);
 
     // Toggle back to restore state
-    await app.pressShortcut('t');
+    await app.pressShortcut('Shift+t');
     await app.page.waitForTimeout(300);
   });
 

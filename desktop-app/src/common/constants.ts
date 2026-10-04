@@ -35,6 +35,8 @@ export const IPC_MAIN_CHANNELS = {
   SESSIONS_PANEL_RESIZE: 'sessions-panel-resize',
   SESSION_CONTEXT: 'session-context',
   SESSION_RENAMED: 'session-renamed',
+  SESSION_SWITCH: 'session-switch',
+  SESSION_NEW: 'session-new',
   AUDIO_MUTED_GET: 'audio-muted-get',
   AUDIO_MUTED_SET: 'audio-muted-set',
   AUDIO_MUTED_CHANGED: 'audio-muted-changed',

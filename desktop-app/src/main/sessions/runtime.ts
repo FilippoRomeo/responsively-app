@@ -12,9 +12,16 @@ import path from 'path';
 import fs from 'fs';
 import {z} from 'zod';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
-import {SessionInfo, SessionRequest} from '../../common/sessions';
-import {atomicWrite, sessionName} from './registry';
-import {RuntimeLease, RuntimeReply, runtimeFile, sessionRequest, sessionsRoot} from './service';
+import {SessionInfo, SessionRequest, WindowBounds} from '../../common/sessions';
+import {atomicWrite, sessionName, windowBounds} from './registry';
+import {
+  RuntimeLease,
+  RuntimeReply,
+  requestShellNewSession,
+  runtimeFile,
+  sessionRequest,
+  sessionsRoot,
+} from './service';
 import {serve} from '../../common/session-rpc';
 import store from '../../store';
 import {getMcpServerStatus, setMcpServerEnabled} from '../mcp';
@@ -138,6 +145,53 @@ export const showSessions = (
     if (panel === win) panel = null;
   });
   void win.loadURL(`${resolveHtmlPath('index.html')}?sessionsPanel=1`);
+};
+let placeholder: BrowserWindow | null = null;
+/**
+ * Cmd+T / Cmd+N: a window where the new Session will appear, filled by the New
+ * Session form. Creating opens the Session at exactly these bounds; cancelling
+ * or closing it creates nothing.
+ */
+export const showNewSessionPlaceholder = (bounds: WindowBounds) => {
+  if (placeholder && !placeholder.isDestroyed()) {
+    placeholder.setBounds(bounds);
+    placeholder.show();
+    placeholder.focus();
+    return;
+  }
+  const win = new BrowserWindow({
+    ...bounds,
+    show: false,
+    title: 'New Session',
+    minWidth: 360,
+    minHeight: 300,
+    backgroundColor: store.get('ui.darkMode') ? '#0d1420' : '#ffffff',
+    webPreferences: {
+      preload:
+        app.isPackaged || process.env.E2E_TEST === 'true'
+          ? path.join(__dirname, 'preload-sessions.js')
+          : path.join(__dirname, '../../.erb/dll/preload-sessions.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+  placeholder = win;
+  // Keep "New Session" rather than the page's own title.
+  win.on('page-title-updated', (event) => event.preventDefault());
+  win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.on('ready-to-show', () => {
+    if (win.isDestroyed()) return;
+    // You asked for it: bring it over the window you were in, even from a Session.
+    if (process.platform === 'darwin') app.focus({steal: true});
+    win.show();
+    win.focus();
+  });
+  win.on('closed', () => {
+    if (placeholder === win) placeholder = null;
+  });
+  void win.loadURL(`${resolveHtmlPath('index.html')}?sessionsPanel=1&placeholder=1`);
 };
 /** Shows you a Session an agent could not use, without taking focus from your work. */
 export const showAttention = (id: string) => showSessions(false, '', false, undefined, id);
@@ -339,10 +393,26 @@ export const initSessions = (
   getWindow = getter;
   reopen = create;
   updateDockMenu();
+  const isPlaceholder = (sender: Electron.WebContents, frame: Electron.WebFrameMain | null) =>
+    placeholder &&
+    !placeholder.isDestroyed() &&
+    sender === placeholder.webContents &&
+    frame === sender.mainFrame;
   const isPanel = (sender: Electron.WebContents, frame: Electron.WebFrameMain | null) =>
-    panel && !panel.isDestroyed() && sender === panel.webContents && frame === sender.mainFrame;
+    (panel && !panel.isDestroyed() && sender === panel.webContents && frame === sender.mainFrame) ||
+    isPlaceholder(sender, frame);
   ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_CONTEXT, (event) => {
     if (!isPanel(event.sender, event.senderFrame)) return;
+    if (isPlaceholder(event.sender, event.senderFrame)) {
+      event.returnValue = {
+        create: true,
+        error: '',
+        attention: '',
+        placeholder: true,
+        darkMode: Boolean(store.get('ui.darkMode')),
+      };
+      return;
+    }
     event.returnValue = {
       create: panelCreate,
       error: panelError,
@@ -351,6 +421,11 @@ export const initSessions = (
     };
   });
   ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_DISMISS, (event) => {
+    // Cancelling the New Session form closes its window: nothing is created.
+    if (isPlaceholder(event.sender, event.senderFrame)) {
+      placeholder?.close();
+      return;
+    }
     if (isPanel(event.sender, event.senderFrame)) {
       panel?.setAlwaysOnTop(false);
       panel?.hide();
@@ -360,7 +435,12 @@ export const initSessions = (
     }
   });
   ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_RESIZE, (event, height: number) => {
-    if (!isPanel(event.sender, event.senderFrame) || !Number.isFinite(height)) return;
+    if (
+      !isPanel(event.sender, event.senderFrame) ||
+      isPlaceholder(event.sender, event.senderFrame) ||
+      !Number.isFinite(height)
+    )
+      return;
     const area = screen.getDisplayMatching(panel!.getBounds()).workArea;
     const target = Math.min(Math.max(Math.ceil(height), 190), area.height - 16);
     if (panel!.getBounds().height !== target) panel!.setSize(panel!.getBounds().width, target);
@@ -373,7 +453,39 @@ export const initSessions = (
     )
       throw new Error('Sessions requests must come from the application window');
     // Requests from the Sessions UI are yours; the renderer cannot claim another origin.
+    if (request?.operation === 'create' && isPlaceholder(event.sender, event.senderFrame)) {
+      const win = placeholder!;
+      // The new Session takes the placeholder's place; the placeholder goes away.
+      const created = await sessionRequest({...request, source: 'user', bounds: win.getBounds()});
+      if (!win.isDestroyed()) win.close();
+      return created;
+    }
     return sessionRequest({...request, source: 'user'});
+  });
+  // Cmd+T: a Session tab at this window's spot; Cmd+N: a new window, offset.
+  ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_NEW, async (event, value: unknown) => {
+    const win = getWindow();
+    if (!win || event.sender !== win.webContents) throw new Error('Invalid application window');
+    const current = win.getBounds();
+    const bounds =
+      (value as {placement?: string})?.placement === 'window'
+        ? {...current, x: current.x + 30, y: current.y + 30}
+        : current;
+    // Session windows have no panel of their own: the shell shows the form in place.
+    if (process.env.RESPONSIVELY_SESSION_ID) {
+      if (!(await requestShellNewSession(bounds))) showSessions(true);
+      return;
+    }
+    showNewSessionPlaceholder(bounds);
+  });
+  // A Session tab: bring that Session's window to this window's exact spot.
+  ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_SWITCH, async (event, id: unknown) => {
+    const win = getWindow();
+    if (!win || event.sender !== win.webContents) throw new Error('Invalid application window');
+    if (typeof id !== 'string' || id === process.env.RESPONSIVELY_SESSION_ID) return;
+    // A full-screen window has its own Space: just bring the other Session forward.
+    const bounds = win.isFullScreen() ? undefined : win.getBounds();
+    await sessionRequest({operation: 'focus', id, bounds, source: 'user'});
   });
   ipcMain.handle(
     IPC_MAIN_CHANNELS.SESSION_CONTEXT,
@@ -450,14 +562,22 @@ export const startSessionRuntime = async () => {
         'e2e-panel-state',
         'e2e-audio-state',
         'e2e-audio-toggle',
+        'e2e-window',
       ]),
       name: sessionName.optional(),
       muted: z.boolean().optional(),
       enabled: z.boolean().optional(),
+      bounds: windowBounds.optional(),
     })
     .strict();
   const {server, endpoint} = await serve(token, async (body) => {
     const req = schema.parse(body);
+    if (req.operation === 'e2e-window') {
+      if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
+      const win = getWindow();
+      if (!win || win.isDestroyed()) throw new Error('No Session window');
+      return {bounds: win.getBounds(), focused: win.isFocused()};
+    }
     if (req.operation === 'e2e-audio-state' || req.operation === 'e2e-audio-toggle') {
       if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
       const win = getWindow();
@@ -503,6 +623,8 @@ export const startSessionRuntime = async () => {
       if (!getWindow()) await reopen();
       const win = getWindow();
       win?.restore();
+      // Switching tabs keeps one spot on screen: take the previous tab's place.
+      if (req.bounds && !win?.isFullScreen()) win?.setBounds(req.bounds);
       win?.show();
       win?.focus();
     }

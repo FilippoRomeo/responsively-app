@@ -108,6 +108,7 @@ export default function SessionsManager({
   active = true,
   showRequest,
   native = false,
+  createOnly = false,
   onHeight,
 }: {
   request: SessionRequester;
@@ -119,6 +120,8 @@ export default function SessionsManager({
   active?: boolean;
   showRequest?: SessionsShowRequest | null;
   native?: boolean;
+  /** The New Session window: cancelling the form closes it. */
+  createOnly?: boolean;
   onHeight?: (height: number) => void;
 }) {
   const [items, setItems] = useState<SessionInfo[]>([]);
@@ -264,6 +267,10 @@ export default function SessionsManager({
     `${item.name} ${item.lastUrl ?? ''}`.toLowerCase().includes(filter.toLowerCase())
   );
   const closeSubview = (preserve = false) => {
+    if (createOnly) {
+      onClose();
+      return;
+    }
     draft.current = preserve && editing ? {id: editing, name, url, start} : null;
     setEditing(null);
     setConfirming(null);

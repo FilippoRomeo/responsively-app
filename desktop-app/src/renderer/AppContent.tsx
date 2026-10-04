@@ -1,6 +1,7 @@
 import {Provider, useDispatch, useSelector} from 'react-redux';
 
 import ToolBar from './components/ToolBar';
+import SessionTabs from './components/SessionTabs';
 import Previewer from './components/Previewer';
 import {store} from './store';
 
@@ -34,6 +35,7 @@ const Browser = () => {
   );
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {presenting ? null : <SessionTabs />}
       {presenting ? null : (
         <ToolBar sessionsRequest={sessionsRequest} onSessionsShown={sessionsShown} />
       )}
