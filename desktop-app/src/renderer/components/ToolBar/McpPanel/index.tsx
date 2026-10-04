@@ -80,6 +80,8 @@ const McpPanel = () => {
   );
 
   const setAgent = async (name: string, allowed: boolean) => {
+    // Show the change at once; the main process's answer then confirms it.
+    setAgents((list) => list.map((a) => (a.name === name ? {...a, allowed} : a)));
     setAgents(
       await window.electron.ipcRenderer.invoke<
         {name: string; allowed: boolean},
