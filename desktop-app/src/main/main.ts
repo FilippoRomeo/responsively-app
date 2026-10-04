@@ -50,6 +50,7 @@ import {
   startShellOwner,
 } from './sessions/service';
 import {stopSessionWhenWindowsClose} from './sessions/window-lifecycle';
+import {windowBounds} from './sessions/registry';
 import {
   initSessions,
   initSessionsTray,
@@ -59,6 +60,7 @@ import {
   showLauncher,
   showSessions,
   showAttention,
+  showNewSessionPlaceholder,
   startSessionRuntime,
 } from './sessions/runtime';
 
@@ -293,6 +295,18 @@ const createWindow = async () => {
   };
 
   const windowState = getSavedWindowState();
+  // A Session opened as a tab starts exactly where its tab strip's window is.
+  const launchBounds = process.env.RESPONSIVELY_SESSION_BOUNDS;
+  delete process.env.RESPONSIVELY_SESSION_BOUNDS;
+  if (launchBounds) {
+    try {
+      Object.assign(windowState, windowBounds.parse(JSON.parse(launchBounds)), {
+        isMaximized: false,
+      });
+    } catch {
+      /* fall back to the saved position */
+    }
+  }
 
   mainWindow = new BrowserWindow({
     show: false,
@@ -463,7 +477,8 @@ app
       await startShellOwner(
         (message) => showSessions(false, message, true),
         showAttention,
-        noteSessionFocused
+        noteSessionFocused,
+        showNewSessionPlaceholder
       );
     if (
       process.platform === 'darwin' &&

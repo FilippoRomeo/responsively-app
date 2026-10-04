@@ -11,11 +11,23 @@ const press = (overrides: Partial<ShortcutInput> & {code: string}): ShortcutInpu
 
 describe('parseCombo', () => {
   it('splits modifiers from the key', () => {
-    expect(parseCombo('mod+alt+z')).toEqual({mod: true, alt: true, shift: false, code: 'KeyZ'});
+    expect(parseCombo('mod+alt+z')).toEqual({
+      mod: true,
+      ctrl: false,
+      alt: true,
+      shift: false,
+      code: 'KeyZ',
+    });
   });
 
   it('treats a trailing ++ as the plus key', () => {
-    expect(parseCombo('mod++')).toEqual({mod: true, alt: false, shift: false, code: 'Equal'});
+    expect(parseCombo('mod++')).toEqual({
+      mod: true,
+      ctrl: false,
+      alt: false,
+      shift: false,
+      code: 'Equal',
+    });
   });
 
   it('maps named keys to physical codes', () => {
@@ -35,6 +47,34 @@ describe('matchShortcut', () => {
     );
     // The wrong modifier for the platform must not fire.
     expect(matchShortcut(press({code: 'KeyR', control: true}), 'darwin')).toBeNull();
+  });
+
+  it('matches Ctrl+Tab as Control on macOS, not Cmd, and not plain Tab', () => {
+    expect(matchShortcut(press({code: 'Tab', control: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.NEXT_SESSION
+    );
+    expect(matchShortcut(press({code: 'Tab', control: true, shift: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.PREVIOUS_SESSION
+    );
+    expect(matchShortcut(press({code: 'Tab', meta: true}), 'darwin')).toBeNull();
+    expect(matchShortcut(press({code: 'Tab'}), 'darwin')).toBeNull();
+    expect(matchShortcut(press({code: 'Tab', control: true}), 'win32')).toBe(
+      SHORTCUT_CHANNEL.NEXT_SESSION
+    );
+  });
+
+  it('gives Cmd+T and Cmd+N to new Sessions and Cmd+Shift+T to the theme', () => {
+    expect(matchShortcut(press({code: 'KeyT', meta: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.NEW_SESSION_TAB
+    );
+    expect(matchShortcut(press({code: 'KeyN', meta: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.NEW_SESSION_WINDOW
+    );
+    expect(matchShortcut(press({code: 'KeyT', meta: true, shift: true}), 'darwin')).toBe(
+      SHORTCUT_CHANNEL.THEME
+    );
+    // Cmd+Ctrl+R is not Cmd+R.
+    expect(matchShortcut(press({code: 'KeyR', meta: true, control: true}), 'darwin')).toBeNull();
   });
 
   it('tells reload from reload-and-clear-cache by shift', () => {

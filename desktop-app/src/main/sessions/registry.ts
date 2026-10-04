@@ -26,6 +26,14 @@ const definition = z.object({
     .optional(),
   muted: z.boolean().optional(),
 });
+export const windowBounds = z
+  .object({
+    x: z.number().int().min(-100000).max(100000),
+    y: z.number().int().min(-100000).max(100000),
+    width: z.number().int().min(200).max(20000),
+    height: z.number().int().min(150).max(20000),
+  })
+  .strict();
 export const requestSchema = z
   .object({
     operation: z.enum([
@@ -51,6 +59,7 @@ export const requestSchema = z
     source: z.enum(['user', 'window', 'quit', 'agent']).optional(),
     muted: z.boolean().optional(),
     enabled: z.boolean().optional(),
+    bounds: windowBounds.optional(),
   })
   .strict();
 

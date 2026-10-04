@@ -11,6 +11,18 @@ import {SessionInfo, SessionRequest} from '../../common/sessions';
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'responsively-sessions-unit-'));
 describe('persistent session boundaries', () => {
+  it('accepts whole-pixel window bounds for Session tabs and rejects anything else', () => {
+    const id = '8b6f2f0e-3c4d-4e5f-9a1b-2c3d4e5f6a7b';
+    const bounds = {x: 10, y: 40, width: 1500, height: 900};
+    expect(requestSchema.parse({operation: 'focus', id, bounds}).bounds).toEqual(bounds);
+    for (const bad of [
+      {...bounds, width: 10.5},
+      {...bounds, width: 50},
+      {...bounds, extra: 1},
+      {x: 0, y: 0, width: 800},
+    ])
+      expect(() => requestSchema.parse({operation: 'focus', id, bounds: bad})).toThrow();
+  });
   it('keeps UUID identity through rename and reload, and rejects duplicate names', () => {
     const dir = root();
     const registry = new SessionRegistry(dir);

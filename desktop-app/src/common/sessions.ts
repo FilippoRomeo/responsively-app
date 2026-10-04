@@ -13,6 +13,13 @@ export interface SessionDefinition {
   /** Page sound of every preview in this Session is muted. */
   muted?: boolean;
 }
+/** Where a Session window goes: tabs share one spot on screen. */
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 export type SessionStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
 export interface SessionRuntime {
   pid: number;
@@ -54,4 +61,6 @@ export interface SessionRequest {
   muted?: boolean;
   /** agents: whether AI agents may use this Session (its MCP server). */
   enabled?: boolean;
+  /** open/focus/create: place the Session window here (a Session tab). */
+  bounds?: WindowBounds;
 }

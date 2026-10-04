@@ -8,7 +8,13 @@ import './App.css';
 declare global {
   interface Window {
     sessionsPanel: {
-      context: () => {darkMode: boolean; create: boolean; error: string; attention?: string};
+      context: () => {
+        darkMode: boolean;
+        create: boolean;
+        error: string;
+        attention?: string;
+        placeholder?: boolean;
+      };
       request: (value: SessionRequest) => Promise<SessionInfo | SessionInfo[]>;
       dismiss: () => void;
       resize: (height: number) => void;
@@ -32,6 +38,20 @@ const applyTheme = (darkMode: boolean) => {
 applyTheme(context.darkMode);
 document.body.classList.add('bg-panel', 'text-fg');
 const root = createRoot(document.getElementById('root')!);
+/** Cmd+T / Cmd+N: the New Session form fills the window where the Session will open. */
+const Placeholder = () => (
+  <div className="flex h-screen items-start justify-center overflow-auto bg-bg p-8">
+    <div className="w-[420px] max-w-full rounded-lg border border-line shadow-elevated">
+      <SessionsManager
+        request={window.sessionsPanel.request}
+        onClose={window.sessionsPanel.dismiss}
+        initialCreate
+        createOnly
+        native
+      />
+    </div>
+  </div>
+);
 const Panel = () => {
   const [showRequest, setShowRequest] = useState<SessionsShowRequest | null>(null);
   // The panel is hidden on blur, not closed: poll the controller only while it is visible.
@@ -58,4 +78,4 @@ const Panel = () => {
     />
   );
 };
-root.render(<Panel />);
+root.render(context.placeholder ? <Placeholder /> : <Panel />);

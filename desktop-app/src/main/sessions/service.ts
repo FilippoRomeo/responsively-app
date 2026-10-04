@@ -2,8 +2,8 @@ import {app, shell} from 'electron';
 import fs from 'fs';
 import path from 'path';
 import {spawn} from 'child_process';
-import {SessionInfo, SessionRuntime, SessionStopSource} from '../../common/sessions';
-import {SessionRegistry, atomicWrite, requestSchema} from './registry';
+import {SessionInfo, SessionRuntime, SessionStopSource, WindowBounds} from '../../common/sessions';
+import {SessionRegistry, atomicWrite, requestSchema, windowBounds} from './registry';
 import {Endpoint, call, serve, secret, PortLeases} from '../../common/session-rpc';
 import {normalizeUrl} from '../mcp/utils';
 import {provesRuntime, readProcess} from './process-proof';
@@ -83,6 +83,7 @@ const childEnv = (): NodeJS.ProcessEnv => {
     'RESPONSIVELY_SESSION_NAME',
     'RESPONSIVELY_SESSION_URL',
     'RESPONSIVELY_SESSION_MUTED',
+    'RESPONSIVELY_SESSION_BOUNDS',
     'RESPONSIVELY_SESSION_CONTROLLER',
     'RESPONSIVELY_MCP_PORT',
     'RESPONSIVELY_BROWSER_SYNC_PORT',
@@ -106,14 +107,16 @@ const childEnv = (): NodeJS.ProcessEnv => {
 // A capability-protected presence beacon, not a second Sessions authority.
 const shellRequest = z
   .object({
-    operation: z.enum(['status', 'quit', 'attention', 'focused']),
+    operation: z.enum(['status', 'quit', 'attention', 'focused', 'new-session']),
     id: z.string().uuid().optional(),
+    bounds: windowBounds.optional(),
   })
   .strict();
 export const startShellOwner = async (
   onQuitBlocked: (message: string) => void,
   onAttention: (id: string) => void = () => {},
-  onFocused: (id: string) => void = () => {}
+  onFocused: (id: string) => void = () => {},
+  onNewSession: (bounds: WindowBounds) => void = () => {}
 ) => {
   const {server, endpoint} = await serve(secret(), async (body) => {
     const req = shellRequest.parse(body);
@@ -123,6 +126,8 @@ export const startShellOwner = async (
     if (req.operation === 'attention' && req.id) onAttention(req.id);
     // A Session window tells the shell it was the last one you used.
     if (req.operation === 'focused' && req.id) onFocused(req.id);
+    // Cmd+T / Cmd+N in a Session window: show the New Session form where it goes.
+    if (req.operation === 'new-session' && req.bounds) onNewSession(req.bounds);
     return {userDataDir: app.getPath('userData')};
   });
   atomicWrite(shellFile(), endpoint);
@@ -197,6 +202,16 @@ export const reportSessionFocused = async (id: string) => {
     await call(read<Endpoint>(shellFile()), {operation: 'focused', id}, 1000);
   } catch {
     /* No shell (agent-only Sessions) */
+  }
+};
+
+/** Ask the shell to show the New Session form at these bounds; false without a shell. */
+export const requestShellNewSession = async (bounds: WindowBounds) => {
+  try {
+    await call(read<Endpoint>(shellFile()), {operation: 'new-session', bounds}, 2000);
+    return true;
+  } catch {
+    return false;
   }
 };
 
@@ -335,7 +350,7 @@ export class SessionManager {
   private async control(
     id: string,
     operation: 'focus' | 'stop' | 'rename' | 'mute' | 'agents',
-    args: {name?: string; muted?: boolean; enabled?: boolean} = {}
+    args: {name?: string; muted?: boolean; enabled?: boolean; bounds?: WindowBounds} = {}
   ) {
     const lease = this.readLease(id);
     if (!lease) throw new Error('Session is stopped');
@@ -345,11 +360,11 @@ export class SessionManager {
     if (proof.id !== id || proof.pid !== lease.pid) throw new Error('Session identity mismatch');
     return call(lease, {operation, ...args});
   }
-  private async open(id: string) {
+  private async open(id: string, bounds?: WindowBounds) {
     if (process.platform === 'darwin') await ensureShellOwner();
     const current = await this.inspect(id);
     if (current.status === 'running') {
-      await this.control(id, 'focus');
+      await this.control(id, 'focus', {bounds});
       return current;
     }
     if (this.readLease(id))
@@ -373,6 +388,8 @@ export class SessionManager {
           ? ''
           : (current.lastUrl ?? ''),
         RESPONSIVELY_SESSION_MUTED: current.muted ? 'true' : '',
+        // A Session tab opens exactly where the tab strip's window is.
+        RESPONSIVELY_SESSION_BOUNDS: bounds ? JSON.stringify(bounds) : '',
         RESPONSIVELY_USER_DATA_DIR: dir,
         RESPONSIVELY_MCP_PORT: String(mcp.port),
         RESPONSIVELY_BROWSER_SYNC_PORT: String(bs.port),
@@ -523,7 +540,7 @@ export class SessionManager {
       audit('create', item.id, item.name, req.source, 'created');
       return req.open === false
         ? this.inspect(item.id)
-        : this.request({operation: 'open', id: item.id, source: req.source});
+        : this.request({operation: 'open', id: item.id, source: req.source, bounds: req.bounds});
     }
     const id = req.id;
     if (!id) throw new Error('Session ID is required');
@@ -535,9 +552,9 @@ export class SessionManager {
         this.registry.get(id);
         switch (req.operation) {
           case 'open':
-            return this.open(id);
+            return this.open(id, req.bounds);
           case 'focus':
-            await this.control(id, 'focus');
+            await this.control(id, 'focus', {bounds: req.bounds});
             return this.inspect(id);
           case 'stop':
             return this.stop(id, req.source ?? 'user');
