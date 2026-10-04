@@ -287,6 +287,12 @@ const schema = {
     type: 'string',
     default: 'https://www.google.com/',
   },
+  // Agent apps seen by this window's MCP server and whether each may use it.
+  mcpAgents: {
+    type: 'object',
+    additionalProperties: {type: 'boolean'},
+    default: {},
+  },
   // Main window only; a Session's mute lives in the Sessions registry.
   audioMuted: {
     type: 'boolean',
@@ -346,9 +352,11 @@ const store = new Store({
 });
 
 // Keys the renderer may touch through the electron-store IPC bridge.
-// windowState and audioMuted are main-process-only.
+// windowState, audioMuted and mcpAgents are main-process-only.
 const RENDERER_STORE_ROOTS = new Set(
-  Object.keys(schema).filter((key) => key !== 'windowState' && key !== 'audioMuted')
+  Object.keys(schema).filter(
+    (key) => key !== 'windowState' && key !== 'audioMuted' && key !== 'mcpAgents'
+  )
 );
 
 export const isRendererStoreKey = (property: unknown): property is string =>

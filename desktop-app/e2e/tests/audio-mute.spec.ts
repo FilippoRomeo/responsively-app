@@ -19,6 +19,7 @@ test('the toolbar button mutes every preview in the main window and is remembere
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   expect(await previewsMuted(electronApp)).toBe(false);
 
+  await app.openSessionMenu();
   await button.click();
   const unmute = app.page.locator('button[title="Unmute sound"]');
   await expect(unmute).toHaveAttribute('aria-pressed', 'true');
@@ -29,8 +30,24 @@ test('the toolbar button mutes every preview in the main window and is remembere
   );
   expect(JSON.parse(fs.readFileSync(config, 'utf8')).audioMuted).toBe(true);
 
+  await app.openSessionMenu();
   await unmute.click();
   await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => previewsMuted(electronApp)).toBe(false);
+});
+
+test('the speaker beside the Session name mutes and unmutes in one click', async ({
+  app,
+  electronApp,
+}) => {
+  await app.dismissModals();
+  const speaker = app.page.locator('button[title="Sound on — click to mute"]');
+  await speaker.click();
+  const muted = app.page.locator('button[title="Muted — click to turn sound on"]');
+  await expect(muted).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => previewsMuted(electronApp)).toBe(true);
+  await muted.click();
+  await expect(speaker).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => previewsMuted(electronApp)).toBe(false);
 });
 
@@ -75,7 +92,7 @@ test('a Session mute is one setting for Manage Sessions and its window, kept acr
     expect(await runtime.state()).toMatchObject({allMuted: false, button: 'false'});
 
     // Manage Sessions → the running window mutes and its button follows.
-    await mainWindow.locator('button[title="Manage Sessions"]').click();
+    await app.openManageSessions();
     const row = mainWindow.getByTestId(`session-${id}`);
     await row.locator(`button[title="Mute this Session's sound"]`).click();
     await expect(row.locator(`button[title="Unmute this Session's sound"]`)).toHaveAttribute(

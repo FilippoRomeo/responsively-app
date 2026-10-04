@@ -12,33 +12,31 @@ const listening = (port: number) =>
     socket.once('error', () => resolve(false));
   });
 
-test('the toolbar Agents button disconnects and reconnects this window', async ({
+test('the MCP panel Agents switch disconnects and reconnects this window', async ({
   app,
   mainWindow,
   mcpPort,
 }) => {
   await app.dismissModals();
-  const disconnect = app.page.locator('button[title="Disconnect AI agents from this window"]');
-  const connect = app.page.locator('button[title="Connect AI agents to this window"]');
   const status = () =>
     mainWindow.evaluate(() =>
       (window as any).electron.ipcRenderer.invoke('mcp-status')
     ) as Promise<{enabled: boolean; running: boolean}>;
-  await expect(disconnect).toHaveAttribute('aria-pressed', 'true');
+  await app.page.locator('button[title="MCP server — connect AI tools"]').click();
+  const agents = app.page.getByRole('button', {name: 'Agents', exact: true});
+  await expect(agents).toHaveAttribute('aria-pressed', 'true');
   try {
-    await disconnect.click();
-    await expect(connect).toHaveAttribute('aria-pressed', 'false');
+    await agents.click();
+    await expect(agents).toHaveAttribute('aria-pressed', 'false');
+    await expect(app.page.getByTestId('mcp-status')).toContainText('off');
     expect(await status()).toMatchObject({enabled: false, running: false});
     await expect.poll(() => listening(mcpPort)).toBe(false);
-    // The MCP panel follows the change made elsewhere.
-    await app.page.locator('button[title="MCP server — connect AI tools"]').click();
-    await expect(app.page.getByTestId('mcp-status')).toContainText('off');
-    await app.page.keyboard.press('Escape');
 
-    await connect.click();
-    await expect(disconnect).toHaveAttribute('aria-pressed', 'true');
+    await agents.click();
+    await expect(agents).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(() => listening(mcpPort)).toBe(true);
   } finally {
+    await app.page.keyboard.press('Escape');
     // Worker-shared app: the MCP specs need the server running.
     await mainWindow.evaluate(() =>
       (window as any).electron.ipcRenderer.invoke('mcp-set-enabled', {enabled: true})
@@ -67,7 +65,7 @@ test('Manage Sessions connects and disconnects agents for a running Session', as
 
     expect((await request({operation: 'agents', id, enabled: false})).runtime?.mcpPort).toBeNull();
 
-    await mainWindow.locator('button[title="Manage Sessions"]').click();
+    await app.openManageSessions();
     const row = mainWindow.getByTestId(`session-${id}`);
     await row.locator('button[title="Connect AI agents to this Session"]').click();
     await expect(

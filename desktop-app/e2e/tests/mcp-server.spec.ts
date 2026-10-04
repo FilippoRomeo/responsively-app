@@ -55,6 +55,7 @@ test.describe('MCP server', () => {
     // whose CDP overlay consumes the trusted clicks the click tool sends.
     const inspectBtn = mainWindow.locator('button[title="Inspect Elements"]');
     if ((await inspectBtn.getAttribute('aria-pressed')) === 'true') {
+      await mainWindow.locator('button[title="Session menu"]').click();
       await inspectBtn.click();
       await mainWindow.waitForTimeout(200);
     }

@@ -62,7 +62,7 @@ test('native Sessions menu and human lifecycle share persistent identity', async
     ) as Promise<SessionInfo | SessionInfo[]>;
   let id: string | undefined;
   try {
-    await mainWindow.getByTitle('Manage Sessions').click();
+    await app.openManageSessions();
     await mainWindow.getByRole('button', {name: 'New Session', exact: true}).click();
     await mainWindow.getByLabel('Name', {exact: true}).fill('Human project');
     await mainWindow.getByLabel('Starting URL (optional)').fill('http://localhost:3020');

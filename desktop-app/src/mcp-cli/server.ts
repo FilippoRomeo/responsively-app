@@ -19,11 +19,18 @@ import {launchController} from './launch';
 import {SessionRequest} from '../common/sessions';
 import {createSessionRouter, hasSessionArgument, withSessionArgument} from './session-routing';
 
-/** Lifecycle calls through this bridge are an agent's, whatever the arguments claim. */
+/**
+ * Lifecycle calls through this bridge are an agent's, whatever the arguments
+ * claim. Agents pass only what the tools define: never window placement or
+ * UI-only switches.
+ */
 export const agentLifecycleRequest = (
   args: Record<string, unknown> | undefined,
   operation: SessionRequest['operation']
-): SessionRequest => ({...args, operation, source: 'agent'}) as SessionRequest;
+): SessionRequest => {
+  const {bounds: _bounds, enabled: _enabled, muted: _muted, ...rest} = args ?? {};
+  return {...rest, operation, source: 'agent'} as SessionRequest;
+};
 
 /**
  * Agents work in the Sessions you made: creating one is hidden from them
@@ -38,15 +45,16 @@ export const startBridge = async () => {
     tools.filter((tool) => !hidden.has(tool.name));
   const manifest = loadManifest();
   const port = resolveTargetPort(process.env, readBeacon());
-  const backend = createBackend({port});
-  const root = controllerRoot();
-  const manage = controllerClient(root, () => launchController(root));
-  const routeToSession = createSessionRouter({manage});
-
   const server = new Server(
     {name: MCP_SERVER_NAME, version: manifest.version},
     {capabilities: {tools: {}}}
   );
+  // The agent app that started this bridge, known once it has initialized.
+  const agentName = () => server.getClientVersion()?.name;
+  const backend = createBackend({port, agentName});
+  const root = controllerRoot();
+  const manage = controllerClient(root, () => launchController(root));
+  const routeToSession = createSessionRouter({manage, agentName});
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     // Lazy by design: listing tools must never launch the app. Serve the

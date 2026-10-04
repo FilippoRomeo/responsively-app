@@ -31,7 +31,14 @@ import {initNativeFunctionHandlers} from './native-functions';
 import {WebPermissionHandlers} from './web-permissions';
 import {initHttpBasicAuthHandlers} from './http-basic-auth';
 import {initAppMetaHandlers} from './app-meta';
-import {getMcpServerStatus, initMcpServer, setMcpServerEnabled} from './mcp';
+import {
+  getMcpServerStatus,
+  hardResetMcpServer,
+  initMcpServer,
+  listMcpAgents,
+  setMcpAgentAllowed,
+  setMcpServerEnabled,
+} from './mcp';
 import {listAgentTools, setToolEntry, AgentEnv} from './mcp/agent-config';
 import {openUrl} from './protocol-handler';
 import {AppUpdater} from './app-updater';
@@ -51,6 +58,7 @@ import {
 } from './sessions/service';
 import {stopSessionWhenWindowsClose} from './sessions/window-lifecycle';
 import {windowBounds} from './sessions/registry';
+import {WindowBounds} from '../common/sessions';
 import {
   initSessions,
   initSessionsTray,
@@ -145,6 +153,7 @@ if (shouldRegisterProtocol()) {
 // here (never inside createWindow) so macOS close→reopen cannot register
 // duplicates. Anything window-dependent receives the getter.
 const getMainWindow = () => mainWindow;
+let closingBounds: WindowBounds | undefined;
 
 initAppMetaHandlers();
 initWebviewContextMenu();
@@ -178,6 +187,16 @@ ipcMain.handle(IPC_MAIN_CHANNELS.MCP_STATUS, async () => getMcpServerStatus());
 ipcMain.handle(IPC_MAIN_CHANNELS.MCP_SET_ENABLED, async (_event, {enabled}: {enabled: boolean}) =>
   setMcpServerEnabled(enabled)
 );
+
+ipcMain.handle(IPC_MAIN_CHANNELS.MCP_AGENTS, async () => listMcpAgents());
+
+ipcMain.handle(IPC_MAIN_CHANNELS.MCP_SET_AGENT, async (_event, value: unknown) => {
+  const {name, allowed} = (value ?? {}) as {name?: unknown; allowed?: unknown};
+  if (typeof name !== 'string' || typeof allowed !== 'boolean') throw new Error('Invalid agent');
+  return setMcpAgentAllowed(name, allowed);
+});
+
+ipcMain.handle(IPC_MAIN_CHANNELS.MCP_HARD_RESET, async () => hardResetMcpServer());
 
 const agentEnv = (): AgentEnv => ({
   homeDir: app.getPath('home'),
@@ -340,6 +359,11 @@ const createWindow = async () => {
   trackWindowState(mainWindow);
   const sessionId = process.env.RESPONSIVELY_SESSION_ID;
   if (sessionId) mainWindow.on('focus', () => void reportSessionFocused(sessionId));
+  // Where a closing Session tab was, for the neighbour that takes its place.
+  mainWindow.on('close', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFullScreen())
+      closingBounds = mainWindow.getBounds();
+  });
   initDevtoolsHandlers(mainWindow);
   wireWebviewSecurity(mainWindow.webContents, {
     openInPreview: (url) => openUrl(url, getMainWindow()),
@@ -466,7 +490,7 @@ app
     }
     if (process.platform === 'darwin' && process.env.RESPONSIVELY_SESSION_ID)
       app.setActivationPolicy('accessory');
-    if (process.env.RESPONSIVELY_SESSION_ID) stopSessionWhenWindowsClose();
+    if (process.env.RESPONSIVELY_SESSION_ID) stopSessionWhenWindowsClose(() => closingBounds);
     if (process.env.RESPONSIVELY_SESSION_URL)
       store.set('homepage', process.env.RESPONSIVELY_SESSION_URL);
     wireSessionOnce();

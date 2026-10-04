@@ -33,7 +33,7 @@ test.describe('MCP panel', () => {
     expect(await endpointReachable(mcpPort)).toBe(true);
 
     await app.page.locator('button[title="MCP server — connect AI tools"]').click();
-    const toggle = app.page.locator('button[title="Start / stop MCP server"]');
+    const toggle = app.page.getByRole('button', {name: 'Agents', exact: true});
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 
     await toggle.click();

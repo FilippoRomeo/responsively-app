@@ -5,6 +5,7 @@ test.describe('Rotate Devices', () => {
     await app.dismissModals();
 
     const rotateBtn = app.page.locator('button[title="Rotate Devices"]');
+    await app.openSessionMenu();
     await expect(rotateBtn).toBeVisible();
   });
 
@@ -13,6 +14,7 @@ test.describe('Rotate Devices', () => {
 
     // Click rotate button
     const rotateBtn = app.page.locator('button[title="Rotate Devices"]');
+    await app.openSessionMenu();
     await rotateBtn.click();
     await app.page.waitForTimeout(500);
 
@@ -34,6 +36,7 @@ test.describe('Rotate Devices', () => {
 
     // Verify the rotate button state changed (should be active or inactive)
     const rotateBtn = app.page.locator('button[title="Rotate Devices"]');
+    await app.openSessionMenu();
     await expect(rotateBtn).toBeVisible();
 
     // Toggle back

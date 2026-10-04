@@ -3,8 +3,11 @@ import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {useEffect, useState} from 'react';
 import {ToolbarAction} from '../primitives';
 
-/** Mutes page sound in every preview of this window (or this Session). */
-const AudioMuteToggle = () => {
+/**
+ * Mutes page sound in every preview of this window (or this Session). `compact`
+ * is the speaker beside the Session name: one click, no label.
+ */
+const AudioMuteToggle = ({compact = false}: {compact?: boolean}) => {
   const [muted, setMuted] = useState(false);
 
   useEffect(() => {
@@ -16,17 +19,26 @@ const AudioMuteToggle = () => {
     return window.electron.ipcRenderer.on<boolean>(IPC_MAIN_CHANNELS.AUDIO_MUTED_CHANGED, setMuted);
   }, []);
 
+  const toggle = () => {
+    window.electron.ipcRenderer
+      .invoke<boolean, boolean>(IPC_MAIN_CHANNELS.AUDIO_MUTED_SET, !muted)
+      .then(setMuted)
+      .catch(() => {});
+  };
+  if (compact)
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        aria-pressed={muted}
+        title={muted ? 'Muted — click to turn sound on' : 'Sound on — click to mute'}
+        className="flex h-[30px] w-[26px] items-center justify-center rounded-[7px] text-muted hover:bg-hover hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      >
+        <Icon icon={muted ? 'lucide:volume-x' : 'lucide:volume-2'} fontSize={15} />
+      </button>
+    );
   return (
-    <ToolbarAction
-      onClick={() => {
-        window.electron.ipcRenderer
-          .invoke<boolean, boolean>(IPC_MAIN_CHANNELS.AUDIO_MUTED_SET, !muted)
-          .then(setMuted)
-          .catch(() => {});
-      }}
-      isActive={muted}
-      title={muted ? 'Unmute sound' : 'Mute sound'}
-    >
+    <ToolbarAction onClick={toggle} isActive={muted} title={muted ? 'Unmute sound' : 'Mute sound'}>
       <Icon icon={muted ? 'lucide:volume-x' : 'lucide:volume-2'} fontSize={15} />
       {muted ? 'Muted' : 'Sound'}
     </ToolbarAction>

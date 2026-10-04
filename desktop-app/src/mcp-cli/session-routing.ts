@@ -102,15 +102,17 @@ export const resolveSessionPort = async (
 export interface SessionRouterOptions {
   manage: Manage;
   backendFor?: (port: number, name: string) => Backend;
+  agentName?: () => string | undefined;
 }
 
 /**
  * A routed backend must never launch anything: if the Session's port stops
  * answering mid-call, the Session stopped, and the agent is told so at once.
  */
-const routedBackend = (port: number, name: string) =>
+const routedBackend = (port: number, name: string, agentName?: () => string | undefined) =>
   createBackend({
     port,
+    agentName,
     unreachableNotice: `Session "${name}" is not answering on port ${port}`,
     launcher: async () => {
       throw new Error(
@@ -121,7 +123,11 @@ const routedBackend = (port: number, name: string) =>
   });
 
 export const createSessionRouter =
-  ({manage, backendFor = routedBackend}: SessionRouterOptions) =>
+  ({
+    manage,
+    agentName,
+    backendFor = (p, n) => routedBackend(p, n, agentName),
+  }: SessionRouterOptions) =>
   async (params: ToolCallParams) => {
     const {[SESSION_ARGUMENT]: session, ...args} = params.arguments ?? {};
     if (typeof session !== 'string' || session.length === 0) {

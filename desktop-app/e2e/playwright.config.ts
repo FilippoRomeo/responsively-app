@@ -32,6 +32,7 @@ const testOrder = [
   'sessions.spec.ts',
   'audio-mute.spec.ts',
   'agents-toggle.spec.ts',
+  'mcp-agents.spec.ts',
   'session-tabs.spec.ts',
   'url-navigation.spec.ts',
   'popup-policy.spec.ts',

@@ -38,6 +38,8 @@ const McpPanel = () => {
   const [tools, setTools] = useState<AgentToolState[]>([]);
   const [copied, setCopied] = useState<boolean>(false);
   const [toolError, setToolError] = useState<string | null>(null);
+  const [agents, setAgents] = useState<{name: string; allowed: boolean}[]>([]);
+  const [resetting, setResetting] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await window.electron.ipcRenderer.invoke<unknown, McpServerStatus>(
@@ -48,6 +50,11 @@ const McpPanel = () => {
       IPC_MAIN_CHANNELS.MCP_LIST_TOOLS
     );
     setTools(nextTools);
+    setAgents(
+      await window.electron.ipcRenderer.invoke<unknown, {name: string; allowed: boolean}[]>(
+        IPC_MAIN_CHANNELS.MCP_AGENTS
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -62,6 +69,37 @@ const McpPanel = () => {
       ),
     []
   );
+  // A new agent app connected to this window.
+  useEffect(
+    () =>
+      window.electron.ipcRenderer.on<{name: string; allowed: boolean}[]>(
+        IPC_MAIN_CHANNELS.MCP_AGENTS_CHANGED,
+        setAgents
+      ),
+    []
+  );
+
+  const setAgent = async (name: string, allowed: boolean) => {
+    setAgents(
+      await window.electron.ipcRenderer.invoke<
+        {name: string; allowed: boolean},
+        {name: string; allowed: boolean}[]
+      >(IPC_MAIN_CHANNELS.MCP_SET_AGENT, {name, allowed})
+    );
+  };
+
+  const hardReset = async () => {
+    setResetting(true);
+    try {
+      setStatus(
+        await window.electron.ipcRenderer.invoke<unknown, McpServerStatus>(
+          IPC_MAIN_CHANNELS.MCP_HARD_RESET
+        )
+      );
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const setTool = async (toolId: string, add: boolean) => {
     setToolError(null);
@@ -115,7 +153,7 @@ const McpPanel = () => {
     >
       <div data-testid="mcp-panel">
         <div className="flex items-center gap-2 px-[10px] pb-[2px] pt-[10px]">
-          <span className="text-[13px] font-bold">MCP server</span>
+          <span className="text-[13px] font-bold">Agents</span>
           <span
             data-testid="mcp-status"
             className={cx(
@@ -131,8 +169,22 @@ const McpPanel = () => {
           <span className="flex-1" />
           <button
             type="button"
-            title="Start / stop MCP server"
-            aria-label="MCP server"
+            title="Hard reset: drop every agent connection and restart MCP fresh"
+            aria-label="Hard reset MCP"
+            disabled={resetting || !(status?.enabled ?? false)}
+            onClick={hardReset}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-fg focus:outline-none disabled:opacity-40"
+          >
+            <Icon
+              icon="lucide:rotate-ccw"
+              fontSize={14}
+              className={cx({'animate-spin': resetting})}
+            />
+          </button>
+          <button
+            type="button"
+            title="Connect / disconnect AI agents (MCP server on/off)"
+            aria-label="Agents"
             aria-pressed={status?.enabled ?? false}
             onClick={toggle}
             className="relative inline-flex items-center focus:outline-none"
@@ -155,6 +207,34 @@ const McpPanel = () => {
         <div className="px-[10px] pb-[10px] pt-1 text-[11.5px] leading-[1.55] text-muted">
           Let AI agents drive this device lab — open URLs, screenshot devices, inspect responsive
           layouts.
+        </div>
+
+        <div className="mx-1 mb-[6px] border-t border-line-soft" />
+
+        <div className="px-[10px] pb-1 pt-[2px] text-[10.5px] font-bold tracking-[0.08em] text-muted">
+          ALLOWED IN THIS WINDOW
+        </div>
+        <div data-testid="mcp-agents" className="pb-1">
+          {agents.length === 0 ? (
+            <div className="px-[10px] pb-2 text-[11.5px] text-muted">
+              No agent has connected yet. Each one appears here the first time it does.
+            </div>
+          ) : null}
+          {agents.map((agent) => (
+            <label
+              key={agent.name}
+              className="flex cursor-pointer items-center gap-[9px] rounded-lg px-[10px] py-[5px] text-[13px] hover:bg-hover"
+            >
+              <input
+                type="checkbox"
+                checked={agent.allowed}
+                onChange={(event) => void setAgent(agent.name, event.target.checked)}
+                aria-label={`Allow ${agent.name}`}
+              />
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{agent.name}</span>
+              {agent.allowed ? null : <span className="text-[11px] text-muted">blocked</span>}
+            </label>
+          ))}
         </div>
 
         <div className="mx-1 mb-[6px] border-t border-line-soft" />

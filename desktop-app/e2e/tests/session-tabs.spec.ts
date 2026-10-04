@@ -128,4 +128,64 @@ test.describe('Session tabs', () => {
     await expect.poll(() => Boolean(placeholder(app))).toBe(false);
     expect(((await request({operation: 'list'})) as unknown as SessionInfo[]).length).toBe(before);
   });
+
+  test('⌘1, ⌘9 and ⌘⇧] pick tabs like a browser, in place', async ({app}) => {
+    await app.dismissModals();
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await app.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(app.page.getByTestId('session-tabs').getByRole('tab')).toHaveCount(3);
+    let here = await placeMain(app);
+    await app.page.keyboard.press(`${mod}+9`);
+    await expect.poll(async () => (await sessionWindow(ids[2])).bounds).toEqual(here);
+    await app.page.keyboard.press(`${mod}+2`);
+    await expect.poll(async () => (await sessionWindow(ids[1])).bounds).toEqual(here);
+    // Move this window, then ⌘⇧] (no current tab here) goes to the first tab.
+    here = await app.electronApp.evaluate(({BrowserWindow}: any) => {
+      const win = BrowserWindow.getAllWindows().find(
+        (w: any) => !w.webContents.getURL().includes('sessionsPanel=1')
+      );
+      const b = win.getBounds();
+      win.setBounds({...b, x: b.x + 15, y: b.y + 10});
+      return win.getBounds();
+    });
+    await app.page.keyboard.press(`${mod}+Shift+BracketRight`);
+    await expect.poll(async () => (await sessionWindow(ids[0])).bounds).toEqual(here);
+  });
+
+  test('closing a Session window brings the tab on its right into that spot', async ({app}) => {
+    await app.dismissModals();
+    const here = await placeMain(app);
+    await app.page.getByTestId(`session-tab-${ids[1]}`).click();
+    await expect.poll(async () => (await sessionWindow(ids[1])).bounds).toEqual(here);
+    // Move the right-hand neighbour away first, so arriving in place is observable.
+    await request({
+      operation: 'focus',
+      id: ids[2],
+      bounds: {x: here.x + 60, y: here.y + 40, width: here.width - 100, height: here.height - 80},
+    });
+    await call(
+      JSON.parse(
+        fs.readFileSync(path.join(root, 'runtimes', `${ids[1]}.json`), 'utf8')
+      ) as Endpoint,
+      {operation: 'e2e-close-window'}
+    );
+    await expect
+      .poll(async () => (await request({operation: 'get', id: ids[1]})).status, {
+        timeout: 20_000,
+      })
+      .toBe('stopped');
+    await expect.poll(async () => (await sessionWindow(ids[2])).bounds).toEqual(here);
+  });
+
+  test('a tab ✕ stops that Session and keeps its data', async ({app}) => {
+    await app.dismissModals();
+    await app.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await app.page.getByTestId(`session-tab-close-${ids[2]}`).click();
+    await expect
+      .poll(async () => (await request({operation: 'get', id: ids[2]})).status, {
+        timeout: 20_000,
+      })
+      .toBe('stopped');
+    await expect(app.page.getByTestId(`session-tab-${ids[2]}`)).toHaveCount(0, {timeout: 10_000});
+  });
 });

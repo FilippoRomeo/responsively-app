@@ -24,7 +24,7 @@ import {
 } from './service';
 import {serve} from '../../common/session-rpc';
 import store from '../../store';
-import {getMcpServerStatus, setMcpServerEnabled} from '../mcp';
+import {getMcpServerStatus, hardResetMcpServer, setMcpServerEnabled} from '../mcp';
 import {getBrowserSyncPort, isBrowserSyncReady} from '../browser-sync';
 import {normalizeUrl} from '../mcp/utils';
 import {resolveHtmlPath} from '../util';
@@ -462,6 +462,14 @@ export const initSessions = (
     }
     return sessionRequest({...request, source: 'user'});
   });
+  // A tab's ✕: this window's own tab closes the window (like ⌘W); another tab stops it.
+  ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_CLOSE_TAB, async (event, id: unknown) => {
+    const win = getWindow();
+    if (!win || event.sender !== win.webContents) throw new Error('Invalid application window');
+    if (typeof id !== 'string') throw new Error('Session ID is required');
+    if (id === process.env.RESPONSIVELY_SESSION_ID) win.close();
+    else await sessionRequest({operation: 'stop', id, source: 'user'});
+  });
   // Cmd+T: a Session tab at this window's spot; Cmd+N: a new window, offset.
   ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_NEW, async (event, value: unknown) => {
     const win = getWindow();
@@ -563,6 +571,8 @@ export const startSessionRuntime = async () => {
         'e2e-audio-state',
         'e2e-audio-toggle',
         'e2e-window',
+        'e2e-close-window',
+        'e2e-mcp-hard-reset',
       ]),
       name: sessionName.optional(),
       muted: z.boolean().optional(),
@@ -572,10 +582,19 @@ export const startSessionRuntime = async () => {
     .strict();
   const {server, endpoint} = await serve(token, async (body) => {
     const req = schema.parse(body);
-    if (req.operation === 'e2e-window') {
+    if (req.operation === 'e2e-mcp-hard-reset') {
+      if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
+      return hardResetMcpServer();
+    }
+    if (req.operation === 'e2e-window' || req.operation === 'e2e-close-window') {
       if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
       const win = getWindow();
       if (!win || win.isDestroyed()) throw new Error('No Session window');
+      // Like ⌘W: closing the last window stops the Session, after this reply.
+      if (req.operation === 'e2e-close-window') {
+        setTimeout(() => win.close(), 50);
+        return {closing: true};
+      }
       return {bounds: win.getBounds(), focused: win.isFocused()};
     }
     if (req.operation === 'e2e-audio-state' || req.operation === 'e2e-audio-toggle') {
