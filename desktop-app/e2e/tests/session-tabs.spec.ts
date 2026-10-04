@@ -24,7 +24,13 @@ test.describe('Session tabs', () => {
         (w: any) => !w.webContents.getURL().includes('sessionsPanel=1')
       );
       const area = screen.getDisplayMatching(win.getBounds()).workArea;
-      win.setBounds({x: area.x + 40, y: area.y + 40, width: 1200, height: 760});
+      // Fit any screen (CI runners are small); a visible window is always inside it.
+      win.setBounds({
+        x: area.x + 20,
+        y: area.y + 20,
+        width: Math.min(1200, area.width - 80),
+        height: Math.min(760, area.height - 80),
+      });
       return win.getBounds();
     });
   const placeholder = (app: any) =>
