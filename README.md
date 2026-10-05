@@ -34,10 +34,10 @@ A single controller owns the Session registry and lifecycle. Session identity ne
 The current known-good application-code baseline is:
 
 ```text
-7b75a8b059ddda5f58af9ea82718b864fbc13d2a
+1bc0caafc554eba240d69f0ccf513a7c2b3da357
 ```
 
-That commit (milestones M1, M2, M5 and M6 plus their fixes, and PRs #20–#25: `create_session` hidden from agents, the stuck devtools panel, per-Session mute, Cmd-Tab/Dock bringing back the last Session, Cmd+R / Cmd+Shift+R, and agents on/off per Session; see [the roadmap](desktop-app/SESSIONS_ROADMAP.md)) has been merged, validated as a packaged test app (Gate C, 24/24), installed and smoke-tested on macOS. The tip of `main` can be newer because of documentation-only commits; those don't change the application. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
+That commit (milestones M1, M2, M5 and M6 plus their fixes, and PRs #20–#28: `create_session` hidden from agents, the stuck devtools panel, per-Session mute, Cmd-Tab/Dock bringing back the last Session, Cmd+R / Cmd+Shift+R, agents on/off per Session, Session tabs (Ctrl+Tab, Cmd+T / Cmd+N, ⌘1–9, ⌘W hands the spot to the next tab), the Session-name tools menu, the MCP panel's per-agent allow list and hard reset, and the sliding toolbar; see [the roadmap](desktop-app/SESSIONS_ROADMAP.md)) has been merged, validated as a packaged test app (Gate C, 24/24), installed and smoke-tested on macOS. The tip of `main` can be newer because of documentation-only commits; those don't change the application. Later milestones become the baseline only after they are merged, installed and smoke-tested the same way. Upstream dependency/toolchain changes, including Electron 44, are **not automatically merged**. Useful upstream fixes are evaluated individually.
 
 ## Current product model
 
@@ -97,14 +97,14 @@ git checkout main
 For a reproducible install, confirm the expected baseline before building:
 
 ```bash
-git diff --quiet 7b75a8b059ddda5f58af9ea82718b864fbc13d2a HEAD -- \
+git diff --quiet 1bc0caafc554eba240d69f0ccf513a7c2b3da357 HEAD -- \
   desktop-app \
   ':(exclude,glob)desktop-app/**/*.md' \
   ':(exclude)desktop-app/scripts/gates' \
   && echo "desktop app non-doc files match the validated baseline"
 ```
 
-This compares every non-Markdown file under `desktop-app` (source, assets, build config, lockfiles, tests) with the validated baseline `7b75a8b059ddda5f58af9ea82718b864fbc13d2a`, so documentation-only commits on `main` don't cause a mismatch. The validation scripts in `desktop-app/scripts/gates/` are excluded too: they build and test the app but aren't part of it. If it prints nothing, something that can affect the app differs from what was validated.
+This compares every non-Markdown file under `desktop-app` (source, assets, build config, lockfiles, tests) with the validated baseline `1bc0caafc554eba240d69f0ccf513a7c2b3da357`, so documentation-only commits on `main` don't cause a mismatch. The validation scripts in `desktop-app/scripts/gates/` are excluded too: they build and test the app but aren't part of it. If it prints nothing, something that can affect the app differs from what was validated.
 
 ### 2. Install dependencies
 
