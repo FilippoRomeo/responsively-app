@@ -114,10 +114,14 @@ export const SessionsButton = ({
           ) : null}
           {/* Always rendered, hidden behind the manager: the tools keep their state. */}
           <div data-testid="session-menu" className={cx('p-[6px]', {hidden: view === 'manager'})}>
-            <div className="flex flex-col gap-[2px] [&_button]:w-full [&_button]:justify-start">
-              {tools}
-            </div>
-            <div className="mx-1 my-[6px] border-t border-line-soft" />
+            {tools ? (
+              <>
+                <div className="flex flex-col gap-[2px] [&_button]:w-full [&_button]:justify-start">
+                  {tools}
+                </div>
+                <div className="mx-1 my-[6px] border-t border-line-soft" />
+              </>
+            ) : null}
             <button
               type="button"
               title="Manage Sessions"

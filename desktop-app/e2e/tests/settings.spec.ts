@@ -1,6 +1,26 @@
 import {test, expect} from '../fixtures/electron-app';
 
 test.describe('Settings', () => {
+  test('Reset toolbar moves the tools into the Session menu, and back', async ({app}) => {
+    await app.dismissModals();
+    await app.openSettings();
+    await expect(app.page.getByTestId('settings-window-data')).toContainText('Cache');
+    const toggle = app.page.getByTestId('settings-toolbar-reset');
+    await expect(app.page.getByTestId('toolbar-tools')).toBeVisible();
+    await toggle.click();
+    await expect(app.page.getByTestId('toolbar-tools')).toHaveCount(0);
+    await app.dismissModals();
+    await app.openSessionMenu();
+    await expect(
+      app.page.getByTestId('session-menu').locator('button[title="Rotate Devices"]')
+    ).toBeVisible();
+    await app.dismissModals();
+    await app.openSettings();
+    await app.page.getByTestId('settings-toolbar-reset').click();
+    await expect(app.page.getByTestId('toolbar-tools')).toBeVisible();
+    await app.dismissModals();
+  });
+
   test('settings modal opens from menu flyout', async ({app}) => {
     await app.dismissModals();
 

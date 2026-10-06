@@ -76,7 +76,7 @@ test.describe('Color Blindness Simulation', () => {
 
     const rotateBtn = app.page.locator('button[title="Rotate Devices"]');
     if ((await rotateBtn.getAttribute('aria-pressed')) === 'true') {
-      await app.openSessionMenu();
+      await app.showTools();
       await rotateBtn.click();
       await app.page.waitForTimeout(300);
     }
@@ -87,7 +87,7 @@ test.describe('Color Blindness Simulation', () => {
     await app.dismissModals();
 
     const colorBlindControls = app.page.locator('[data-testid="color-blindness-controls"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await expect(colorBlindControls).toBeVisible();
 
     const dropdownBtn = colorBlindControls.locator('button').first();

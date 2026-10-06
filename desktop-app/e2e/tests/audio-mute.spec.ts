@@ -15,13 +15,12 @@ test('the toolbar button mutes every preview in the main window and is remembere
   electronApp,
 }) => {
   await app.dismissModals();
-  const button = app.page.locator('button[title="Mute sound"]');
+  const button = app.page.locator('button[title="Sound on — click to mute"]');
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   expect(await previewsMuted(electronApp)).toBe(false);
 
-  await app.openSessionMenu();
   await button.click();
-  const unmute = app.page.locator('button[title="Unmute sound"]');
+  const unmute = app.page.locator('button[title="Muted — click to turn sound on"]');
   await expect(unmute).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => previewsMuted(electronApp)).toBe(true);
   const config = path.join(
@@ -30,7 +29,6 @@ test('the toolbar button mutes every preview in the main window and is remembere
   );
   expect(JSON.parse(fs.readFileSync(config, 'utf8')).audioMuted).toBe(true);
 
-  await app.openSessionMenu();
   await unmute.click();
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => previewsMuted(electronApp)).toBe(false);

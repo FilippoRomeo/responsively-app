@@ -159,7 +159,12 @@ export class ResponsivelyApp {
     });
   }
 
-  /** The window's tools (rotate, inspect, capture…) live in the Session-name menu. */
+  /** The window's tools (rotate, inspect, capture…): in the toolbar, or in the Session menu with the classic toolbar. */
+  async showTools() {
+    if (await this.page.getByTestId('toolbar-tools').isVisible()) return;
+    await this.openSessionMenu();
+  }
+
   async openSessionMenu() {
     const menu = this.page.getByTestId('session-menu');
     // Open in the manager view, the first click closes it; the second opens the menu.
@@ -177,7 +182,7 @@ export class ResponsivelyApp {
   }
 
   async openColorBlindnessDropdown() {
-    await this.openSessionMenu();
+    await this.showTools();
     const colorBlindControls = this.page.locator('[data-testid="color-blindness-controls"]');
     const dropdownBtn = colorBlindControls.locator('button').first();
     await dropdownBtn.click();

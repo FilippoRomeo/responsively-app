@@ -30,7 +30,13 @@ import {
   zoomOut,
   zoomSteps,
 } from './features/renderer';
-import {hideSupportForever, setDarkMode, setSupportShownAt, setWhatsNewSeen} from './features/ui';
+import {
+  hideSupportForever,
+  setClassicToolbar,
+  setDarkMode,
+  setSupportShownAt,
+  setWhatsNewSeen,
+} from './features/ui';
 
 /**
  * All electron-store persistence lives here as action listeners, keeping
@@ -46,6 +52,13 @@ startListening({
   actionCreator: setDarkMode,
   effect: (action) => {
     window.electron.store.set('ui.darkMode', action.payload);
+  },
+});
+
+startListening({
+  actionCreator: setClassicToolbar,
+  effect: (action) => {
+    window.electron.store.set('ui.classicToolbar', action.payload);
   },
 });
 

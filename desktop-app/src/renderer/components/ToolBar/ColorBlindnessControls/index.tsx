@@ -4,7 +4,7 @@ import {webViewPubSub} from 'renderer/lib/pubsub';
 
 export const COLOR_BLINDNESS_CHANNEL = 'color-blindness';
 
-export const ColorBlindnessControls = () => {
+export const ColorBlindnessControls = ({iconOnly = false}: {iconOnly?: boolean}) => {
   const [simulationName, setSimulationName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export const ColorBlindnessControls = () => {
       <VisionSimulationDropDown
         simulationName={simulationName}
         onChange={setSimulationName}
-        variant="toolbar"
+        variant={iconOnly ? 'icon' : 'toolbar'}
       />
     </div>
   );

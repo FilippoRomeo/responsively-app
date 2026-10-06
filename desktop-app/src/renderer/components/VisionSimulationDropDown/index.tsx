@@ -48,8 +48,11 @@ const GROUPS: Array<{header: string; items: string[]}> = [
 interface Props {
   simulationName: string | undefined;
   onChange: (name: string | undefined) => void;
-  /** `toolbar` shows the labelled action; `compact` is icon-only (per device). */
-  variant?: 'toolbar' | 'compact';
+  /**
+   * `toolbar` shows the labelled action, `icon` the toolbar's icon + chevron;
+   * `compact` is icon-only (per device).
+   */
+  variant?: 'toolbar' | 'icon' | 'compact';
 }
 
 export const VisionSimulationDropDown = ({
@@ -58,7 +61,8 @@ export const VisionSimulationDropDown = ({
   variant = 'compact',
 }: Props) => {
   const isSimulating = simulationName != null;
-  const isToolbar = variant === 'toolbar';
+  const isToolbar = variant !== 'compact';
+  const isLabelled = variant === 'toolbar';
 
   return (
     <Popover
@@ -67,16 +71,22 @@ export const VisionSimulationDropDown = ({
       className="max-h-[470px] w-[238px] overflow-y-auto p-[6px]"
       triggerClassName={cx(
         'flex items-center transition-colors',
-        isToolbar
-          ? 'h-[30px] gap-[7px] rounded-[7px] px-[11px] text-[12.5px]'
-          : 'h-7 w-7 justify-center rounded-md text-[18px]',
-        isSimulating ? 'bg-accent-soft text-accent' : 'text-fg hover:bg-hover'
+        isLabelled && 'h-[30px] gap-[7px] rounded-[7px] px-[11px] text-[12.5px]',
+        variant === 'icon' && 'h-[30px] gap-[2px] rounded-lg px-[7px]',
+        variant === 'compact' && 'h-7 w-7 justify-center rounded-md text-[18px]',
+        isSimulating && 'bg-accent-soft text-accent',
+        !isSimulating &&
+          (variant === 'icon'
+            ? 'text-muted hover:bg-hover hover:text-fg'
+            : 'text-fg hover:bg-hover')
       )}
       trigger={
         <span className="pointer-events-none contents">
           <Icon icon="bx:low-vision" fontSize={isToolbar ? 16 : 18} />
-          {isToolbar ? 'Simulate' : null}
-          {isToolbar ? <Icon icon="mdi:chevron-down" fontSize={13} className="text-muted" /> : null}
+          {isLabelled ? 'Simulate' : null}
+          {isToolbar ? (
+            <Icon icon="mdi:chevron-down" fontSize={isLabelled ? 13 : 11} className="text-muted" />
+          ) : null}
         </span>
       }
     >

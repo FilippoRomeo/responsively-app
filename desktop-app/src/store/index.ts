@@ -31,6 +31,11 @@ const schema = {
         enum: Object.values(PREVIEW_LAYOUTS),
         default: PREVIEW_LAYOUTS.FLEX,
       },
+      // The toolbar as it was before the icon bar: the tools in the Session menu.
+      classicToolbar: {
+        type: 'boolean',
+        default: false,
+      },
       announcements: {
         type: 'object',
         properties: {

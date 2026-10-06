@@ -1,13 +1,23 @@
 import * as React from 'react';
 
-import {render, fireEvent} from '@testing-library/react';
+import {render, fireEvent, waitFor} from '@testing-library/react';
+import {configureStore} from '@reduxjs/toolkit';
+import {Provider} from 'react-redux';
 
+import {IPC_MAIN_CHANNELS} from 'common/constants';
+import {uiSlice} from 'renderer/store/features/ui';
 import {SettingsContent} from './SettingsContent';
 
 const mockOnClose = vi.fn();
 
 describe('SettingsContentHeader', () => {
-  const renderComponent = () => render(<SettingsContent onClose={mockOnClose} />);
+  const store = configureStore({reducer: {ui: uiSlice.reducer}});
+  const renderComponent = () =>
+    render(
+      <Provider store={store}>
+        <SettingsContent onClose={mockOnClose} />
+      </Provider>
+    );
 
   it('Accept-Language is saved to store', () => {
     const {getByTestId} = renderComponent();
@@ -41,5 +51,36 @@ describe('SettingsContentHeader', () => {
     );
 
     expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('Reset toolbar switches to the classic toolbar and back', () => {
+    const {getByTestId} = renderComponent();
+    const reset = getByTestId('settings-toolbar-reset');
+    expect(reset).toHaveTextContent('Reset toolbar');
+    fireEvent.click(reset);
+    expect(store.getState().ui.classicToolbar).toBe(true);
+    expect(reset).toHaveTextContent('Use the icon toolbar');
+    fireEvent.click(reset);
+    expect(store.getState().ui.classicToolbar).toBe(false);
+  });
+
+  it('Clear everything clears this window and counts down to what is left', async () => {
+    const full = {cache: 48.2e6, cookies: 37, cookieBytes: 18e3, storage: 9.6e6, serviceWorkers: 0};
+    const empty = {cache: 0, cookies: 0, cookieBytes: 0, storage: 4e3, serviceWorkers: 0};
+    vi.mocked(window.electron.ipcRenderer.invoke).mockImplementation(async (channel: string) =>
+      channel === IPC_MAIN_CHANNELS.WINDOW_DATA_CLEAR ? empty : full
+    );
+    const {getByTestId} = renderComponent();
+    const card = getByTestId('settings-window-data');
+    await waitFor(() => expect(card).toHaveTextContent('57.8 MB'));
+    expect(card).toHaveTextContent('37 · 18 KB');
+
+    fireEvent.click(getByTestId('settings-clear-window-data'));
+    await waitFor(() => expect(card).toHaveTextContent('4 KB — cleared'), {timeout: 3000});
+    expect(card).toHaveTextContent('0 · 0 B');
+    expect(window.electron.ipcRenderer.invoke).toHaveBeenCalledWith(
+      IPC_MAIN_CHANNELS.WINDOW_DATA_CLEAR
+    );
+    vi.mocked(window.electron.ipcRenderer.invoke).mockReset();
   });
 });

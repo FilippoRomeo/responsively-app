@@ -5,7 +5,7 @@ test.describe('Screenshot', () => {
     await app.dismissModals();
 
     const screenshotBtn = app.page.locator('button[title="Screenshot All WebViews"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await expect(screenshotBtn).toBeVisible();
   });
 
@@ -19,7 +19,7 @@ test.describe('Screenshot', () => {
     await app.navigateTo(`${testServerUrl}/test-page.html`, {timeout: 3000});
 
     const screenshotBtn = app.page.locator('button[title="Screenshot All WebViews"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await screenshotBtn.click();
 
     // The modal loader should appear with "Capturing screen..." text

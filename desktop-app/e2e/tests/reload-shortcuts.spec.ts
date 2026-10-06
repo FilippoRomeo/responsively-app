@@ -75,4 +75,35 @@ test.describe('Reload shortcuts', () => {
     await expect.poll(() => cacheClears(app), {timeout: 10_000}).toBeGreaterThan(before);
     await expect.poll(() => markedPreviews(app), {timeout: 15_000}).toBe(0);
   });
+
+  test('Cmd+Shift+R also clears cookies and storage, and counts them down in a toast', async ({
+    app,
+  }) => {
+    const cookies = () =>
+      app.electronApp.evaluate(
+        async ({session}) => (await session.defaultSession.cookies.get({})).length
+      );
+    await app.electronApp.evaluate(({session}) =>
+      session.defaultSession.cookies.set({url: 'http://localhost/', name: 'e2e', value: 'x'})
+    );
+    expect(await cookies()).toBeGreaterThan(0);
+    await app.electronApp.evaluate(({webContents}) =>
+      Promise.all(
+        webContents
+          .getAllWebContents()
+          .filter((wc) => wc.getType() === 'webview')
+          .map((wc) => wc.executeJavaScript("localStorage.setItem('e2e', 'x'.repeat(20000))"))
+      )
+    );
+    await pressInsideGuest(app, 'r', [guestMod, 'shift']);
+    const toast = app.page.getByTestId('clear-data-toast');
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText('reloaded', {timeout: 10_000});
+    await expect(toast).toContainText(/Cleared [1-9]/);
+    await expect(toast).toContainText(/Site storage\s*0 B/);
+    await expect(toast).toContainText(/Cookies\s*0 · 0 B/);
+    expect(await cookies()).toBe(0);
+    await expect.poll(() => markedPreviews(app), {timeout: 15_000}).toBe(0);
+    await expect(toast).toBeHidden({timeout: 10_000});
+  });
 });
