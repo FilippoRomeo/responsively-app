@@ -219,16 +219,22 @@ test.describe('Inspect Elements', () => {
     // DevtoolsResizer panel should disappear (undocked to separate window)
     await expect(devtoolsPanel).not.toBeVisible({timeout: 5000});
 
-    // Close the undocked devtools window
-    await app.electronApp.evaluate(async ({webContents}) => {
-      const all = webContents.getAllWebContents();
-      for (const wc of all) {
-        const url = wc.getURL();
-        if (url.startsWith('devtools://')) {
-          wc.close();
-        }
-      }
+    // Close the undocked devtools through the page it inspects. Closing the
+    // devtools front end's own webContents could block the main process on
+    // CI, and every later call (and the worker's teardown) hung behind it.
+    await app.electronApp.evaluate(({webContents}) => {
+      webContents
+        .getAllWebContents()
+        .filter((wc) => wc.getType() === 'webview' && wc.isDevToolsOpened())
+        .forEach((wc) => wc.closeDevTools());
     });
+    await expect
+      .poll(() =>
+        app.electronApp.evaluate(({webContents}) =>
+          webContents.getAllWebContents().some((wc) => wc.isDevToolsOpened())
+        )
+      )
+      .toBe(false);
     await app.page.waitForTimeout(500);
   });
 });
