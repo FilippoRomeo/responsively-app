@@ -47,6 +47,12 @@
   --heart: #f66d9b;
   --heart-soft: rgba(246, 109, 155, 0.14);
   --on-heart: #33091a;
+  /* Data series (Settings › Storage): told apart by lightness too, not hue alone. */
+  --chart-1: #6ea8ff;
+  --chart-2: #a78bfa;
+  --chart-3: #2fd9a2;
+  --chart-4: #f5b84b;
+  --chart-5: #f472b6;
   --flash: rgba(255, 255, 255, 0.82);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
@@ -76,6 +82,11 @@
   --heart: #d6336c;
   --heart-soft: rgba(214, 51, 108, 0.1);
   --on-heart: #ffffff;
+  --chart-1: #1d4ed8;
+  --chart-2: #7c3aed;
+  --chart-3: #08724f;
+  --chart-4: #b45309;
+  --chart-5: #be185d;
   --flash: rgba(255, 255, 255, 0.9);
   --shadow: 0 12px 32px rgba(23, 32, 48, 0.18), 0 0 0 1px rgba(23, 32, 48, 0.06);
 }

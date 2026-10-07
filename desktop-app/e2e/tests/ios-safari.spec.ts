@@ -69,13 +69,13 @@ test('real iOS Safari: agents pick it, see it, and it stops and deletes cleanly'
   await expect(screen).toBeHidden();
   await expect.poll(() => simDevice()?.state, {timeout: 60_000}).toBe('Shutdown');
 
-  // Settings › Browsers lists it and deletes it with two clicks.
+  // Settings › Storage lists it and deletes it with two clicks.
   await app.openSettings();
   const row = app.page
-    .getByTestId('settings-browsers')
+    .getByTestId('settings-storage')
     .locator('div.border-t', {hasText: 'iPhone 12 Pro · iOS'});
-  await row.getByRole('button', {name: 'Delete'}).click();
-  await row.getByRole('button', {name: /Delete .* GB\?/}).click();
+  await row.getByRole('button', {name: /^Delete iPhone 12 Pro/}).click();
+  await row.getByRole('button', {name: /^Delete .*B\?$/}).click();
   await expect.poll(() => simDevice(), {timeout: 60_000}).toBeUndefined();
   await app.dismissModals();
   await client.close();

@@ -1,6 +1,6 @@
 import {execFile, spawn} from 'child_process';
 import {app, ipcMain, nativeImage} from 'electron';
-import {existsSync, mkdtempSync, rmSync} from 'fs';
+import {existsSync, mkdtempSync, rmSync, statSync} from 'fs';
 import {tmpdir} from 'os';
 import path from 'path';
 import {promisify} from 'util';
@@ -47,6 +47,14 @@ const dirBytes = async (dir: string) => {
   }
 };
 
+const lastWritten = (file: string) => {
+  try {
+    return statSync(file).mtime.toISOString();
+  } catch {
+    return undefined;
+  }
+};
+
 type SimDevice = {name: string; udid: string; state: string; dataPath: string; runtime: string};
 
 const ourDevices = async (): Promise<SimDevice[]> => {
@@ -70,7 +78,13 @@ const list = async (): Promise<IosSimState> => {
       Object.values(
         images as Record<
           string,
-          {runtimeIdentifier: string; identifier: string; sizeBytes: number; deletable: boolean}
+          {
+            runtimeIdentifier: string;
+            identifier: string;
+            sizeBytes: number;
+            deletable: boolean;
+            lastUsedAt?: string;
+          }
         >
       ).find((i) => i.runtimeIdentifier === id);
     return {
@@ -90,6 +104,7 @@ const list = async (): Promise<IosSimState> => {
           name: r.name,
           sizeBytes: imageFor(r.identifier)?.sizeBytes ?? 0,
           deletable: imageFor(r.identifier)?.deletable ?? false,
+          lastUsedAt: imageFor(r.identifier)?.lastUsedAt,
           deviceNames: (r.supportedDeviceTypes ?? []).map((t) => t.name),
         })),
       devices: await Promise.all(
@@ -99,6 +114,8 @@ const list = async (): Promise<IosSimState> => {
           runtime: d.runtime,
           booted: d.state === 'Booted',
           sizeBytes: await dirBytes(path.dirname(d.dataPath)),
+          // CoreSimulator rewrites device.plist on every boot and shutdown.
+          lastUsedAt: lastWritten(path.join(path.dirname(d.dataPath), 'device.plist')),
         }))
       ),
     };

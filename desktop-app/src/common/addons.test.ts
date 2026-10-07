@@ -1,4 +1,15 @@
-import {matchesSite, parseSkill, partOn, Stack} from './addons';
+import {execFileSync} from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import {
+  matchesSite,
+  parseSkill,
+  partOn,
+  pythonEnvScript,
+  Stack,
+  suggestPythonBuild,
+} from './addons';
 
 describe('matchesSite', () => {
   it('matches hosts, ports and wildcards; never non-web pages', () => {
@@ -45,4 +56,31 @@ describe('parseSkill', () => {
       body: 'Never change files outside src/.',
     });
   });
+});
+
+describe('Python environments', () => {
+  it('suggests the install for what the project declares', () => {
+    expect(suggestPythonBuild({env: 'uv', file: 'requirements.txt'})).toBe(
+      'uv pip install -r requirements.txt'
+    );
+    expect(suggestPythonBuild({env: 'venv', file: 'pyproject.toml'})).toBe('pip install -e .');
+    expect(suggestPythonBuild({env: 'conda', file: 'environment.yml'})).toBe('python --version');
+  });
+
+  it('makes the environment once, then runs the command inside it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "py env '"));
+    const env = path.join(dir, 'env');
+    const script = pythonEnvScript({env: 'venv', file: 'requirements.txt'}, env, true);
+    const run = () =>
+      execFileSync('/bin/sh', ['-c', `${script}python -c 'import sys; print(sys.prefix)'`])
+        .toString()
+        .trim();
+    expect(fs.realpathSync(run())).toBe(fs.realpathSync(env));
+    expect(fs.realpathSync(run())).toBe(fs.realpathSync(env));
+    expect(pythonEnvScript({env: 'none', file: 'requirements.txt'}, env, true)).toBe('');
+    expect(pythonEnvScript({env: 'uv', file: 'requirements.txt'}, env, false)).not.toContain(
+      'uv venv'
+    );
+    fs.rmSync(dir, {recursive: true, force: true});
+  }, 60_000);
 });

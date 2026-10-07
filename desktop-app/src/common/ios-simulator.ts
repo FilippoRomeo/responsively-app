@@ -18,6 +18,8 @@ export interface IosSimRuntime {
   name: string;
   sizeBytes: number;
   deletable: boolean;
+  /** When a Simulator last used it (ISO), if macOS recorded it. */
+  lastUsedAt?: string;
   /** Simulator models this iOS version runs, by name (iPhone 13, …). */
   deviceNames: string[];
 }
@@ -28,6 +30,8 @@ export interface IosSimDevice {
   runtime: string;
   booted: boolean;
   sizeBytes: number;
+  /** Its last boot or shutdown (ISO). */
+  lastUsedAt?: string;
 }
 
 export interface IosSimState {

@@ -74,7 +74,19 @@ _Installing [compose3d](https://github.com/FilippoRomeo/compose3d) from its repo
 
 ![compose3d's editor inside the MacBook preview, with the cube selected and its move gizmo](docs/media/compose3d-editor.png)
 
-Agents get the same things through MCP: the add-on's tools (`list_addon_tools`, `call_addon_tool`), its rules (`get_rules`) and prompts (`get_prompts`), and `evaluate` to read and change the live page, here the three.js scene. Add-ons nobody used for six months are offered for deletion, data included.
+Agents get the same things through MCP: the add-on's tools (`list_addon_tools`, `call_addon_tool`), its rules (`get_rules`) and prompts (`get_prompts`), and `evaluate` to read and change the live page, here the three.js scene.
+
+### Python tools
+
+A Python project (a `requirements.txt`, `pyproject.toml` or `environment.yml`) gets its own environment: uv, conda or a plain venv, whichever this Mac has, or none. The environment lives in Responsively's folder, never in the project's, and the add-on's build, start command and MCP server all run inside it.
+
+![Installing a Python tool: an app panel and a start command, the environment choice (uv, conda, venv or none) with the versions found on this Mac, and the build command that runs inside it](docs/media/python-addon.png)
+
+## Storage
+
+**Settings › Storage** shows everything Responsively keeps on this Mac in one place: iOS versions, Simulators, add-ons, their Python environments and each Session's profile (cache, cookies, storage). Each item shows its size and when it was last used, and is removed with two clicks: Delete, Uninstall, or Reset for a Session profile, which goes to the Trash. Anything unused for six months is marked, and one button offers to clean it all up; you always confirm.
+
+![Settings › Storage: 9.5 GB in total, split into iOS versions, Simulators, add-ons, Python environments and Session profiles, each item with its size, last use and a Delete, Uninstall or Reset button](docs/media/storage.png)
 
 ## Supported build
 

@@ -42,6 +42,11 @@ module.exports = {
         'on-heart': 'var(--on-heart)',
         titlebar: 'var(--titlebar)',
         'titlebar-fg': 'var(--titlebar-fg)',
+        'chart-1': 'var(--chart-1)',
+        'chart-2': 'var(--chart-2)',
+        'chart-3': 'var(--chart-3)',
+        'chart-4': 'var(--chart-4)',
+        'chart-5': 'var(--chart-5)',
       },
       boxShadow: {
         elevated: 'var(--shadow)',

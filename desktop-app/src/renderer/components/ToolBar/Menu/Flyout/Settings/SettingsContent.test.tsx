@@ -67,9 +67,10 @@ describe('SettingsContentHeader', () => {
   it('Clear everything clears this window and counts down to what is left', async () => {
     const full = {cache: 48.2e6, cookies: 37, cookieBytes: 18e3, storage: 9.6e6, serviceWorkers: 0};
     const empty = {cache: 0, cookies: 0, cookieBytes: 0, storage: 4e3, serviceWorkers: 0};
-    vi.mocked(window.electron.ipcRenderer.invoke).mockImplementation(async (channel: string) =>
-      channel === IPC_MAIN_CHANNELS.WINDOW_DATA_CLEAR ? empty : full
-    );
+    vi.mocked(window.electron.ipcRenderer.invoke).mockImplementation(async (channel: string) => {
+      if (channel === IPC_MAIN_CHANNELS.WINDOW_DATA_CLEAR) return empty;
+      return channel === IPC_MAIN_CHANNELS.WINDOW_DATA_USAGE ? full : undefined;
+    });
     const {getByTestId} = renderComponent();
     const card = getByTestId('settings-window-data');
     await waitFor(() => expect(card).toHaveTextContent('57.8 MB'));

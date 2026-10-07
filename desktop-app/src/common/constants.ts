@@ -71,6 +71,7 @@ export const IPC_MAIN_CHANNELS = {
   IOS_SIMULATOR: 'ios-simulator',
   ADDONS: 'addons',
   ADDONS_LOG: 'addons-log',
+  SESSION_PROFILE_SIZES: 'session-profile-sizes',
   ADDONS_CHANGED: 'addons-changed',
   ADDONS_PAGE_SCRIPTS: 'addons-page-scripts',
   LOAD_URL_IN_WEBVIEW: 'load-url-in-webview',
