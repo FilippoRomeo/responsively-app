@@ -18,6 +18,7 @@ describe('ui slice', () => {
       appView: 'BROWSER',
       menuFlyout: false,
       isPresenting: false,
+      classicToolbar: false,
       announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
     });
   });

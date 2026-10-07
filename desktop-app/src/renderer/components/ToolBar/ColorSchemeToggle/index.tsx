@@ -2,13 +2,14 @@ import {Icon} from '@iconify/react';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {SetNativeThemeArgs, SetNativeThemeResult} from 'main/native-functions';
 import {useState} from 'react';
-import {ToolbarAction} from '../primitives';
+import {IconButton, ToolbarAction} from '../primitives';
 
-const ColorSchemeToggle = () => {
+const ColorSchemeToggle = ({iconOnly = false}: {iconOnly?: boolean}) => {
   const [isDarkColorScheme, setIsDarkColorScheme] = useState<boolean>(false);
+  const Button = iconOnly ? IconButton : ToolbarAction;
 
   return (
-    <ToolbarAction
+    <Button
       onClick={() => {
         window.electron.ipcRenderer.invoke<SetNativeThemeArgs, SetNativeThemeResult>(
           IPC_MAIN_CHANNELS.SET_NATIVE_THEME,
@@ -22,8 +23,8 @@ const ColorSchemeToggle = () => {
       title="Device theme color toggle"
     >
       <Icon icon={isDarkColorScheme ? 'carbon:moon' : 'carbon:sun'} fontSize={15} />
-      Scheme
-    </ToolbarAction>
+      {iconOnly ? null : 'Scheme'}
+    </Button>
   );
 };
 

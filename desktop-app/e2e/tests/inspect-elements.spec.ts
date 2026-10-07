@@ -16,7 +16,7 @@ test.describe('Inspect Elements', () => {
   test.afterEach(async ({app}) => {
     const inspectBtn = app.page.locator('button[title="Inspect Elements"]');
     if ((await inspectBtn.getAttribute('aria-pressed')) === 'true') {
-      await app.openSessionMenu();
+      await app.showTools();
       await inspectBtn.click();
       await app.page.waitForTimeout(200);
     }
@@ -25,7 +25,7 @@ test.describe('Inspect Elements', () => {
     await app.dismissModals();
 
     const inspectBtn = app.page.locator('button[title="Inspect Elements"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await expect(inspectBtn).toBeVisible();
   });
 
@@ -35,7 +35,7 @@ test.describe('Inspect Elements', () => {
     const inspectBtn = app.page.locator('button[title="Inspect Elements"]');
 
     // Click to enable inspect mode
-    await app.openSessionMenu();
+    await app.showTools();
     await inspectBtn.click();
     await app.page.waitForTimeout(300);
 
@@ -65,7 +65,7 @@ test.describe('Inspect Elements', () => {
     // Ensure inspect is currently active, then click to disable
     const wasActive = (await inspectBtn.getAttribute('aria-pressed')) === 'true';
 
-    await app.openSessionMenu();
+    await app.showTools();
     await inspectBtn.click();
     await app.page.waitForTimeout(300);
 
@@ -76,7 +76,7 @@ test.describe('Inspect Elements', () => {
 
     // Ensure inspect mode is off at the end
     if (isActive) {
-      await app.openSessionMenu();
+      await app.showTools();
       await inspectBtn.click();
       await app.page.waitForTimeout(300);
     }

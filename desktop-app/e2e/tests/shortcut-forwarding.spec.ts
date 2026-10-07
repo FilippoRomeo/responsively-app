@@ -69,7 +69,7 @@ test.describe('Shortcut forwarding from webviews', () => {
 
     // Rotation is global and workers are shared across spec files, so leaving
     // it on changes device dimensions for whatever runs next in this worker.
-    await app.openSessionMenu();
+    await app.showTools();
     await rotateBtn.click();
     await expect.poll(() => rotateBtn.getAttribute('aria-pressed'), {timeout: 10_000}).toBe(before);
   });

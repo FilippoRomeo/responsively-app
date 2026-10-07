@@ -30,6 +30,7 @@ const AudioMuteToggle = ({compact = false}: {compact?: boolean}) => {
       <button
         type="button"
         onClick={toggle}
+        data-testid="audio-mute"
         aria-pressed={muted}
         title={muted ? 'Muted — click to turn sound on' : 'Sound on — click to mute'}
         className="flex h-[30px] w-[26px] items-center justify-center rounded-[7px] text-muted hover:bg-hover hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
@@ -38,7 +39,12 @@ const AudioMuteToggle = ({compact = false}: {compact?: boolean}) => {
       </button>
     );
   return (
-    <ToolbarAction onClick={toggle} isActive={muted} title={muted ? 'Unmute sound' : 'Mute sound'}>
+    <ToolbarAction
+      onClick={toggle}
+      data-testid="audio-mute"
+      isActive={muted}
+      title={muted ? 'Unmute sound' : 'Mute sound'}
+    >
       <Icon icon={muted ? 'lucide:volume-x' : 'lucide:volume-2'} fontSize={15} />
       {muted ? 'Muted' : 'Sound'}
     </ToolbarAction>

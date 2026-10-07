@@ -56,7 +56,7 @@ test.describe('Screenshot Save', () => {
     const beforeFiles = getJpegs(screenshotDir);
 
     const screenshotBtn = app.page.locator('button[title="Screenshot All WebViews"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await screenshotBtn.click();
 
     // Wait for screenshots to appear AND finish writing (a file can exist,
@@ -110,7 +110,7 @@ test.describe('Screenshot Save', () => {
     }
 
     const screenshotBtn = app.page.locator('button[title="Screenshot All WebViews"]');
-    await app.openSessionMenu();
+    await app.showTools();
     await screenshotBtn.click();
 
     await expect.poll(() => getJpegs(screenshotDir).length, {timeout: 15_000}).toBeGreaterThan(0);

@@ -601,7 +601,7 @@ export const startSessionRuntime = async () => {
       if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
       const win = getWindow();
       if (!win || win.isDestroyed()) throw new Error('No Session window');
-      const button = 'document.querySelector(\'button[title$="ute sound"]\')';
+      const button = 'document.querySelector(\'[data-testid="audio-mute"]\')';
       if (req.operation === 'e2e-audio-toggle') {
         await win.webContents.executeJavaScript(`${button}?.click()`);
         return {clicked: true};

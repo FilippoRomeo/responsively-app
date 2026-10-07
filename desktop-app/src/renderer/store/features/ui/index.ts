@@ -24,6 +24,8 @@ export interface UIState {
   menuFlyout: boolean;
   /** Present mode: chrome hidden, canvas full-bleed (session state). */
   isPresenting: boolean;
+  /** Tools in the Session menu (the old toolbar) instead of the icon bar. */
+  classicToolbar: boolean;
   announcements: AnnouncementsState;
 }
 
@@ -34,6 +36,7 @@ const initialState: UIState = {
   appView: APP_VIEWS.BROWSER,
   menuFlyout: false,
   isPresenting: false,
+  classicToolbar: false,
   announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
 };
 
@@ -53,6 +56,9 @@ export const uiSlice = createSlice({
     setPresenting: (state, action: PayloadAction<boolean>) => {
       state.isPresenting = action.payload;
     },
+    setClassicToolbar: (state, action: PayloadAction<boolean>) => {
+      state.classicToolbar = action.payload;
+    },
     setWhatsNewSeen: (state, action: PayloadAction<string>) => {
       state.announcements.seenVersion = action.payload;
     },
@@ -71,6 +77,7 @@ export const {
   setAppView,
   closeMenuFlyout,
   setPresenting,
+  setClassicToolbar,
   setWhatsNewSeen,
   setSupportShownAt,
   hideSupportForever,
@@ -78,6 +85,7 @@ export const {
 
 export const selectDarkMode = (state: RootState) => state.ui.darkMode;
 export const selectAppView = (state: RootState) => state.ui.appView;
+export const selectClassicToolbar = (state: RootState) => state.ui.classicToolbar;
 export const selectMenuFlyout = (state: RootState) => state.ui.menuFlyout;
 export const selectIsPresenting = (state: RootState) => state.ui.isPresenting;
 export const selectAnnouncements = (state: RootState) => state.ui.announcements;

@@ -17,11 +17,11 @@ import {
   prepareFullPageCapture,
   useShutterSound,
 } from 'renderer/hooks/useScreenshot';
-import {APP_VIEWS, setAppView} from 'renderer/store/features/ui';
+import {APP_VIEWS, selectClassicToolbar, setAppView} from 'renderer/store/features/ui';
 import NavigationControls from './NavigationControls';
 import Menu from './Menu';
 import AddressBar from './AddressBar';
-import {IconButton, ToolbarAction} from './primitives';
+import {IconButton, ToolbarAction, ToolbarGroup} from './primitives';
 import ColorSchemeToggle from './ColorSchemeToggle';
 import AudioMuteToggle from './AudioMuteToggle';
 import ModalLoader from '../ModalLoader';
@@ -44,6 +44,7 @@ const ToolBar = ({
   const isInspecting = useSelector(selectIsInspecting);
   const isCapturingScreenshot = useSelector(selectIsCapturingScreenshot);
   const activeSuite = useSelector(selectActiveSuite);
+  const classic = useSelector(selectClassicToolbar);
   const dispatch = useDispatch();
   const playShutter = useShutterSound();
 
@@ -106,8 +107,42 @@ const ToolBar = ({
   useKeyboardShortcut(SHORTCUT_CHANNEL.SCREENSHOT_ALL, screenshotCaptureHandler);
   useKeyboardShortcut(SHORTCUT_CHANNEL.INSPECT_ELEMENTS, handleInspectShortcut);
 
+  // The icon bar shows the tools in the toolbar; the classic toolbar (Settings →
+  // Reset toolbar) keeps them, labelled, in the Session menu.
+  const Tool = classic ? ToolbarAction : IconButton;
+  const tools = (
+    <>
+      <Tool onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
+        <Icon
+          icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
+          fontSize={16}
+        />
+        {classic ? 'Rotate' : null}
+      </Tool>
+      <Tool
+        onClick={() => dispatch(setIsInspecting(!isInspecting))}
+        isActive={isInspecting}
+        title="Inspect Elements"
+      >
+        <Icon icon="lucide:inspect" fontSize={15} />
+        {classic ? 'Inspect' : null}
+      </Tool>
+      <Tool
+        onClick={screenshotCaptureHandler}
+        isActive={isCapturingScreenshot}
+        title="Screenshot All WebViews"
+      >
+        <Icon icon="lucide:camera" fontSize={15} />
+        {classic ? 'Capture' : null}
+      </Tool>
+      <ColorBlindnessControls iconOnly={!classic} />
+      <ColorSchemeToggle iconOnly={!classic} />
+      <AudioMuteToggle compact={!classic} />
+    </>
+  );
+
   return (
-    <div className="flex h-14 flex-shrink-0 items-center gap-3 border-b border-line-soft bg-panel px-[14px]">
+    <div className="relative flex h-14 flex-shrink-0 items-center gap-3 border-b border-line-soft bg-panel px-[14px]">
       <NavigationControls />
       {/* The floor keeps the address input usable no matter how crowded the
           row gets — without it the two flex-1 tracks absorb the whole deficit
@@ -130,40 +165,20 @@ const ToolBar = ({
             event.currentTarget.scrollLeft += event.deltaY;
         }}
       >
-        <AudioMuteToggle compact />
+        {classic ? (
+          <AudioMuteToggle compact />
+        ) : (
+          <div data-testid="toolbar-tools" className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+              All devices
+            </span>
+            <ToolbarGroup>{tools}</ToolbarGroup>
+          </div>
+        )}
         <SessionsButton
           showRequest={sessionsRequest}
           onShown={onSessionsShown}
-          tools={
-            <>
-              <ToolbarAction onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
-                <Icon
-                  icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
-                  fontSize={16}
-                />
-                Rotate
-              </ToolbarAction>
-              <ToolbarAction
-                onClick={() => dispatch(setIsInspecting(!isInspecting))}
-                isActive={isInspecting}
-                title="Inspect Elements"
-              >
-                <Icon icon="lucide:inspect" fontSize={15} />
-                Inspect
-              </ToolbarAction>
-              <ToolbarAction
-                onClick={screenshotCaptureHandler}
-                isActive={isCapturingScreenshot}
-                title="Screenshot All WebViews"
-              >
-                <Icon icon="lucide:camera" fontSize={15} />
-                Capture
-              </ToolbarAction>
-              <ColorBlindnessControls />
-              <ColorSchemeToggle />
-              <AudioMuteToggle />
-            </>
-          }
+          tools={classic ? tools : undefined}
         />
         <McpPanel />
         <PreviewSuiteSelector />

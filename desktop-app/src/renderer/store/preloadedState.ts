@@ -47,6 +47,7 @@ export const buildPreloadedState = () => {
       appView: 'BROWSER' as const,
       menuFlyout: false,
       isPresenting: false,
+      classicToolbar: Boolean(store.get('ui.classicToolbar')),
       announcements: {
         seenVersion: (store.get('ui.announcements.seenVersion') as string | undefined) ?? null,
         supportShownAt:
