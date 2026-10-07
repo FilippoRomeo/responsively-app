@@ -45,61 +45,70 @@ async function captureWebviewCenterPixel(electronApp: ElectronApplication) {
   });
 }
 
+/** prefers-color-scheme: dark, as each preview's page sees it. */
+const darkInPreviews = (app: {page: import('@playwright/test').Page}) =>
+  app.page.evaluate(() =>
+    Promise.all(
+      Array.from(document.querySelectorAll('webview')).map((w) =>
+        (w as any).executeJavaScript("matchMedia('(prefers-color-scheme: dark)').matches")
+      )
+    )
+  ) as Promise<boolean[]>;
+
+const setForAllDevices = async (
+  app: {page: import('@playwright/test').Page},
+  label: 'Site default' | 'Light' | 'Dark'
+) => {
+  await app.page.getByTestId('appearance-button').click();
+  await app.page
+    .getByRole('radiogroup', {name: 'Previews colour scheme'})
+    .getByRole('radio', {name: label})
+    .click();
+  await app.page.keyboard.press('Escape');
+};
+
 test.describe('Device Color Scheme', () => {
-  test('color scheme toggle button is visible in toolbar', async ({app}) => {
+  test('Appearance › Previews sets dark or light on every device', async ({app}) => {
     await app.dismissModals();
+    await setForAllDevices(app, 'Dark');
+    await expect.poll(() => darkInPreviews(app)).toEqual(expect.arrayContaining([true]));
+    expect((await darkInPreviews(app)).every(Boolean)).toBe(true);
 
-    const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
-    await app.showTools();
-    await expect(colorSchemeBtn).toBeVisible();
+    await setForAllDevices(app, 'Light');
+    await expect.poll(async () => (await darkInPreviews(app)).some(Boolean)).toBe(false);
+    await setForAllDevices(app, 'Site default');
   });
 
-  test('clicking toggle changes the device theme', async ({app}) => {
+  test("a device's own scheme overrides the all-devices one for that device only", async ({
+    app,
+  }) => {
     await app.dismissModals();
+    await setForAllDevices(app, 'Light');
+    await expect.poll(async () => (await darkInPreviews(app)).some(Boolean)).toBe(false);
 
-    const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
-    await app.showTools();
-    await colorSchemeBtn.click();
-    await app.page.waitForTimeout(300);
+    const own = app.page
+      .locator('[data-testid="device-pill"]:visible')
+      .first()
+      .locator('button[title^="Colour scheme"]');
+    await own.click(); // dark, this device only
+    await expect
+      .poll(async () => {
+        const [first, ...others] = await darkInPreviews(app);
+        return first && !others.some(Boolean);
+      })
+      .toBe(true);
+    await own.click(); // light
+    await expect.poll(async () => (await darkInPreviews(app))[0]).toBe(false);
+    await own.click(); // back to the all-devices setting
+    await expect(own).toHaveAttribute('aria-pressed', 'false');
 
-    await app.showTools();
-    await expect(colorSchemeBtn).toBeVisible();
-  });
-
-  test('clicking toggle again reverts the device theme', async ({app}) => {
-    await app.dismissModals();
-
-    const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
-    await app.showTools();
-    await colorSchemeBtn.click();
-    await app.page.waitForTimeout(300);
-
-    await app.showTools();
-    await expect(colorSchemeBtn).toBeVisible();
-  });
-
-  test('toggle button sets nativeTheme to dark', async ({app}) => {
-    await app.dismissModals();
-
-    const colorSchemeBtn = app.page.locator('button[title="Device theme color toggle"]');
-    await app.showTools();
-    await colorSchemeBtn.click();
-    await app.page.waitForTimeout(5000);
-
-    const shouldUseDark: boolean = await app.electronApp.evaluate(
-      async ({nativeTheme}) => nativeTheme.shouldUseDarkColors
-    );
-    expect(shouldUseDark).toBe(true);
-
-    // Toggle back
-    await app.showTools();
-    await colorSchemeBtn.click();
-    await app.page.waitForTimeout(300);
-
-    const shouldUseDarkAfter: boolean = await app.electronApp.evaluate(
-      async ({nativeTheme}) => nativeTheme.shouldUseDarkColors
-    );
-    expect(shouldUseDarkAfter).toBe(false);
+    // "All devices" replaces any device's own choice.
+    await own.click();
+    await expect.poll(async () => (await darkInPreviews(app))[0]).toBe(true);
+    await setForAllDevices(app, 'Light');
+    await expect.poll(async () => (await darkInPreviews(app)).some(Boolean)).toBe(false);
+    await expect(own).toHaveAttribute('aria-pressed', 'false');
+    await setForAllDevices(app, 'Site default');
   });
 
   test('dark color scheme changes webview background color', async ({app, testServerUrl}) => {

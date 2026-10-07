@@ -275,7 +275,7 @@ test.describe('Device Interaction Mirroring', () => {
       await expect.poll(minGuestScrollY, {timeout: 10_000}).toBeGreaterThan(0);
 
       // Click "Scroll to top" button
-      await app.revealDevicePill();
+      await app.openDeviceMore();
       const scrollToTopBtn = app.scrollToTopButtons.first();
       await scrollToTopBtn.click();
 
@@ -284,13 +284,14 @@ test.describe('Device Interaction Mirroring', () => {
       await expect.poll(minGuestScrollY, {timeout: 10_000}).toBe(0);
     });
 
-    test('per-device refresh button exists for each device', async ({app}) => {
+    test('every device has its own ⋯ menu with Refresh', async ({app}) => {
       await app.dismissModals();
 
       const webviewCount = await app.webviews.count();
-      const refreshBtnCount = await app.perDeviceRefreshButtons.count();
-
-      expect(refreshBtnCount).toBe(webviewCount);
+      expect(await app.moreDeviceToolsButtons.count()).toBe(webviewCount);
+      await app.openDeviceMore();
+      await expect(app.perDeviceRefreshButtons).toHaveCount(1);
+      await app.page.keyboard.press('Escape');
     });
   });
 });

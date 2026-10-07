@@ -46,6 +46,7 @@ const testOrder = [
   'reload-shortcuts.spec.ts',
   'address-bar-features.spec.ts',
   'device-toolbar.spec.ts',
+  'device-tools.spec.ts',
   'zoom-controls.spec.ts',
   'ui-theme.spec.ts',
   'settings.spec.ts',

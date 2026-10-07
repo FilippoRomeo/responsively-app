@@ -5,6 +5,7 @@ import reducer, {
   hideSupportForever,
   setAppView,
   setDarkMode,
+  setPalette,
   setPresenting,
   setSupportShownAt,
   setWhatsNewSeen,
@@ -19,8 +20,13 @@ describe('ui slice', () => {
       menuFlyout: false,
       isPresenting: false,
       classicToolbar: false,
+      palette: 'graphite',
       announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
     });
+  });
+
+  it('setPalette updates state', () => {
+    expect(reducer(undefined, setPalette('stone')).palette).toBe('stone');
   });
 
   it('setDarkMode updates state', () => {

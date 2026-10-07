@@ -1,25 +1,25 @@
 import {test, expect} from '../fixtures/electron-app';
 
 test.describe('Preview Suites', () => {
-  test('the active suite chip is marked as pressed', async ({app}) => {
+  test('the Devices menu marks the active suite', async ({app}) => {
     await app.dismissModals();
+    await app.openSuiteSelector();
 
-    const chips = app.page.locator('[data-testid="suite-selector"] button[aria-pressed]');
+    const chips = app.page.locator('[data-testid^="suite-chip-"]');
     await expect(chips.first()).toBeVisible();
-
     // Exactly one suite is active at a time.
-    const pressed = app.page.locator('[data-testid="suite-selector"] button[aria-pressed="true"]');
-    await expect(pressed).toHaveCount(1);
+    await expect(app.page.locator('[data-testid^="suite-chip-"][aria-pressed="true"]')).toHaveCount(
+      1
+    );
+    await app.page.keyboard.press('Escape');
   });
 
-  test('the suite chip shows how many devices the suite holds', async ({app}) => {
+  test('the Devices button shows how many devices the suite holds', async ({app}) => {
     await app.dismissModals();
 
-    const activeChip = app.page.locator(
-      '[data-testid="suite-selector"] button[aria-pressed="true"]'
-    );
-    const chipCount = parseInt((await activeChip.innerText()).replace(/\D/g, ''), 10);
-    expect(chipCount).toBe(await app.webviews.count());
+    const label = await app.page.getByTestId('devices-button').innerText();
+    const count = parseInt(label.replace(/\D/g, ''), 10);
+    expect(count).toBe(await app.webviews.count());
   });
 
   test('the suite editor toggles a device in and out of the active suite', async ({app}) => {

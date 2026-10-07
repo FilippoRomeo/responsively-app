@@ -6,7 +6,7 @@ import {
   ToggleInspectorArgs,
   ToggleInspectorResult,
 } from 'main/devtools';
-import {RefObject, useCallback, useEffect} from 'react';
+import {RefObject, useCallback, useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {
   selectDevtoolsWebviewId,
@@ -33,6 +33,8 @@ const useDevtoolsBridge = ({ref, webviewReady, zoomfactor}: Params) => {
   const isDevtoolsOpen = useSelector(selectIsDevtoolsOpen);
   const devtoolsOpenForWebviewId = useSelector(selectDevtoolsWebviewId);
   const dockPosition = useSelector(selectDockPosition);
+  // Point-to-inspect on this device only (the toolbar's Inspect covers all).
+  const [inspectingHere, setInspectingHere] = useState(false);
 
   const openDevTools = useCallback(async () => {
     if (!ref.current) {
@@ -91,6 +93,7 @@ const useDevtoolsBridge = ({ref, webviewReady, zoomfactor}: Params) => {
         return;
       }
       dispatch(setIsInspecting(false));
+      setInspectingHere(false);
       const {
         coords: {x: deviceX, y: deviceY},
       } = args;
@@ -123,10 +126,24 @@ const useDevtoolsBridge = ({ref, webviewReady, zoomfactor}: Params) => {
           webviewId: webview.getWebContentsId(),
         }
       );
+      setInspectingHere(isInspecting);
     })();
   }, [ref, isInspecting, webviewReady]);
 
-  return {openDevTools, inspectElement};
+  const toggleInspectHere = useCallback(async () => {
+    const webview = ref.current;
+    if (!webview || !webviewReady) return;
+    const next = !inspectingHere;
+    await window.electron.ipcRenderer.invoke<ToggleInspectorArgs, ToggleInspectorResult>(
+      next
+        ? IPC_MAIN_CHANNELS.ENABLE_INSPECTOR_OVERLAY
+        : IPC_MAIN_CHANNELS.DISABLE_INSPECTOR_OVERLAY,
+      {webviewId: webview.getWebContentsId()}
+    );
+    setInspectingHere(next);
+  }, [ref, webviewReady, inspectingHere]);
+
+  return {openDevTools, inspectElement, inspectingHere, toggleInspectHere};
 };
 
 export default useDevtoolsBridge;

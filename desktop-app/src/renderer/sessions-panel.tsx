@@ -10,6 +10,7 @@ declare global {
     sessionsPanel: {
       context: () => {
         darkMode: boolean;
+        palette?: string;
         create: boolean;
         error: string;
         attention?: string;
@@ -24,6 +25,7 @@ declare global {
           error: string;
           attention?: string;
           darkMode: boolean;
+          palette?: string;
         }) => void
       ) => () => void;
     };
@@ -31,11 +33,12 @@ declare global {
 }
 
 const context = window.sessionsPanel.context();
-const applyTheme = (darkMode: boolean) => {
+const applyTheme = (darkMode: boolean, palette?: string) => {
   document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+  if (palette) document.documentElement.dataset.palette = palette;
   document.documentElement.classList.toggle('dark', darkMode);
 };
-applyTheme(context.darkMode);
+applyTheme(context.darkMode, context.palette);
 document.body.classList.add('bg-panel', 'text-fg');
 const root = createRoot(document.getElementById('root')!);
 /** Cmd+T / Cmd+N: the New Session form fills the window where the Session will open. */
@@ -59,7 +62,7 @@ const Panel = () => {
   useEffect(
     () =>
       window.sessionsPanel.onShow((value) => {
-        applyTheme(value.darkMode);
+        applyTheme(value.darkMode, value.palette);
         setShowRequest({create: value.create, error: value.error, attention: value.attention});
       }),
     []

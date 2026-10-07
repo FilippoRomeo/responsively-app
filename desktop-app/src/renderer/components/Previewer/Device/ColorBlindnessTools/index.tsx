@@ -21,9 +21,11 @@ interface InjectedCss {
 interface Props {
   getWebview: () => Electron.WebviewTag | null;
   onSimulationChange?: (name: string | undefined) => void;
+  /** Still applies the toolbar's Simulate (all devices) to this one, without its own menu. */
+  hideTrigger?: boolean;
 }
 
-export const ColorBlindnessTools = ({getWebview, onSimulationChange}: Props) => {
+export const ColorBlindnessTools = ({getWebview, onSimulationChange, hideTrigger}: Props) => {
   const [injectCss, setInjectCssState] = useState<InjectedCss>();
   const setInjectCss = useCallback(
     (next: InjectedCss | undefined) => {
@@ -232,5 +234,6 @@ export const ColorBlindnessTools = ({getWebview, onSimulationChange}: Props) => 
     };
   }, [applySimulation]);
 
+  if (hideTrigger) return null;
   return <VisionSimulationDropDown simulationName={injectCss?.name} onChange={applySimulation} />;
 };

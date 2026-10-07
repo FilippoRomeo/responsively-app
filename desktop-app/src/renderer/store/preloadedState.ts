@@ -3,6 +3,7 @@ import {Device, getDevicesMap} from 'common/deviceList';
 import {DEFAULT_SUITE, PreviewSuites} from './features/device-manager';
 import {sanitizeSuites} from './features/device-manager/utils';
 import {zoomSteps} from './features/renderer';
+import {PALETTES} from './features/ui';
 
 const urlFromQueryParam = (): string | undefined => {
   const params = new URLSearchParams(window.location.search);
@@ -48,6 +49,7 @@ export const buildPreloadedState = () => {
       menuFlyout: false,
       isPresenting: false,
       classicToolbar: Boolean(store.get('ui.classicToolbar')),
+      palette: PALETTES.find((p) => p === store.get('ui.palette')) ?? 'graphite',
       announcements: {
         seenVersion: (store.get('ui.announcements.seenVersion') as string | undefined) ?? null,
         supportShownAt:

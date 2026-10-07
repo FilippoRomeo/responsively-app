@@ -86,7 +86,7 @@ test.describe('Inspect Elements', () => {
     await app.dismissModals();
 
     const openDevtoolsBtn = app.page.locator('button[title="Open devtools"]').first();
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await openDevtoolsBtn.click();
     await app.page.waitForTimeout(1000);
 
@@ -110,7 +110,7 @@ test.describe('Inspect Elements', () => {
     await app.dismissModals();
 
     const openDevtoolsBtn = app.page.locator('button[title="Open devtools"]').first();
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await openDevtoolsBtn.click();
     await app.page.waitForTimeout(1000);
 
@@ -144,7 +144,7 @@ test.describe('Inspect Elements', () => {
     await app.page.locator('[data-testid="layout-FLEX"]').click();
 
     const openDevtoolsBtn = app.page.locator('button[title="Open devtools"]').first();
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await openDevtoolsBtn.click();
     await app.page.waitForTimeout(1000);
 
@@ -186,7 +186,7 @@ test.describe('Inspect Elements', () => {
     await app.dismissModals();
 
     const openDevtoolsBtn = app.page.locator('button[title="Open devtools"]').first();
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await openDevtoolsBtn.click();
     await app.page.waitForTimeout(1000);
 
@@ -205,7 +205,7 @@ test.describe('Inspect Elements', () => {
     await app.dismissModals();
 
     const openDevtoolsBtn = app.page.locator('button[title="Open devtools"]').first();
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await openDevtoolsBtn.click();
     await app.page.waitForTimeout(1000);
 

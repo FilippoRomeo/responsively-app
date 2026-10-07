@@ -80,6 +80,17 @@ const SiteToolsPopover = ({address, actions, onShowPermissions}: Props) => {
             />
           ))}
           <div className="mx-1 my-[6px] border-t border-line-soft" />
+          <SectionCaption className="px-[10px] pb-1 pt-2">All sites</SectionCaption>
+          <MenuRow
+            title="Clear browsing history"
+            onClick={() => {
+              close();
+              window.electron.store.set('history', []);
+            }}
+            leading={<Icon icon="carbon:trash-can" className="text-muted" fontSize={16} />}
+            label="Clear browsing history"
+          />
+          <div className="mx-1 my-[6px] border-t border-line-soft" />
           <div
             data-testid="ssl-toggle-row"
             className="flex items-center justify-between px-[10px] py-2"

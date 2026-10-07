@@ -34,6 +34,7 @@ import {
   hideSupportForever,
   setClassicToolbar,
   setDarkMode,
+  setPalette,
   setSupportShownAt,
   setWhatsNewSeen,
 } from './features/ui';
@@ -52,6 +53,13 @@ startListening({
   actionCreator: setDarkMode,
   effect: (action) => {
     window.electron.store.set('ui.darkMode', action.payload);
+  },
+});
+
+startListening({
+  actionCreator: setPalette,
+  effect: (action) => {
+    window.electron.store.set('ui.palette', action.payload);
   },
 });
 

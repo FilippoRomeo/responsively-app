@@ -14,11 +14,18 @@ contextBridge.exposeInMainWorld('sessionsPanel', {
       error: string;
       attention?: string;
       darkMode: boolean;
+      palette?: string;
     }) => void
   ) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      value: {create: boolean; error: string; attention?: string; darkMode: boolean}
+      value: {
+        create: boolean;
+        error: string;
+        attention?: string;
+        darkMode: boolean;
+        palette?: string;
+      }
     ) => callback(value);
     ipcRenderer.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_SHOW, listener);
     return () => ipcRenderer.removeListener(IPC_MAIN_CHANNELS.SESSIONS_PANEL_SHOW, listener);

@@ -98,8 +98,10 @@ export class ResponsivelyApp {
     return this.page.locator('[data-testid="device-manager-sheet"]');
   }
 
+  /** Devices ▾ › Manage suites & devices (the classic toolbar also has its + button). */
   async openDeviceManager() {
-    await this.page.locator('button[title="Device Manager"]').click();
+    await this.openSuiteSelector();
+    await this.page.getByRole('button', {name: 'Manage suites & devices'}).click();
     await this.deviceManagerSheet.waitFor({state: 'visible', timeout: 10_000});
   }
 
@@ -124,10 +126,20 @@ export class ResponsivelyApp {
     await this.page.waitForTimeout(1000);
   }
 
-  /** Opens the suite editor popover (the dashed + button beside the chips). */
+  /** Opens the Devices ▾ menu: suites, the active suite's devices, the Device Manager. */
   async openSuiteSelector() {
-    await this.page.locator('button[title="Edit suite"]').click();
+    await this.page.getByTestId('devices-button').click();
     await this.page.waitForTimeout(300);
+  }
+
+  /** Opens a device's ⋯ menu (refresh, devtools, rulers, overlay…). */
+  async openDeviceMore(index = 0) {
+    await this.page
+      .locator('[data-testid="device-pill"]:visible')
+      .nth(index)
+      .locator('button[title="More device tools"]')
+      .click();
+    await this.page.waitForTimeout(200);
   }
 
   /** Clear the hijacked alert log and return any messages captured so far. */
@@ -175,8 +187,14 @@ export class ResponsivelyApp {
     await menu.waitFor({state: 'visible'});
   }
 
-  /** The Sessions manager, behind "Manage Sessions…" in the Session-name menu. */
+  /** The Sessions manager: ⋮ › Manage Sessions… (classic toolbar: the Session-name menu). */
   async openManageSessions() {
+    if (await this.page.getByTestId('toolbar-tools').isVisible()) {
+      await this.openMenuFlyout();
+      await this.page.getByText('Manage Sessions…').click();
+      await this.page.getByTestId('sessions-dialog').waitFor({state: 'visible'});
+      return;
+    }
     await this.openSessionMenu();
     await this.page.getByTestId('session-menu').locator('button[title="Manage Sessions"]').click();
   }

@@ -7,7 +7,7 @@ test.describe('Menu Flyout', () => {
     await app.openMenuFlyout();
 
     await expect(app.page.getByText('Dock devtools')).toBeVisible();
-    await expect(app.page.getByText('Devices & suites')).toBeVisible();
+    await expect(app.page.getByText('Manage Sessions…')).toBeVisible();
   });
 
   test('clicking outside the flyout closes it', async ({app}) => {
@@ -33,13 +33,14 @@ test.describe('Menu Flyout', () => {
     await app.closeMenuFlyout();
   });
 
-  test('clear browsing history empties the stored history', async ({app}) => {
+  test('Site menu › Clear browsing history empties the stored history', async ({app}) => {
     await app.dismissModals();
     await app.page.evaluate(() => {
       (window as any).electron.store.set('history', [{url: 'https://example.com'}]);
     });
 
-    await app.openMenuFlyout();
+    // It clears every site's history, so it sits under "All sites" in the Site menu.
+    await app.page.locator('button[title="Site tools"]').click();
     await app.page.getByText('Clear browsing history').click();
 
     const history = await app.page.evaluate(() => (window as any).electron.store.get('history'));
