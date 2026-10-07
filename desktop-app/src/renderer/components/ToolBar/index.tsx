@@ -30,6 +30,7 @@ import useKeyboardShortcut, {
   SHORTCUT_CHANNEL,
 } from '../KeyboardShortcutsManager/useKeyboardShortcut';
 import McpPanel from './McpPanel';
+import {AddonsButton} from '../Addons';
 import {SessionsButton, SessionsShowRequest} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
 
@@ -180,6 +181,7 @@ const ToolBar = ({
           onShown={onSessionsShown}
           tools={classic ? tools : undefined}
         />
+        <AddonsButton />
         <McpPanel />
         <PreviewSuiteSelector />
         <IconButton
