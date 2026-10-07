@@ -45,6 +45,16 @@ export interface RuntimeReply extends SessionRuntime {
   devices: string[];
 }
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** A runtime has this long to start quitting (close its port) after accepting Stop. */
+export const STOP_QUIT_MS = 15_000;
+/** ...and this long to exit: Chromium's shutdown waits on its other processes. */
+export const STOP_EXIT_MS = 60_000;
+/** Refused means the runtime closed its endpoint (it does so in will-quit), not that it hangs. */
+const portClosed = (lease: Endpoint) =>
+  call(lease, {operation: 'status'}, 1000).then(
+    () => false,
+    (e) => (e as NodeJS.ErrnoException).code === 'ECONNREFUSED'
+  );
 /** One line per lifecycle action, so what happened to a Session can be read back later. */
 const audit = (
   operation: string,
@@ -146,9 +156,9 @@ export const startShellOwner = async (
     event.preventDefault();
     if (stopping) return;
     stopping = true;
-    // ponytail: 30s cap only guards a hung controller; its own stop is bounded (~20s).
+    // The cap only guards a hung controller: its own stop is bounded by STOP_EXIT_MS.
     void (async () => {
-      const result = await stopAllSessions(sessionRequest, runningIds, 30_000);
+      const result = await stopAllSessions(sessionRequest, runningIds, STOP_EXIT_MS + 15_000);
       const {blocked} = result;
       for (const id of result.active) active.add(id);
       stopping = false;
@@ -463,8 +473,13 @@ export class SessionManager {
     this.pending.set(id, 'stopping');
     try {
       await this.control(id, 'stop');
-      const deadline = Date.now() + 15_000;
-      while (Date.now() < deadline) {
+      const lease = this.readLease(id);
+      const started = Date.now();
+      // The runtime closes its port when it starts quitting, then exits once
+      // Chromium has shut down, which under load takes seconds. Only a runtime
+      // that never starts quitting, or never finishes, is a failed stop.
+      let quitting = false;
+      while (Date.now() - started < STOP_EXIT_MS) {
         await pause(100);
         await this.inspect(id);
         if (!this.readLease(id)) {
@@ -473,6 +488,9 @@ export class SessionManager {
           this.registry.update(id, {lastStop: {by: source, at: new Date().toISOString()}});
           return this.inspect(id);
         }
+        if (!quitting && lease) quitting = await portClosed(lease);
+        if (!quitting && Date.now() - started > STOP_QUIT_MS)
+          throw new Error('Session did not start stopping; its data has been preserved');
       }
       throw new Error('Session did not stop; its data has been preserved');
     } finally {

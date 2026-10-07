@@ -1,4 +1,5 @@
 import {test, expect} from '../fixtures/electron-app';
+import {expectStopped} from '../fixtures/session-processes';
 import {ElectronApplication} from '@playwright/test';
 import {SessionInfo, SessionRequest} from '../../src/common/sessions';
 import fs from 'fs';
@@ -47,7 +48,7 @@ test('native Sessions menu and human lifecycle share persistent identity', async
   mainWindow,
   electronApp,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(200_000);
   await app.dismissModals();
   const menu = await electronApp.evaluate(({Menu}) =>
     Menu.getApplicationMenu()?.items.map((m) => m.label)
@@ -98,9 +99,12 @@ test('native Sessions menu and human lifecycle share persistent identity', async
     await row.getByRole('button', {name: 'Focus', exact: true}).click();
     await expect(row.getByRole('button', {name: 'Stop', exact: true})).toBeEnabled();
     await row.getByRole('button', {name: 'Stop', exact: true}).click();
-    await expect
-      .poll(async () => ((await request({operation: 'get', id})) as SessionInfo).status)
-      .toBe('stopped');
+    const stoppedId = id;
+    await expectStopped(
+      async () => ((await request({operation: 'get', id: stoppedId})) as SessionInfo).status,
+      await electronApp.evaluate(() => process.env.RESPONSIVELY_SESSIONS_ROOT!),
+      stoppedId
+    );
     await expect(row.getByRole('button', {name: 'Delete', exact: true})).toBeEnabled();
     await row.getByRole('button', {name: 'Delete', exact: true}).click();
     // Cancel really preserves the definition and all data.

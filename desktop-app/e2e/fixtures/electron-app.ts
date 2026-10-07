@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {ResponsivelyApp} from '../models/app';
+import {closeApp} from './session-processes';
 
 type ElectronFixtures = {
   electronApp: ElectronApplication;
@@ -69,12 +70,8 @@ export const test = base.extend<{}, ElectronFixtures>({
 
       await use(electronApp);
 
-      const timeout = (ms: number) =>
-        new Promise((_resolve, reject) => setTimeout(() => reject(new Error('timeout')), ms));
-      await Promise.race([electronApp.evaluate(({app}) => app.quit()), timeout(5000)]).catch(
-        () => {}
-      );
-      await Promise.race([electronApp.close(), timeout(5000)]).catch(() => {});
+      // Bounded, and nothing of this test's Sessions is left running.
+      await closeApp(electronApp, env.RESPONSIVELY_SESSIONS_ROOT);
       try {
         fs.rmSync(userDataDir, {recursive: true, force: true});
       } catch {

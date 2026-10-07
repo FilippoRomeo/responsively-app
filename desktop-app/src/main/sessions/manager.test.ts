@@ -4,7 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 vi.mock('electron', () => ({app: {getPath: () => os.tmpdir()}, shell: {trashItem: vi.fn()}}));
-import {SessionManager, runtimeFile} from './service';
+import {spawn} from 'child_process';
+import {SessionManager, STOP_QUIT_MS, runtimeFile} from './service';
+import {serve} from '../../common/session-rpc';
 import {atomicWrite} from './registry';
 import {SessionInfo} from '../../common/sessions';
 import {shell} from 'electron';
@@ -83,6 +85,78 @@ describe('SessionManager safety', () => {
     expect(hung.status).toBe('error');
     expect(hung.error).toMatch(/not responding/);
   });
+  /**
+   * A fake runtime: a real endpoint and a real process. On Stop it closes its
+   * endpoint (as will-quit does) and its process exits `exitAfterMs` later;
+   * `quits: false` ignores Stop.
+   */
+  const fakeRuntime = async (m: SessionManager, id: string, quits: boolean, exitAfterMs = 0) => {
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio: 'ignore'});
+    const lease = {
+      id,
+      pid: child.pid!,
+      token: 'fake-runtime',
+      userDataDir: m.registry.dataDir(id),
+      mcpPort: null,
+      browserSyncPort: 20002,
+      startedAt: new Date().toISOString(),
+    };
+    const {server, endpoint} = await serve(lease.token, async (body) => {
+      if ((body as {operation: string}).operation === 'stop' && quits)
+        setTimeout(() => {
+          server.close();
+          server.closeIdleConnections();
+          setTimeout(() => child.kill('SIGKILL'), exitAfterMs);
+        }, 50);
+      return {...lease, ready: true, devices: []};
+    });
+    atomicWrite(runtimeFile(id), {...lease, ...endpoint});
+    return {child, server};
+  };
+
+  it('waits for a runtime that is quitting slowly and reports it stopping, not hung', async () => {
+    const m = new SessionManager();
+    const s = (await m.request({operation: 'create', name: 'Slow', open: false})) as SessionInfo;
+    const {child} = await fakeRuntime(m, s.id, true, 2500);
+    const statuses = new Set<string>();
+    const watch = setInterval(() => {
+      m.inspect(s.id)
+        .then((info) => statuses.add(info.status))
+        .catch(() => {});
+    }, 200);
+    try {
+      const stopped = (await m.request({operation: 'stop', id: s.id})) as SessionInfo;
+      expect(stopped.status).toBe('stopped');
+      expect(stopped.lastStop?.by).toBe('user');
+    } finally {
+      clearInterval(watch);
+      child.kill('SIGKILL');
+    }
+    expect(statuses.has('stopping')).toBe(true);
+    expect(statuses.has('error')).toBe(false);
+  }, 15_000);
+
+  it(
+    'fails a stop when the runtime never starts quitting; it is still reported running',
+    async () => {
+      const m = new SessionManager();
+      const s = (await m.request({operation: 'create', name: 'Stuck', open: false})) as SessionInfo;
+      const {child, server} = await fakeRuntime(m, s.id, false);
+      try {
+        await expect(m.request({operation: 'stop', id: s.id})).rejects.toThrow(
+          /did not start stopping/
+        );
+        // Still answering, so it is running, not hung; its data is untouched.
+        expect((await m.inspect(s.id)).status).toBe('running');
+        expect(fs.existsSync(runtimeFile(s.id))).toBe(true);
+      } finally {
+        server.close();
+        child.kill('SIGKILL');
+      }
+    },
+    STOP_QUIT_MS + 10_000
+  );
+
   it('resets data only for a stopped Session, moving its profile to Trash and keeping it', async () => {
     vi.mocked(shell.trashItem).mockClear();
     const m = new SessionManager();

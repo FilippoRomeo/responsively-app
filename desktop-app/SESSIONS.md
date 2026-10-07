@@ -2,11 +2,11 @@
 
 Use **Sessions → New Session…** or the toolbar's **Sessions** button. A Session is a saved project context with an immutable UUID, a name, its own browser data and device suites. Names must be unique. Ports and processes are temporary resources, not identities.
 
-In a Session window the toolbar button shows that Session's name, and ⌘⇧M (Manage) and ⌘⇧N (New) open the same toolbar manager; there is no separate floating panel there. The floating panel under the menu-bar icon belongs to the shell, and it stops refreshing while it is hidden.
+In a Session window its tab shows that Session's name; ⋮ › Manage Sessions… and ⌘⇧M (Manage) open the Sessions manager there, and ⌘⇧N (New) opens the New Session form; there is no separate floating panel there. (With the classic toolbar, Settings › Reset toolbar, a toolbar button shows the name and holds the manager.) The floating panel under the menu-bar icon belongs to the shell, and it stops refreshing while it is hidden.
 
 - **Open** starts a stopped Session; opening a running Session focuses it.
 - **Focus** brings a running Session's window to the front.
-- **Stop** quits that Session's process and preserves its data.
+- **Stop** quits that Session's process and preserves its data. The runtime closes its endpoint as it starts quitting, then exits once Chromium has shut down, which on a busy machine takes seconds: the Session shows "stopping" until it exits. A runtime that does not start quitting within 15 s, or has not exited 60 s after Stop, is a failed stop ("not responding"; Force quit is offered). Quit waits for that before it reports a Session that would not stop.
 - **Close Window** (⌘W or the red button) stops that Session through the controller, so it ends as "stopped" with its data kept.
 - **⌘Q in a Session window** first shows "Press ⌘Q again to quit Responsively"; a second ⌘Q within 2.5 s quits the whole app (every Session stops and the active ones reopen at the next launch). Without a running shell, as for an agent-only Session, it stops just that Session.
 - **Reset** is available only when stopped and requires confirmation. Its profile moves to the OS Trash; its name and starting URL are kept, and the next Open starts fresh.

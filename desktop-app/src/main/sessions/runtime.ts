@@ -606,15 +606,25 @@ export const startSessionRuntime = async () => {
         'e2e-window',
         'e2e-close-window',
         'e2e-mcp-hard-reset',
+        'e2e-slow-quit',
       ]),
       name: sessionName.optional(),
       muted: z.boolean().optional(),
       enabled: z.boolean().optional(),
       bounds: windowBounds.optional(),
+      ms: z.number().int().min(-1).max(600_000).optional(),
     })
     .strict();
+  // E2E only: hold the exit this long after the endpoint closes (-1: never), as a
+  // loaded machine does while Chromium shuts down.
+  let slowQuitMs = 0;
   const {server, endpoint} = await serve(token, async (body) => {
     const req = schema.parse(body);
+    if (req.operation === 'e2e-slow-quit') {
+      if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
+      slowQuitMs = req.ms ?? 0;
+      return {slowQuitMs};
+    }
     if (req.operation === 'e2e-mcp-hard-reset') {
       if (process.env.E2E_TEST !== 'true') throw new Error('Test operation unavailable');
       return hardResetMcpServer();
@@ -720,5 +730,10 @@ export const startSessionRuntime = async () => {
     return runtime;
   });
   atomicWrite(file, {...lease, ...endpoint});
-  app.on('will-quit', () => server.close());
+  app.on('will-quit', (event) => {
+    server.close();
+    if (slowQuitMs === 0) return;
+    event.preventDefault();
+    if (slowQuitMs > 0) setTimeout(() => app.exit(0), slowQuitMs);
+  });
 };

@@ -61,6 +61,8 @@ const testOrder = [
   'addons.spec.ts',
   'addons-agents.spec.ts',
   'storage.spec.ts',
+  // Slow on purpose (18 s, 60 s and a bounded teardown): last, off the critical path.
+  'session-slow-stop.spec.ts',
 ];
 
 export default defineConfig({

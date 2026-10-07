@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {test, expect} from '../fixtures/electron-app';
+import {expectStopped} from '../fixtures/session-processes';
 import {SessionInfo, SessionRequest, WindowBounds} from '../../src/common/sessions';
 import {call, Endpoint} from '../../src/common/session-rpc';
 
@@ -153,6 +154,7 @@ test.describe('Session tabs', () => {
   });
 
   test('closing a Session window brings the tab on its right into that spot', async ({app}) => {
+    test.setTimeout(150_000);
     await app.dismissModals();
     const here = await placeMain(app);
     await app.page.getByTestId(`session-tab-${ids[1]}`).click();
@@ -169,23 +171,24 @@ test.describe('Session tabs', () => {
       ) as Endpoint,
       {operation: 'e2e-close-window'}
     );
-    await expect
-      .poll(async () => (await request({operation: 'get', id: ids[1]})).status, {
-        timeout: 20_000,
-      })
-      .toBe('stopped');
+    await expectStopped(
+      async () => (await request({operation: 'get', id: ids[1]})).status,
+      root,
+      ids[1]
+    );
     await expect.poll(async () => (await sessionWindow(ids[2])).bounds).toEqual(here);
   });
 
   test('a tab ✕ stops that Session and keeps its data', async ({app}) => {
+    test.setTimeout(150_000);
     await app.dismissModals();
     await app.page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await app.page.getByTestId(`session-tab-close-${ids[2]}`).click();
-    await expect
-      .poll(async () => (await request({operation: 'get', id: ids[2]})).status, {
-        timeout: 20_000,
-      })
-      .toBe('stopped');
+    await expectStopped(
+      async () => (await request({operation: 'get', id: ids[2]})).status,
+      root,
+      ids[2]
+    );
     await expect(app.page.getByTestId(`session-tab-${ids[2]}`)).toHaveCount(0, {timeout: 10_000});
   });
 });
