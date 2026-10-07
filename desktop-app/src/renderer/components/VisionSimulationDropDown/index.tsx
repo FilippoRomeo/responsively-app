@@ -1,5 +1,6 @@
 import {Icon} from '@iconify/react';
 import cx from 'classnames';
+import {useState} from 'react';
 import Popover from '../Popover';
 
 export const SIMULATIONS = {
@@ -34,16 +35,168 @@ export const VISUAL_IMPAIRMENTS = [
 ];
 export const SUNLIGHT = [SIMULATIONS.SOLARIZE];
 
-const DISABLE_LABEL = 'Disable tool';
-
-const GROUPS: Array<{header: string; items: string[]}> = [
-  {header: 'No deficiency', items: [DISABLE_LABEL]},
-  {header: 'Red-green deficiency', items: RED_GREEN},
-  {header: 'Blue-yellow deficiency', items: BLUE_YELLOW},
-  {header: 'Full color deficiency', items: FULL},
-  {header: 'Visual impairment', items: VISUAL_IMPAIRMENTS},
-  {header: 'Temporary impairment', items: SUNLIGHT},
+// The approved Simulate design: three kinds, one open at a time, so the list
+// never runs off the window.
+const KINDS: Array<{
+  id: string;
+  name: string;
+  sub: string;
+  options: Array<{value: string; name: string; desc: string}>;
+}> = [
+  {
+    id: 'cvd',
+    name: 'Colour blindness',
+    sub: 'Some colours look the same',
+    options: [
+      {
+        value: SIMULATIONS.DEUTERANOMALY,
+        name: 'Deuteranomaly',
+        desc: 'Weak green — the most common',
+      },
+      {
+        value: SIMULATIONS.DEUTERANOPIA,
+        name: 'Deuteranopia',
+        desc: 'No green — red and green look alike',
+      },
+      {value: SIMULATIONS.PROTANOMALY, name: 'Protanomaly', desc: 'Weak red'},
+      {value: SIMULATIONS.PROTANOPIA, name: 'Protanopia', desc: 'No red — reds look dark'},
+      {value: SIMULATIONS.TRITANOMALY, name: 'Tritanomaly', desc: 'Weak blue'},
+      {
+        value: SIMULATIONS.TRITANOPIA,
+        name: 'Tritanopia',
+        desc: 'No blue — blue and yellow look alike',
+      },
+      {value: SIMULATIONS.ACHROMATOMALY, name: 'Achromatomaly', desc: 'Very faint colour'},
+      {value: SIMULATIONS.ACHROMATOPSIA, name: 'Achromatopsia', desc: 'No colour, only greys'},
+    ],
+  },
+  {
+    id: 'eye',
+    name: 'Eye conditions',
+    sub: 'Blur, tunnel vision, low contrast',
+    options: [
+      {value: SIMULATIONS.CATARACT, name: 'Cataract', desc: 'Blurry and yellowed'},
+      {value: SIMULATIONS.FAR, name: 'Farsightedness', desc: 'Blurry up close'},
+      {value: SIMULATIONS.GLAUCOME, name: 'Glaucoma', desc: 'Tunnel vision — dark edges'},
+      {
+        value: SIMULATIONS.COLOR_CONTRAST_LOSS,
+        name: 'Contrast loss',
+        desc: 'Everything washed out',
+      },
+    ],
+  },
+  {
+    id: 'sit',
+    name: 'Situations',
+    sub: 'Hard viewing conditions',
+    options: [{value: SIMULATIONS.SOLARIZE, name: 'Bright sunlight', desc: 'Glare on the screen'}],
+  },
 ];
+
+const Check = ({on}: {on: boolean}) => (
+  <Icon
+    icon="ic:round-check"
+    fontSize={14}
+    className={cx('shrink-0 text-accent', {'opacity-0': !on})}
+  />
+);
+
+const rowClass =
+  'flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-[7px] text-left text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover';
+
+const SimulationMenu = ({
+  simulationName,
+  pick,
+  isToolbar,
+}: {
+  simulationName: string | undefined;
+  pick: (name: string | undefined) => void;
+  isToolbar: boolean;
+}) => {
+  const [open, setOpen] = useState<string | null>(
+    KINDS.find((k) => k.options.some((o) => o.value === simulationName))?.id ?? 'cvd'
+  );
+  return (
+    <>
+      <div className="px-[10px] pb-[6px] pt-2">
+        <div className="text-[13.5px] font-bold">Simulate vision</div>
+        <div className="mt-[2px] text-[11.5px] text-muted">
+          {isToolbar ? 'Applies to every device in this window' : 'Applies to this device only'}
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-pressed={simulationName === undefined}
+        onClick={() => pick(undefined)}
+        className={cx(rowClass, 'text-[13px]')}
+      >
+        <span className="pointer-events-none contents">
+          <Check on={simulationName === undefined} />
+          Off — normal vision
+        </span>
+      </button>
+      <div className="mx-1 my-[6px] border-t border-line-soft" />
+      {KINDS.map((kind) => {
+        const isOpen = open === kind.id;
+        return (
+          <div key={kind.id}>
+            <button
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpen(isOpen ? null : kind.id)}
+              className={rowClass}
+            >
+              <span className="pointer-events-none contents">
+                <Icon
+                  icon="lucide:chevron-right"
+                  fontSize={14}
+                  className={cx('shrink-0 text-muted transition-transform', {'rotate-90': isOpen})}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold">{kind.name}</span>
+                  <span className="block text-[11.5px] text-muted">{kind.sub}</span>
+                </span>
+                {kind.options.some((o) => o.value === simulationName) ? (
+                  <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-accent" />
+                ) : null}
+                <span className="text-[11px] text-muted">{kind.options.length}</span>
+              </span>
+            </button>
+            {isOpen ? (
+              <div className="pb-1 pl-[14px]">
+                {kind.options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={simulationName === option.value}
+                    onClick={() => pick(option.value)}
+                    className={cx(rowClass, 'py-[5px]')}
+                  >
+                    <span className="pointer-events-none contents">
+                      <Check on={simulationName === option.value} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px]">{option.name}</span>
+                        <span className="block text-[11.5px] text-muted">{option.desc}</span>
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+      {isToolbar ? (
+        <>
+          <div className="mx-1 my-[6px] border-t border-line-soft" />
+          <div className="px-[10px] pb-2 pt-[6px] text-[11.5px] leading-normal text-muted">
+            Just one device? Use the eye button in that device&apos;s header.
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+};
 
 interface Props {
   simulationName: string | undefined;
@@ -68,7 +221,7 @@ export const VisionSimulationDropDown = ({
     <Popover
       triggerTitle="Simulate vision"
       anchor={isToolbar ? 'bottom end' : 'bottom start'}
-      className="max-h-[470px] w-[238px] overflow-y-auto p-[6px]"
+      className="max-h-[min(620px,calc(100vh-120px))] w-[320px] overflow-y-auto p-[6px]"
       triggerClassName={cx(
         'flex items-center transition-colors',
         isLabelled && 'h-[30px] gap-[7px] rounded-[7px] px-[11px] text-[12.5px]',
@@ -91,45 +244,14 @@ export const VisionSimulationDropDown = ({
       }
     >
       {({close}) => (
-        <>
-          {GROUPS.map((group) => (
-            <div key={group.header}>
-              <div className="px-[10px] pb-[3px] pt-[10px] text-[10.5px] font-bold uppercase tracking-[0.07em] text-muted">
-                {group.header}
-              </div>
-              {group.items.map((item) => {
-                const isDisableEntry = item === DISABLE_LABEL;
-                const isActive = isDisableEntry
-                  ? simulationName === undefined
-                  : simulationName === item.toLowerCase();
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => {
-                      onChange(isDisableEntry ? undefined : item.toLowerCase());
-                      close();
-                    }}
-                    className={cx(
-                      'flex w-full items-center gap-2 rounded-[7px] px-[10px] py-[6px] text-left text-[13px] capitalize text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover',
-                      {'font-semibold': isActive}
-                    )}
-                  >
-                    <span className="pointer-events-none contents">
-                      <Icon
-                        icon="ic:round-check"
-                        fontSize={14}
-                        className={cx('text-accent', {'opacity-0': !isActive})}
-                      />
-                      {item}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </>
+        <SimulationMenu
+          simulationName={simulationName}
+          isToolbar={isToolbar}
+          pick={(name) => {
+            onChange(name);
+            close();
+          }}
+        />
       )}
     </Popover>
   );

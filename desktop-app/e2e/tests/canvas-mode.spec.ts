@@ -307,7 +307,7 @@ test.describe('Canvas mode', () => {
     // Clear it for the next spec file.
     await app.revealDevicePill();
     await firstDevice.locator('button[title="Simulate vision"]').click();
-    await app.page.getByRole('button', {name: 'Disable tool'}).first().click();
+    await app.page.getByRole('button', {name: 'Off — normal vision'}).first().click();
     await expect(app.page.locator('[data-testid="sim-badge"]')).toHaveCount(0);
   });
 });
