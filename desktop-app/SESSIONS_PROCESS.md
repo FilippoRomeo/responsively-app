@@ -85,10 +85,10 @@ Milestone text describes desired behaviour, not current file or module ownership
 
 - **Build** from clean `main` with `-c.appId=app.responsively.mcp.local` (the script builds in `~/ResponsivelyGateF/<install-run>/repo/`). Verify bundle ID, version, arm64, `codesign --verify --deep --strict`, the MCP CLI and manifest, and that the new code is present in `app.asar`. Record the hashes.
 - **Quit** the installed app fully, from the menu-bar icon (**Quit Responsively**). Confirm 0 processes from the bundle, no live runtime leases or endpoints belonging to running processes (tell stale files apart from live state), and no open files in the data folders.
-- **Back up** by copying (`ditto`) the app and both data folders (`~/Library/Application Support/ResponsivelyMCP` and `~/Library/Application Support/ResponsivelySessions`) into `~/ResponsivelyGateF/<install-run>/backup-<timestamp>/`. Verify every file with SHA-256. **Stop for approval.**
-- **Replace:** stage to `~/Applications/.ResponsivelyMCP.app.new` and verify it; move the old app into the backup as `ResponsivelyMCP.app.replaced` (never delete it); move the new app into place; verify its hash.
+- **Back up** the app as a zip (`ditto -c -k`) and both data folders (`~/Library/Application Support/ResponsivelyMCP` and `~/Library/Application Support/ResponsivelySessions`) as copies into `~/ResponsivelyGateF/<install-run>/backup-<timestamp>/`. Verify every file with SHA-256 and every symlink's target (the zip by unpacking it). The app is never kept unpacked: macOS launches any bundle with the same ID, and has opened a backup instead of the installed app. **Stop for approval.**
+- **Replace:** check the installed app is still the one backed up; stage to `~/Applications/.ResponsivelyMCP.app.new` and verify it; move the old app aside, move the new app into place and verify its hash; then move the old app and the build output to the Trash (the zip is the rollback copy).
 - **Smoke test** with one disposable Session: the user's data is unchanged, the user's own Sessions are untouched (Sessions that were open at the last Quit reopen), and MCP `list_sessions` matches.
-- **Roll back** only on a material regression: capture evidence first, move the new bundle aside, restore `.replaced`, and restore data only if data was actually damaged.
+- **Roll back** only on a material regression: capture evidence first, move the new bundle to the Trash, unzip `ResponsivelyMCP.app.zip` into `~/Applications` (the replace log prints the command), and restore data only if data was actually damaged.
 - **Record** the new baseline (source SHA, installed hashes, backup path) in [SESSIONS_ROADMAP.md](SESSIONS_ROADMAP.md).
 
 ## Hard rules
