@@ -10,6 +10,12 @@ import log from 'electron-log';
 export const initLogging = () => {
   if (process.env.RESPONSIVELY_SESSION_ID)
     log.transports.file.resolvePath = () => path.join(app.getPath('userData'), 'logs', 'main.log');
+  // An isolated copy (Gate C) logs into its own folder, not the installed app's
+  // log, which is keyed by the shared app name.
+  else if (process.env.RESPONSIVELY_LOG_DIR) {
+    const file = process.env.RESPONSIVELY_SESSION_CONTROLLER ? 'controller.log' : 'main.log';
+    log.transports.file.resolvePath = () => path.join(process.env.RESPONSIVELY_LOG_DIR!, file);
+  }
   log.transports.file.level = 'info';
   log.transports.console.level =
     process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true' ? 'debug' : 'warn';
