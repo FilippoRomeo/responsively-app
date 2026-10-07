@@ -24,6 +24,9 @@ export interface DeviceManagerState {
   // Per-device rotation (session state, not persisted). The global rotate
   // flag lives in the renderer slice; a device is rotated when either is set.
   individualRotations: Record<string, boolean>;
+  // Device id → iOS runtime id for devices showing real iOS Safari instead of
+  // Chromium (session state, not persisted: reopening never boots a Simulator).
+  deviceBrowsers: Record<string, string>;
 }
 
 export const DEFAULT_SUITE: PreviewSuite = {
@@ -39,6 +42,7 @@ const initialState: DeviceManagerState = {
   activeSuite: DEFAULT_SUITE.id,
   suites: [DEFAULT_SUITE],
   individualRotations: {},
+  deviceBrowsers: {},
 };
 
 export const deviceManagerSlice = createSlice({
@@ -115,6 +119,15 @@ export const deviceManagerSlice = createSlice({
         delete state.individualRotations[id];
       }
     },
+    /** `runtime` undefined puts the device back on Chromium. */
+    setDeviceBrowser(state, action: PayloadAction<{id: string; runtime?: string}>) {
+      const {id, runtime} = action.payload;
+      if (runtime) {
+        state.deviceBrowsers[id] = runtime;
+      } else {
+        delete state.deviceBrowsers[id];
+      }
+    },
   },
 });
 
@@ -130,12 +143,16 @@ export const {
   setCanvasPosition,
   resetCanvasPositions,
   setIndividualRotation,
+  setDeviceBrowser,
 } = deviceManagerSlice.actions;
 
 export const selectSuites = (state: RootState) => state.deviceManager.suites;
 
 export const selectIndividualRotations = (state: RootState) =>
   state.deviceManager.individualRotations;
+
+export const selectDeviceBrowser = (id: string) => (state: RootState) =>
+  state.deviceManager.deviceBrowsers[id];
 
 export const selectActiveSuite = (state: RootState): PreviewSuite => {
   const {activeSuite, suites} = state.deviceManager;

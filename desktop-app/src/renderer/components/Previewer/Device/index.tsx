@@ -4,9 +4,11 @@ import {CONTEXT_MENUS} from 'main/webview-context-menu/common';
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {
+  selectDeviceBrowser,
   selectIndividualRotations,
   setIndividualRotation,
 } from 'renderer/store/features/device-manager';
+import {BrowserPicker, runtimeLabel, SimulatorScreen} from 'renderer/components/IosSafari';
 import {
   selectAddress,
   selectCanvasOptions,
@@ -47,6 +49,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
   const zoomfactor = useSelector(selectZoomFactor);
   const rotateDevices = useSelector(selectRotate);
   const individualRotations = useSelector(selectIndividualRotations);
+  const iosRuntime = useSelector(selectDeviceBrowser(device.id));
   const layout = useSelector(selectLayout);
   const canvasOptions = useSelector(selectCanvasOptions);
   const isPresenting = useSelector(selectIsPresenting);
@@ -243,6 +246,27 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
       flashing={flashing}
       initialSrc={initialAddress.current}
       webviewRef={setWebviewRef}
+      browserBadge={
+        iosRuntime ? (
+          <span
+            data-testid="browser-badge"
+            className="whitespace-nowrap rounded-full bg-accent-soft px-2 py-[2px] text-[10.5px] text-accent"
+          >
+            Safari · {runtimeLabel(iosRuntime)}
+          </span>
+        ) : null
+      }
+      screenOverride={
+        iosRuntime ? (
+          <SimulatorScreen
+            deviceName={device.name}
+            runtime={iosRuntime}
+            width={width * zoomfactor}
+            height={height * zoomfactor}
+            rotated={isDeviceRotationEnabled}
+          />
+        ) : null
+      }
       // Present mode is pure content — no per-device pills.
       toolbar={
         isPresenting && isCanvasLayout ? null : (
@@ -263,6 +287,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
             designOverlay={designOverlay}
             resolution={resolution}
             variant={isCanvasLayout ? 'canvas' : 'grid'}
+            browserPicker={<BrowserPicker deviceId={device.id} deviceName={device.name} />}
           />
         )
       }

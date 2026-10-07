@@ -51,9 +51,15 @@ const resolveTarget = async (
     'get-capture-targets',
     {device}
   );
-  // Without a device filter the bridge returns previews in suite order, so
-  // targets[0] is the primary device.
-  const target = targets[0];
+  // Without a device filter the bridge returns previews in suite order: the
+  // first Chromium one is the primary device these tools can drive.
+  const target = device ? targets[0] : (targets.find((t) => !t.iosRuntime) ?? targets[0]);
+  if (target?.iosRuntime) {
+    throw new Error(
+      `${target.deviceName} shows real iOS Safari; read_page, click and type_text work on ` +
+        'Chromium devices only for now. Use screenshot to see it.'
+    );
+  }
   if (target === undefined) {
     const reasons = skipped.map((s) => `${s.deviceName}: ${s.reason}`).join('; ');
     throw new Error(

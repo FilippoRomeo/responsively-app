@@ -85,6 +85,7 @@ export const buildPreloadedState = () => {
         : DEFAULT_SUITE.id,
       suites,
       individualRotations: {},
+      deviceBrowsers: {},
     },
   };
 };

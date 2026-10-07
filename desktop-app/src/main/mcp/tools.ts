@@ -11,6 +11,7 @@ import {
   McpSkippedCapture,
 } from '../../common/mcp';
 import {captureImage} from '../screenshot';
+import {simulatorScreenshot} from '../ios-simulator';
 import {GetMainWindow, sendBridgeCommand} from './bridge';
 import {clickElement, readPage, typeText} from './interactions';
 import {toolDefs} from './toolDefs';
@@ -43,13 +44,21 @@ const errorResult = (error: unknown) => ({
 const captureTarget = async (
   target: McpCaptureTargetsResult['targets'][number]
 ): Promise<{content: [TextContent, ImageContent]} | {skip: McpSkippedCapture}> => {
-  const targetContents = webContents.fromId(target.webContentsId);
-  if (targetContents === undefined || targetContents.isDestroyed()) {
-    return {skip: {deviceName: target.deviceName, reason: 'the preview was closed'}};
+  const {iosRuntime} = target;
+  if (!iosRuntime) {
+    const targetContents = webContents.fromId(target.webContentsId);
+    if (targetContents === undefined || targetContents.isDestroyed()) {
+      return {skip: {deviceName: target.deviceName, reason: 'the preview was closed'}};
+    }
   }
-  let image: Electron.NativeImage | undefined;
+  let image: Electron.NativeImage | null | undefined;
   try {
-    image = await captureImage(target.webContentsId);
+    image = iosRuntime
+      ? await simulatorScreenshot(target.deviceName, iosRuntime)
+      : await captureImage(target.webContentsId);
+    if (image === null) {
+      return {skip: {deviceName: target.deviceName, reason: 'iOS Safari is still starting'}};
+    }
   } catch (error) {
     return {
       skip: {
@@ -74,7 +83,7 @@ const captureTarget = async (
     content: [
       {
         type: 'text',
-        text: `${target.deviceName} (${target.width}x${target.height}) — ${target.url}`,
+        text: `${target.deviceName} (${target.width}x${target.height})${iosRuntime ? ' — real iOS Safari' : ''} — ${target.url}`,
       },
       {
         type: 'image',
@@ -158,6 +167,24 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       return errorResult(error);
     }
   });
+
+  server.registerTool(
+    'set_device_browser',
+    toolDefs.set_device_browser,
+    async ({device, browser, ios_version: iosVersion}) => {
+      try {
+        return textResult(
+          await sendBridgeCommand(getMainWindow, 'set-device-browser', {
+            device,
+            browser,
+            iosVersion,
+          })
+        );
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
 
   server.registerTool('read_page', toolDefs.read_page, async ({device}) => {
     try {

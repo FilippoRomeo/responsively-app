@@ -68,6 +68,7 @@ export const IPC_MAIN_CHANNELS = {
   DELETE_STORAGE: 'delete-storage',
   WINDOW_DATA_USAGE: 'window-data-usage',
   WINDOW_DATA_CLEAR: 'window-data-clear',
+  IOS_SIMULATOR: 'ios-simulator',
   LOAD_URL_IN_WEBVIEW: 'load-url-in-webview',
   SET_NATIVE_THEME: 'set-native-theme',
   COPY_TO_CLIPBOARD: 'copy-to-clipboard',

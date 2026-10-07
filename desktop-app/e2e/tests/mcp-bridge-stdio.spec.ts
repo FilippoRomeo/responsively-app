@@ -17,6 +17,7 @@ const EXPECTED_TOOLS = [
   'read_page',
   'screenshot',
   'set_active_devices',
+  'set_device_browser',
   'stop_session',
   'type_text',
 ];

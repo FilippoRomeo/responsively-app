@@ -65,6 +65,23 @@ export const toolDefs = {
         .describe('Device ids or exact device names to show, e.g. ["10008", "iPad Pro"]'),
     },
   },
+  set_device_browser: {
+    description:
+      'Choose the browser one active device preview runs. "chromium" is the built-in ' +
+      'preview. "ios-safari" shows real Safari in the iOS Simulator for that device (iPhone ' +
+      'models with an installed iOS version; the first start boots the Simulator, about 25 s). ' +
+      'navigate and screenshot work on Safari devices; read_page, click and type_text work ' +
+      'on Chromium devices only. Omit ios_version to use the newest installed iOS that ' +
+      'supports the device.',
+    inputSchema: {
+      device: z.string().min(1).describe('Device id or exact name of an active device'),
+      browser: z.enum(['chromium', 'ios-safari']).describe('The browser to show'),
+      ios_version: z
+        .string()
+        .optional()
+        .describe('Installed iOS version for ios-safari, e.g. "26.1"'),
+    },
+  },
   read_page: {
     description:
       'Read the page rendered in a Responsively App device preview: the page text plus its ' +
