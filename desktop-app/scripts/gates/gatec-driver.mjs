@@ -548,12 +548,12 @@ try {
   );
   say('Now click Dismiss in that panel (not Open). Then find the window titled "gatec-m6-B".');
   const q4 = await ask(
-    'In the "gatec-m6-B" window, look at the toolbar row with Rotate, Inspect and Capture. After the colour controls and a thin divider there is a button with a small panels icon, just left of the MCP button. Does that button read "gatec-m6-B"?'
+    'In the "gatec-m6-B" window, the Session name is in its tab at the top (no longer on the toolbar). Click ⋮ at the right end of the toolbar, then "Manage Sessions…". Does the tab read "gatec-m6-B", and does a Sessions list open that includes "gatec-m6-B"? (Press Esc to close it.)'
   );
   const q4detail = {answer: q4};
   if (q4 !== 'yes') {
     q4detail.saw = await askText(
-      'What does that button read instead, or what is there? (for example: "Sessions", "no button", "cut off")'
+      'What did you see instead? (for example: "tab reads Sessions", "no Manage Sessions in ⋮", "list empty")'
     );
     const shot = await askText(
       'To save a picture of that window: type y, then click the "gatec-m6-B" window. macOS may ask to allow Screen Recording for Terminal; allowing it is optional. Type n to skip.'
@@ -571,7 +571,11 @@ try {
       }
     }
   }
-  record('Q4 M2: the toolbar button shows the Session name (your answer)', q4 === 'yes', q4detail);
+  record(
+    'Q4 M2: the tab names the Session and ⋮ › Manage Sessions… lists it (your answer)',
+    q4 === 'yes',
+    q4detail
+  );
   say('Thanks. The gate continues on its own now; keep this window open.');
 
   const reopened = await call('open_session', {id: ids.A}, 120_000);

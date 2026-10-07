@@ -2,8 +2,8 @@
 # Gate C: build an isolated test copy of the app from one exact commit, then
 # check it through its packaged MCP bridge and its own controller: Session
 # routing by UUID (also after a restart), who stopped a Session, the attention
-# panel (focus measured; you confirm what you see), the Session name on the
-# toolbar, and force quit of a hung Session.
+# panel (focus measured; you confirm what you see), the Session name in its
+# tab and ⋮ › Manage Sessions…, and force quit of a hung Session.
 #
 # Writes only under $HOME/ResponsivelyGateC/<run>/ (clone, build, caches, data,
 # evidence), except what macOS and Electron key by the test bundle ID or app
@@ -14,17 +14,33 @@
 # only if every check and the isolation check passed),
 # which gatef.sh requires before it installs that commit.
 #
-# Usage: bash gatec.sh <full-commit-sha> [run-name]   (default run-name: c-<sha7>-001)
+# Usage: bash gatec.sh <full-commit-sha> [run-name] [--reuse-build <earlier-run>]
+#   (default run-name: c-<sha7>-001)
+# --reuse-build skips clone, install, build and package: it tests the app an
+# earlier run built from the same commit, after checking that run's clone is at
+# that commit and its app.asar and bridge still hash as recorded when built.
+# Data and evidence are new; the earlier run is only read.
 # Quit the installed Responsively first. Run it in a normal Terminal window and
 # stay there: part-way through it asks you 3 yes/no questions.
 set -euo pipefail
 
 EXPECTED_SHA="${1:-}"
 if ! printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-  echo "Usage: bash gatec.sh <full 40-character commit SHA> [run-name]"
+  echo "Usage: bash gatec.sh <full 40-character commit SHA> [run-name] [--reuse-build <earlier-run>]"
   exit 2
 fi
 RUN_NAME="${2:-c-${EXPECTED_SHA:0:7}-001}"
+REUSE_RUN=""
+if [ "${3:-}" = "--reuse-build" ]; then
+  REUSE_RUN="${4:-}"
+  [ -n "$REUSE_RUN" ] && [ "$REUSE_RUN" != "$RUN_NAME" ] || {
+    echo "--reuse-build needs the name of an earlier run, different from this one"
+    exit 2
+  }
+elif [ -n "${3:-}" ]; then
+  echo "Unknown option: $3"
+  exit 2
+fi
 REPO_URL="https://github.com/FilippoRomeo/responsively-app.git"
 APP_ID="app.responsively.validation-${RUN_NAME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -136,6 +152,7 @@ finish() {
       echo "ASAR_SHA=$(shasum -a 256 "$APP/Contents/Resources/app.asar" | awk '{print $1}')"
       echo "CLI_SHA=$(shasum -a 256 "$CLI" | awk '{print $1}')"
       echo "RESULT=$VERDICT"
+      [ -z "$REUSE_RUN" ] || echo "BUILD_RUN=$REUSE_RUN"
     } | tee "$RUN/tested.env" > "$EV/tested.env"
     STEP="finish"
   fi
@@ -192,44 +209,66 @@ shasum -a 256 "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "$DRIVER" | tee "$EV
 snapshot_real before
 log_sizes before
 
-STEP="clone"
-git clone "$REPO_URL" "$REPO" > "$EV/clone.log" 2>&1
-git -C "$REPO" checkout --detach "$EXPECTED_SHA" >> "$EV/clone.log" 2>&1
-HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
-HEAD_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
-log "HEAD=$HEAD_SHA tree=$HEAD_TREE"
-[ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: expected commit $EXPECTED_SHA"; exit 1; }
+if [ -n "$REUSE_RUN" ]; then
+  STEP="reuse"
+  PREV="$HOME/ResponsivelyGateC/$REUSE_RUN"
+  [ -f "$PREV/evidence/package-hashes.txt" ] || { log "FAIL: $PREV has no evidence/package-hashes.txt"; exit 1; }
+  HEAD_SHA="$(git -C "$PREV/repo" rev-parse HEAD)"
+  HEAD_TREE="$(git -C "$PREV/repo" rev-parse HEAD^{tree})"
+  log "reusing the build of $REUSE_RUN: HEAD=$HEAD_SHA tree=$HEAD_TREE"
+  [ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: $REUSE_RUN was built from another commit"; exit 1; }
+  FOUND="$(find "$PREV/repo/desktop-app/.work/gatec-${REUSE_RUN}/build" -maxdepth 2 -type d -name 'ResponsivelyApp.app' 2>/dev/null | head -n 1 || true)"
+  [ -n "$FOUND" ] || { log "FAIL: no ResponsivelyApp.app in $REUSE_RUN"; exit 1; }
+  APP="$FOUND"
+  # Same files in the same order: their hashes must match what that run recorded when it built them.
+  shasum -a 256 "$APP/Contents/Resources/app.asar" "$APP/Contents/Resources/mcp/cli.js" > "$EV/package-hashes.txt"
+  [ "$(awk '{print $1}' "$EV/package-hashes.txt")" = "$(awk '{print $1}' "$PREV/evidence/package-hashes.txt")" ] || {
+    log "FAIL: the app in $REUSE_RUN changed since it was built"
+    exit 1
+  }
+  # The reused app keeps the bundle ID it was built with.
+  APP_ID="app.responsively.validation-${REUSE_RUN}"
+  log "app.asar and bridge unchanged since $REUSE_RUN built them"
+else
+  STEP="clone"
+  git clone "$REPO_URL" "$REPO" > "$EV/clone.log" 2>&1
+  git -C "$REPO" checkout --detach "$EXPECTED_SHA" >> "$EV/clone.log" 2>&1
+  HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
+  HEAD_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
+  log "HEAD=$HEAD_SHA tree=$HEAD_TREE"
+  [ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: expected commit $EXPECTED_SHA"; exit 1; }
 
-cd "$REPO/desktop-app"
+  cd "$REPO/desktop-app"
 
-STEP="install"
-log "yarn install (several minutes)"
-npx -y yarn@1.22.22 install --frozen-lockfile > "$EV/install.log" 2>&1
+  STEP="install"
+  log "yarn install (several minutes)"
+  npx -y yarn@1.22.22 install --frozen-lockfile > "$EV/install.log" 2>&1
 
-STEP="build"
-log "yarn build"
-rm -rf "$REPO/desktop-app/release/app/dist"
-npx -y yarn@1.22.22 build > "$EV/build.log" 2>&1
+  STEP="build"
+  log "yarn build"
+  rm -rf "$REPO/desktop-app/release/app/dist"
+  npx -y yarn@1.22.22 build > "$EV/build.log" 2>&1
 
-STEP="package"
-log "electron-builder --dir, appId $APP_ID"
-CI=false CSC_IDENTITY_AUTO_DISCOVERY=false ./node_modules/.bin/electron-builder \
-  --mac --arm64 --dir --publish never \
-  -c.appId="$APP_ID" \
-  -c.directories.output="$BUILD_REL" \
-  -c.mac.identity=- \
-  -c.mac.hardenedRuntime=true \
-  -c.mac.entitlements="assets/entitlements.mcp.local.plist" \
-  -c.mac.entitlementsInherit="assets/entitlements.mcp.local.plist" \
-  > "$EV/package.log" 2>&1
+  STEP="package"
+  log "electron-builder --dir, appId $APP_ID"
+  CI=false CSC_IDENTITY_AUTO_DISCOVERY=false ./node_modules/.bin/electron-builder \
+    --mac --arm64 --dir --publish never \
+    -c.appId="$APP_ID" \
+    -c.directories.output="$BUILD_REL" \
+    -c.mac.identity=- \
+    -c.mac.hardenedRuntime=true \
+    -c.mac.entitlements="assets/entitlements.mcp.local.plist" \
+    -c.mac.entitlementsInherit="assets/entitlements.mcp.local.plist" \
+    > "$EV/package.log" 2>&1
 
-STEP="verify-package"
-FOUND="$(find "$REPO/desktop-app/$BUILD_REL" -maxdepth 2 -type d -name 'ResponsivelyApp.app' | head -n 1)"
-[ -n "$FOUND" ] || { log "FAIL: no ResponsivelyApp.app under $BUILD_REL"; exit 1; }
-case "$FOUND" in
-  "$RUN"/*) APP="$FOUND" ;;
-  *) log "FAIL: built app is outside the run folder: $FOUND"; exit 1 ;;
-esac
+  STEP="verify-package"
+  FOUND="$(find "$REPO/desktop-app/$BUILD_REL" -maxdepth 2 -type d -name 'ResponsivelyApp.app' | head -n 1)"
+  [ -n "$FOUND" ] || { log "FAIL: no ResponsivelyApp.app under $BUILD_REL"; exit 1; }
+  case "$FOUND" in
+    "$RUN"/*) APP="$FOUND" ;;
+    *) log "FAIL: built app is outside the run folder: $FOUND"; exit 1 ;;
+  esac
+fi
 CLI="$APP/Contents/Resources/mcp/cli.js"
 BUNDLE_ID="$(/usr/bin/defaults read "$APP/Contents/Info.plist" CFBundleIdentifier)"
 log "app=$APP bundleId=$BUNDLE_ID"
@@ -239,7 +278,8 @@ grep -q "stopped answering on its MCP port" "$CLI" || { log "FAIL: packaged brid
 grep -q "is not answering on port" "$CLI" || { log "FAIL: packaged bridge lacks the log fix (#13)"; exit 1; }
 grep -q "attention" "$CLI" || { log "FAIL: packaged bridge lacks the M6 attention request"; exit 1; }
 log "packaged bridge contains the routing code, the log fix and the attention request"
-shasum -a 256 "$APP/Contents/Resources/app.asar" "$CLI" | tee "$EV/package-hashes.txt"
+[ -n "$REUSE_RUN" ] || shasum -a 256 "$APP/Contents/Resources/app.asar" "$CLI" > "$EV/package-hashes.txt"
+cat "$EV/package-hashes.txt"
 
 STEP="driver"
 STALE_PORT="$(node -e 'const s=require("net").createServer().listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
