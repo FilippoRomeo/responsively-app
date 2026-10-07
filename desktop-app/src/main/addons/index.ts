@@ -25,6 +25,7 @@ import store from '../../store';
 import {atomicWrite} from '../sessions/registry';
 import {sessionsRoot} from '../sessions/service';
 import {isRegisteredWebview} from '../webview-registry';
+import {threeHook} from './three-hook';
 
 const exec = promisify(execFile);
 
@@ -160,6 +161,60 @@ const detect = (dir: string) => {
   };
 };
 
+// Tools that need a step to run in a browser, set up from their repo as it
+// is: Responsively only adds its own files (in responsively/), the source is
+// untouched.
+const DEV_SITES = ['localhost:*', '127.0.0.1:*'];
+const RECIPES: Record<string, (dir: string) => Pick<Addon, 'about' | 'buildCommand' | 'parts'>> = {
+  'filipporomeo/compose3d': (dir) => {
+    fs.mkdirSync(path.join(dir, 'responsively'), {recursive: true});
+    fs.writeFileSync(path.join(dir, 'responsively', 'three-hook.js'), `(${threeHook})();\n`);
+    return {
+      about:
+        'Move and edit the 3D objects of any three.js page you preview, without adding it to the project; agents reach the live scene too.',
+      buildCommand:
+        'npm install --omit=dev --ignore-scripts --no-audit --no-fund && ' +
+        `echo "export * from './packages/devtools/src/index.js'; export {createThreeBinding} from './packages/three/src/index.js';" | ` +
+        'npx -y esbuild@0.25 --bundle --format=iife --global-name=Compose3D --outfile=responsively/compose3d.js',
+      parts: [
+        {
+          id: 'three-hook',
+          kind: 'script',
+          label: 'three.js hook',
+          file: 'responsively/three-hook.js',
+          matches: DEV_SITES,
+          when: 'start',
+        },
+        {
+          id: 'editor',
+          kind: 'script',
+          label: 'Editor',
+          file: 'responsively/compose3d.js',
+          matches: DEV_SITES,
+          init:
+            '__RESPONSIVELY_THREE__.whenReady(({scene, camera, renderer}) => { ' +
+            'window.__COMPOSE3D__ = Compose3D.mountCompose3DLiveDevtools({scene, camera, renderer, binding: Compose3D.createThreeBinding(scene), endpoints: false, manifestUrl: false}); })',
+        },
+        {
+          id: 'rule',
+          kind: 'rule',
+          label: 'Rule',
+          name: 'compose3d',
+          description: 'Inspect or change the three.js scene of the page in the preview',
+          mode: 'on-demand',
+          body: [
+            'Use `evaluate` in the page:',
+            '- `__RESPONSIVELY_THREE__.tree()`: the live scene graph (name, type, uuid, position); `.scene`, `.camera`, `.renderer` are the live objects.',
+            '- Change the scene through those live objects, e.g. `__RESPONSIVELY_THREE__.scene.getObjectByName("Cube").position.set(1, 0, 0)`.',
+            '- `__COMPOSE3D__.show()` / `.close()` open and close the editor; `.snapshot()` returns the selection and the edits the user made in it. The editor itself answers only real user input.',
+            'compose3d is not in the project: to keep a change, write the values into the project source yourself, then reload.',
+          ].join('\n'),
+        },
+      ],
+    };
+  },
+};
+
 const inspect = async (raw: string): Promise<Addon> => {
   const source = raw.trim();
   const now = new Date().toISOString();
@@ -195,7 +250,8 @@ const inspect = async (raw: string): Promise<Addon> => {
     // gh uses the user's GitHub sign-in, so private repos work too.
     await exec('gh', ['repo', 'clone', `${owner}/${repo}`, dir, '--', '--depth', '1']);
     const {pkg: _pkg, ...found} = detect(dir);
-    return {...base, ...found, name: repo, id, sourceKind: 'github', dir};
+    const recipe = RECIPES[`${owner}/${repo}`.toLowerCase()]?.(dir);
+    return {...base, ...found, ...recipe, name: repo, id, sourceKind: 'github', dir};
   }
   if (npm) {
     const name = npm[1] ?? npm[2];
@@ -288,6 +344,16 @@ const dirBytes = async (dir: string) => {
   }
 };
 
+// The shell add-on commands run in, with the user's environment minus what
+// npm/npx set for the process that started Responsively (npm_config_local_prefix
+// would point an add-on's `npm install` at that other project).
+const shellEnv = () =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(
+      (e): e is [string, string] => e[1] !== undefined && !/^npm_/i.test(e[0])
+    )
+  );
+
 // Build commands run in a login shell so the user's PATH (node, conda,
 // python) is there; output streams to the window that asked.
 let runCount = 0;
@@ -299,7 +365,7 @@ const run = (sender: WebContents, addon: {dir?: string}, command: string) => {
   };
   const child = spawn(process.env.SHELL || '/bin/zsh', ['-lc', command], {
     cwd: addon.dir,
-    env: process.env,
+    env: shellEnv(),
   });
   child.stdout.on('data', (d) => send({text: d.toString()}));
   child.stderr.on('data', (d) => send({text: d.toString()}));
@@ -343,6 +409,7 @@ const syncStarts = () => {
           const out = fs.openSync(path.join(addon.dir ?? os.tmpdir(), `${part.id}.log`), 'a');
           const child = spawn(process.env.SHELL || '/bin/zsh', ['-lc', part.command], {
             cwd: addon.dir,
+            env: shellEnv(),
             stdio: ['ignore', out, out],
           });
           child.on('exit', () => starts.delete(key));
@@ -518,7 +585,7 @@ const connect = (entry: Enabled<'mcp'>) => {
           command: process.env.SHELL || '/bin/zsh',
           args: ['-lc', part.command ?? ''],
           cwd: addon.dir,
-          env: process.env as Record<string, string>,
+          env: shellEnv(),
           stderr: 'ignore',
         });
     const ready = Promise.race([
