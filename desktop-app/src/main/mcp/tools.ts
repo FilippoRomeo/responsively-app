@@ -13,7 +13,8 @@ import {
 import {captureImage} from '../screenshot';
 import {simulatorScreenshot} from '../ios-simulator';
 import {GetMainWindow, sendBridgeCommand} from './bridge';
-import {clickElement, readPage, typeText} from './interactions';
+import {clickElement, evaluateInPage, readPage, typeText} from './interactions';
+import {callAddonTool, getPrompts, getRules, listAddonTools} from '../addons';
 import {toolDefs} from './toolDefs';
 import {normalizeUrl} from './utils';
 
@@ -185,6 +186,51 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       }
     }
   );
+
+  server.registerTool('evaluate', toolDefs.evaluate, async ({expression, device}) => {
+    try {
+      return textResult(await evaluateInPage(getMainWindow, expression, device));
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool('list_addon_tools', toolDefs.list_addon_tools, async () => {
+    try {
+      return textResult(await listAddonTools());
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool(
+    'call_addon_tool',
+    toolDefs.call_addon_tool,
+    async ({addon, tool, arguments: args}) => {
+      try {
+        // Relay the add-on's own result (text, images…) as it is.
+        return (await callAddonTool(addon, tool, args ?? {})) as never;
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool('get_rules', toolDefs.get_rules, async ({name}) => {
+    try {
+      return textResult(getRules(name));
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool('get_prompts', toolDefs.get_prompts, async ({name}) => {
+    try {
+      return textResult(getPrompts(name));
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
 
   server.registerTool('read_page', toolDefs.read_page, async ({device}) => {
     try {

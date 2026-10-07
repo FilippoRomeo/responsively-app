@@ -25,7 +25,30 @@ export type AddonPart =
       when?: 'ready' | 'start';
     }
   /** A command run when a Session using the add-on opens (e.g. the app a panel shows). */
-  | {id: string; kind: 'start'; label: string; command: string; url?: string};
+  | {id: string; kind: 'start'; label: string; command: string; url?: string}
+  /**
+   * An MCP server whose tools agents reach through this Session
+   * (list_addon_tools / call_addon_tool): a command (stdio) or a URL (HTTP).
+   */
+  | {id: string; kind: 'mcp'; label: string; command?: string; url?: string}
+  /**
+   * A rule written like a Claude skill (SKILL.md: name + description, then the
+   * body). `always`: agents get it in full; `on-demand`: by name and
+   * description, the body when they ask.
+   */
+  | {
+      id: string;
+      kind: 'rule';
+      label: string;
+      name: string;
+      description: string;
+      /** SKILL.md in the add-on's folder, or the body itself. */
+      file?: string;
+      body?: string;
+      mode: 'always' | 'on-demand';
+    }
+  /** A premade prompt agents can use (e.g. "check this page on real iOS Safari"). */
+  | {id: string; kind: 'prompt'; label: string; name: string; description: string; text: string};
 
 export interface Addon {
   id: string;
@@ -123,4 +146,19 @@ export const matchesSite = (patterns: string[], url: string) => {
     const [h, p] = pattern.split(':');
     return glob(h, host) && (p === undefined || glob(p, port));
   });
+};
+
+/** Reads a SKILL.md: YAML-ish frontmatter (name, description) and the body. */
+export const parseSkill = (text: string) => {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  const front = match?.[1] ?? '';
+  const field = (key: string) => {
+    const line = front.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'))?.[1]?.trim() ?? '';
+    return line.replace(/^(['"])(.*)\1$/, '$2');
+  };
+  return {
+    name: field('name'),
+    description: field('description'),
+    body: (match?.[2] ?? text).trim(),
+  };
 };

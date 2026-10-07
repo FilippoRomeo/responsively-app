@@ -22,6 +22,13 @@ export interface McpBeacon {
   writtenAt: string;
 }
 
+/** Sent to agents when they connect (app server and bridge alike). */
+export const MCP_AGENT_INSTRUCTIONS =
+  'Responsively App: device previews of a web page, one Session per project. Before working ' +
+  'in a Session, call get_rules for it: follow the "always" rules, and read the others by name ' +
+  'when relevant. get_prompts lists routines the user saved; list_addon_tools lists tools of ' +
+  'add-ons the user switched on.';
+
 export type McpBridgeCommand =
   | 'get-app-state'
   | 'navigate'

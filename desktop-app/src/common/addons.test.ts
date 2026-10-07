@@ -1,4 +1,4 @@
-import {matchesSite, partOn, Stack} from './addons';
+import {matchesSite, parseSkill, partOn, Stack} from './addons';
 
 describe('matchesSite', () => {
   it('matches hosts, ports and wildcards; never non-web pages', () => {
@@ -24,5 +24,25 @@ describe('partOn', () => {
     expect(partOn(stack, 'a', 'panel')).toBe(false);
     expect(partOn(stack, 'b', 'script')).toBe(false);
     expect(partOn(stack, 'missing', 'script')).toBe(false);
+  });
+});
+
+describe('parseSkill', () => {
+  it('reads a Claude-style SKILL.md', () => {
+    const skill = parseSkill(
+      '---\nname: ios-check\ndescription: "Check a page on real iOS Safari"\n---\n\n# Steps\n1. Switch the phone.'
+    );
+    expect(skill).toEqual({
+      name: 'ios-check',
+      description: 'Check a page on real iOS Safari',
+      body: '# Steps\n1. Switch the phone.',
+    });
+  });
+  it('treats a file without frontmatter as all body', () => {
+    expect(parseSkill('Never change files outside src/.')).toEqual({
+      name: '',
+      description: '',
+      body: 'Never change files outside src/.',
+    });
   });
 });

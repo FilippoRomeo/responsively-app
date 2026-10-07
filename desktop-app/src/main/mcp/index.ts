@@ -5,7 +5,7 @@ import http from 'http';
 import {AddressInfo} from 'net';
 import store from '../../store';
 import log from '../logging';
-import {MCP_SERVER_NAME} from '../../common/mcp';
+import {MCP_AGENT_INSTRUCTIONS, MCP_SERVER_NAME} from '../../common/mcp';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import {writeMcpBeacon} from './beacon';
 import {GetMainWindow, initMcpBridge} from './bridge';
@@ -32,7 +32,10 @@ const handleMcpRequest = async (
 ) => {
   // Stateless mode: a fresh server + transport per request, so concurrent
   // agents need no session bookkeeping.
-  const server = new McpServer({name: MCP_SERVER_NAME, version: app.getVersion()});
+  const server = new McpServer(
+    {name: MCP_SERVER_NAME, version: app.getVersion()},
+    {instructions: MCP_AGENT_INSTRUCTIONS}
+  );
   registerTools(server, getMainWindow);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
