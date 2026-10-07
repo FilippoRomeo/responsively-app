@@ -4,6 +4,10 @@ A maintained fork of [responsively-org/responsively-app](https://github.com/resp
 
 This is not an official Responsively release. The original Responsively project, website and general-purpose downloads remain upstream.
 
+![One page on a phone, a tablet and a laptop side by side: one column, two columns, three columns](docs/media/devices.png)
+
+_One page, every device at once: the phone gets one column and a menu button, the iPad two columns, the MacBook three. Your coding agent drives the same window over MCP._
+
 ## Why this fork exists
 
 The upstream app is designed as one responsive-development browser. This fork adds a project/session layer so one installed app can safely serve several independent projects without sharing browser state or taking over each other's MCP runtime.
@@ -59,6 +63,18 @@ See:
 - [Sessions architecture and lifecycle](desktop-app/SESSIONS.md)
 - [Sessions roadmap, verified issues and planned milestones](desktop-app/SESSIONS_ROADMAP.md)
 - [Sessions execution and validation process](desktop-app/SESSIONS_PROCESS.md)
+
+## Add-ons
+
+Dev tools live in Responsively instead of in your project's packages. Paste a GitHub repo, an npm package, a web address (say, a ComfyUI panel) or a folder; it is used as it is, nothing to convert. Responsively shows what it found (page scripts, an app panel, an MCP server, rules written like Claude skills, premade prompts) and lets you run its build in a small terminal. Before it installs, it asks for exactly what the add-on may do. Every part has its own switch, and you can save a set of switches as a stack.
+
+![Installing compose3d from its GitHub repo: paste the source, review what it adds, build it, allow it, and its editor appears on the page](docs/media/addon-install.gif)
+
+_Installing [compose3d](https://github.com/FilippoRomeo/compose3d) from its repo. Then a plain three.js page (no compose3d in its packages) gets the editor, and you can select and move its objects:_
+
+![compose3d's editor inside the MacBook preview, with the cube selected and its move gizmo](docs/media/compose3d-editor.png)
+
+Agents get the same things through MCP: the add-on's tools (`list_addon_tools`, `call_addon_tool`), its rules (`get_rules`) and prompts (`get_prompts`), and `evaluate` to read and change the live page, here the three.js scene. Add-ons nobody used for six months are offered for deletion, data included.
 
 ## Supported build
 
@@ -252,6 +268,9 @@ Browser tools include:
 - `read_page`
 - `click`
 - `type_text`
+- `set_device_browser` (a phone preview can show real iOS Safari from the iOS Simulator)
+- `evaluate` (run JavaScript in a preview and get the result)
+- `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
 
