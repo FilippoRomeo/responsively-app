@@ -64,6 +64,16 @@ See:
 - [Sessions roadmap, verified issues and planned milestones](desktop-app/SESSIONS_ROADMAP.md)
 - [Sessions execution and validation process](desktop-app/SESSIONS_PROCESS.md)
 
+## Toolbar and devices
+
+![The toolbar: Devices (Default, 3 devices), the All devices group (rotate, inspect, capture, simulate, sound), add-ons, MCP and Appearance open with Dark/Light, four colours (Graphite, Stone, Black, Midnight) and the previews' colour scheme; each device header has its own rotate, screenshot, inspect, sound and light/dark buttons, ⋯ and ×](docs/media/toolbar.png)
+
+- **Devices ▾** picks the suite and which devices are in it.
+- **All devices** acts on every preview: rotate, inspect, capture, simulate vision and sound. The speaker mutes everything in one click; **▾** beside it mutes, shows what is playing and sets the volume per device.
+- **Appearance** sets Responsively's own Dark/Light and colour, and Light/Dark for every preview's page (`prefers-color-scheme`).
+- Each device header has its own **rotate, screenshot, inspect, sound and light/dark**; **⋯** holds refresh, devtools, rulers, focus, full-page screenshot, design overlay and event mirroring; **×** takes the device out of the suite.
+- **⋮ › Manage Sessions…** (⌘⇧M) opens the Sessions manager.
+
 ## Add-ons
 
 Dev tools live in Responsively instead of in your project's packages. Paste a GitHub repo, an npm package, a web address (say, a ComfyUI panel) or a folder; it is used as it is, nothing to convert. Responsively shows what it found (page scripts, an app panel, an MCP server, rules written like Claude skills, premade prompts) and lets you run its build in a small terminal. Before it installs, it asks for exactly what the add-on may do. Every part has its own switch, and you can save a set of switches as a stack.

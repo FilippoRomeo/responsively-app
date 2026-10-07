@@ -290,23 +290,21 @@ test.describe('Canvas mode', () => {
     await expect.poll(() => firstPill.evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
   });
 
-  test('a per-device simulation shows a badge in the label', async ({app}) => {
+  test('a simulation shows a badge in each device label', async ({app}) => {
     await app.dismissModals();
     await app.page.locator('[data-testid="layout-COLUMN"]').click();
 
-    // The device pill reveals on hover; use the first device's sim dropdown.
-    const firstDevice = app.page.locator('[data-testid="device-pill"]').first();
-    await app.revealDevicePill();
-    await firstDevice.locator('button[title="Simulate vision"]').click();
+    // The toolbar's Simulate applies to every device; each label names it.
+    await app.openColorBlindnessDropdown();
     await app.page.getByRole('button', {name: 'deuteranopia'}).first().click();
-
-    await expect(app.page.locator('[data-testid="sim-badge"]').first()).toHaveText('deuteranopia', {
-      timeout: 10_000,
-    });
+    await expect(app.page.locator('[data-testid="sim-badge"]')).toHaveCount(
+      await app.webviews.count(),
+      {timeout: 10_000}
+    );
+    await expect(app.page.locator('[data-testid="sim-badge"]').first()).toHaveText('deuteranopia');
 
     // Clear it for the next spec file.
-    await app.revealDevicePill();
-    await firstDevice.locator('button[title="Simulate vision"]').click();
+    await app.openColorBlindnessDropdown();
     await app.page.getByRole('button', {name: 'Off — normal vision'}).first().click();
     await expect(app.page.locator('[data-testid="sim-badge"]')).toHaveCount(0);
   });

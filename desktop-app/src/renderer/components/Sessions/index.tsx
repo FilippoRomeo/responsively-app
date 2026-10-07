@@ -4,6 +4,8 @@ import {ReactNode, useCallback, useEffect, useRef, useState} from 'react';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {SessionInfo, SessionRequest} from 'common/sessions';
 import {getDevicesMap} from 'common/deviceList';
+import {Dialog, DialogPanel} from '@headlessui/react';
+import useOverlayRegistry from 'renderer/hooks/useOverlayRegistry';
 import Popover from '../Popover';
 import Input from '../Input';
 import {ToolbarAction} from '../ToolBar/primitives';
@@ -136,6 +138,57 @@ export const SessionsButton = ({
         </>
       )}
     </Popover>
+  );
+};
+
+/** ⋮ › Manage Sessions… asks the icon toolbar's dialog to open. */
+export const MANAGE_SESSIONS_EVENT = 'responsively:manage-sessions';
+
+/**
+ * The icon toolbar's Sessions manager: a dialog opened from ⋮ or ⌘⇧M, since the
+ * tab strip already names this Session (the classic toolbar keeps SessionsButton).
+ */
+export const SessionsDialog = ({
+  showRequest = null,
+  onShown,
+}: {
+  showRequest?: SessionsShowRequest | null;
+  onShown?: () => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState<SessionsShowRequest | null>(null);
+  useOverlayRegistry(open);
+  useEffect(() => {
+    if (!showRequest) return;
+    setShown(showRequest);
+    setOpen(true);
+    onShown?.();
+  }, [showRequest, onShown]);
+  useEffect(() => {
+    const show = () => {
+      setShown(null);
+      setOpen(true);
+    };
+    window.addEventListener(MANAGE_SESSIONS_EVENT, show);
+    return () => window.removeEventListener(MANAGE_SESSIONS_EVENT, show);
+  }, []);
+  return (
+    <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
+      <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-start justify-center p-4 pt-[72px]">
+        <DialogPanel
+          data-testid="sessions-dialog"
+          className="w-[420px] max-w-full overflow-hidden rounded-dialog border border-line bg-panel text-fg shadow-elevated"
+        >
+          <SessionsManager
+            request={request}
+            onClose={() => setOpen(false)}
+            active={open}
+            showRequest={shown}
+          />
+        </DialogPanel>
+      </div>
+    </Dialog>
   );
 };
 

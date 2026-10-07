@@ -6,7 +6,8 @@ import MenuRow from 'renderer/components/MenuRow';
 import Modal from 'renderer/components/Modal';
 import Toggle from 'renderer/components/Toggle';
 import {selectDockPosition, setDockPosition} from 'renderer/store/features/devtools';
-import {APP_VIEWS, setAppView} from 'renderer/store/features/ui';
+import {selectClassicToolbar} from 'renderer/store/features/ui';
+import {MANAGE_SESSIONS_EVENT} from 'renderer/components/Sessions';
 import ShortcutsModal from '../../Shortcuts/ShortcutsModal';
 import Bookmark from './Bookmark';
 import {SettingsContent} from './Settings/SettingsContent';
@@ -36,12 +37,26 @@ interface Props {
 const MenuFlyout = ({closeFlyout}: Props) => {
   const dispatch = useDispatch();
   const dockPosition = useSelector(selectDockPosition);
+  const classic = useSelector(selectClassicToolbar);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
 
   return (
     <>
       <div className="absolute right-0 top-[30px] z-50 w-[232px] rounded-[10px] border border-line bg-panel p-[6px] text-fg shadow-elevated focus:outline-none">
+        {classic ? null : (
+          <MenuItem
+            icon="lucide:panels-top-left"
+            label="Manage Sessions…"
+            trailing={<span className="text-[11px] text-muted">⌘⇧M</span>}
+            onClick={() => {
+              closeFlyout();
+              window.dispatchEvent(new Event(MANAGE_SESSIONS_EVENT));
+            }}
+          />
+        )}
+        <Bookmark />
+        <div className="mx-1 my-[6px] border-t border-line-soft" />
         <div className="flex items-center justify-between px-[10px] py-2">
           <span className="text-[13.5px]">Dock devtools</span>
           <Toggle
@@ -54,24 +69,6 @@ const MenuFlyout = ({closeFlyout}: Props) => {
             }
           />
         </div>
-        <MenuItem
-          icon="heroicons:swatch"
-          iconClassName="text-accent"
-          label="Devices & suites"
-          onClick={() => {
-            closeFlyout();
-            dispatch(setAppView(APP_VIEWS.DEVICE_MANAGER));
-          }}
-        />
-        <MenuItem
-          icon="carbon:trash-can"
-          label="Clear browsing history"
-          onClick={() => {
-            window.electron.store.set('history', []);
-            closeFlyout();
-          }}
-        />
-        <Bookmark />
         <MenuItem
           icon="lucide:settings"
           label="Settings"

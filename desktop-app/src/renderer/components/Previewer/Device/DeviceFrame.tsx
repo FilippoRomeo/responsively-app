@@ -52,6 +52,8 @@ interface Props {
   toolbar: ReactNode;
   /** Header badge naming a non-Chromium browser (Safari · iOS 26.1). */
   browserBadge?: ReactNode;
+  /** Takes the device out of the suite (absent: it is the last one). */
+  onRemove?: () => void;
   /** Replaces the preview with another browser's screen (real iOS Safari). */
   screenOverride?: ReactNode;
 }
@@ -85,6 +87,7 @@ const DeviceFrame = ({
   webviewRef,
   toolbar,
   browserBadge,
+  onRemove,
   screenOverride,
 }: Props) => {
   const scaledHeight = height * zoomfactor;
@@ -122,6 +125,19 @@ const DeviceFrame = ({
         {browserBadge}
         <span className="flex-1" />
         {navigation.loading && !screenOverride ? <Spinner spinnerHeight={20} /> : null}
+        {onRemove ? (
+          <button
+            type="button"
+            title={`Remove ${device.name}`}
+            aria-label={`Remove ${device.name}`}
+            onClick={onRemove}
+            className="flex h-6 w-6 items-center justify-center self-center rounded-md text-[13px] text-muted hover:bg-hover hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            <span className="pointer-events-none contents">
+              <Icon icon="lucide:x" />
+            </span>
+          </button>
+        ) : null}
       </div>
       {toolbar}
       <div className="flex gap-4">

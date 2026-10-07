@@ -144,12 +144,18 @@ const McpPanel = () => {
     <Popover
       triggerTitle="MCP server — connect AI tools"
       anchor="bottom end"
-      triggerClassName="flex h-[34px] items-center gap-[7px] rounded-[9px] border border-line px-3 text-[12.5px] font-bold text-fg transition-colors hover:bg-hover"
+      triggerClassName="flex h-[30px] items-center gap-[7px] rounded-[9px] border border-line px-[10px] text-[12.5px] font-bold text-fg transition-colors hover:bg-hover"
       className="w-[302px] p-[6px]"
       trigger={
         <span className="pointer-events-none contents">
           <Icon icon="lucide:plug-zap" fontSize={16} className="text-accent" />
-          MCP
+          <span className="max-[1180px]:hidden">MCP</span>
+          <span
+            className={cx(
+              'h-[6px] w-[6px] rounded-full',
+              isRunning ? 'bg-accent' : 'bg-control-off'
+            )}
+          />
         </span>
       }
     >

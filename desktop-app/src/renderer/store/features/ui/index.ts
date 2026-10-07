@@ -18,6 +18,9 @@ export interface AnnouncementsState {
   supportHidden: boolean;
 }
 
+export const PALETTES = ['graphite', 'stone', 'black', 'midnight'] as const;
+export type Palette = (typeof PALETTES)[number];
+
 export interface UIState {
   darkMode: boolean;
   appView: AppView;
@@ -26,6 +29,8 @@ export interface UIState {
   isPresenting: boolean;
   /** Tools in the Session menu (the old toolbar) instead of the icon bar. */
   classicToolbar: boolean;
+  /** Dark theme colours; light mode has one palette. */
+  palette: Palette;
   announcements: AnnouncementsState;
 }
 
@@ -37,6 +42,7 @@ const initialState: UIState = {
   menuFlyout: false,
   isPresenting: false,
   classicToolbar: false,
+  palette: 'graphite',
   announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
 };
 
@@ -59,6 +65,9 @@ export const uiSlice = createSlice({
     setClassicToolbar: (state, action: PayloadAction<boolean>) => {
       state.classicToolbar = action.payload;
     },
+    setPalette: (state, action: PayloadAction<Palette>) => {
+      state.palette = action.payload;
+    },
     setWhatsNewSeen: (state, action: PayloadAction<string>) => {
       state.announcements.seenVersion = action.payload;
     },
@@ -78,6 +87,7 @@ export const {
   closeMenuFlyout,
   setPresenting,
   setClassicToolbar,
+  setPalette,
   setWhatsNewSeen,
   setSupportShownAt,
   hideSupportForever,
@@ -86,6 +96,7 @@ export const {
 export const selectDarkMode = (state: RootState) => state.ui.darkMode;
 export const selectAppView = (state: RootState) => state.ui.appView;
 export const selectClassicToolbar = (state: RootState) => state.ui.classicToolbar;
+export const selectPalette = (state: RootState) => state.ui.palette;
 export const selectMenuFlyout = (state: RootState) => state.ui.menuFlyout;
 export const selectIsPresenting = (state: RootState) => state.ui.isPresenting;
 export const selectAnnouncements = (state: RootState) => state.ui.announcements;

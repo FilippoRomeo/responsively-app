@@ -1,9 +1,10 @@
 import React, {useEffect} from 'react';
 import {useSelector} from 'react-redux';
-import {selectDarkMode} from 'renderer/store/features/ui';
+import {selectDarkMode, selectPalette} from 'renderer/store/features/ui';
 
 const ThemeProvider = ({children}: {children: React.ReactNode}) => {
   const darkMode = useSelector(selectDarkMode);
+  const palette = useSelector(selectPalette);
 
   useEffect(() => {
     document.body.classList.add('bg-bg', 'text-fg');
@@ -15,7 +16,8 @@ const ThemeProvider = ({children}: {children: React.ReactNode}) => {
     // collapsed into semantic classes.
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
     document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
+    document.documentElement.dataset.palette = palette;
+  }, [darkMode, palette]);
 
   return <>{children}</>;
 };

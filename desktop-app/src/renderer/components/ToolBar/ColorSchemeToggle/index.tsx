@@ -1,28 +1,25 @@
 import {Icon} from '@iconify/react';
-import {IPC_MAIN_CHANNELS} from 'common/constants';
-import {SetNativeThemeArgs, SetNativeThemeResult} from 'main/native-functions';
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
+import {
+  onPreviewsSchemeChange,
+  previewsScheme,
+  setPreviewsScheme,
+} from 'renderer/components/Previewer/Device/scheme';
 import {IconButton, ToolbarAction} from '../primitives';
 
+/** Classic toolbar: dark or light previews on every device (Appearance has the full choice). */
 const ColorSchemeToggle = ({iconOnly = false}: {iconOnly?: boolean}) => {
-  const [isDarkColorScheme, setIsDarkColorScheme] = useState<boolean>(false);
+  const [dark, setDark] = useState(previewsScheme() === 'dark');
+  useEffect(() => onPreviewsSchemeChange(() => setDark(previewsScheme() === 'dark')), []);
   const Button = iconOnly ? IconButton : ToolbarAction;
 
   return (
     <Button
-      onClick={() => {
-        window.electron.ipcRenderer.invoke<SetNativeThemeArgs, SetNativeThemeResult>(
-          IPC_MAIN_CHANNELS.SET_NATIVE_THEME,
-          {
-            theme: isDarkColorScheme ? 'light' : 'dark',
-          }
-        );
-        setIsDarkColorScheme(!isDarkColorScheme);
-      }}
-      isActive={isDarkColorScheme}
+      onClick={() => setPreviewsScheme(dark ? 'light' : 'dark')}
+      isActive={dark}
       title="Device theme color toggle"
     >
-      <Icon icon={isDarkColorScheme ? 'carbon:moon' : 'carbon:sun'} fontSize={15} />
+      <Icon icon={dark ? 'carbon:moon' : 'carbon:sun'} fontSize={15} />
       {iconOnly ? null : 'Scheme'}
     </Button>
   );

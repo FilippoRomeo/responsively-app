@@ -27,7 +27,7 @@ test.describe('Devtools overlay coordination', () => {
     await app.dismissModals();
 
     // Open devtools on the first device.
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     await app.page.locator('button[title="Open devtools"]').first().click();
     await expect.poll(() => devtoolsAttached(app), {timeout: 15_000}).toBe(true);
 
@@ -65,12 +65,9 @@ test.describe('Devtools overlay coordination', () => {
         ({BrowserWindow}) => BrowserWindow.getAllWindows()[0].contentView.children.length
       );
     const openOn = async (index: number) => {
-      await app.revealDevicePill(index);
-      await app.page
-        .locator('[data-testid="device-pill"]:visible')
-        .nth(index)
-        .locator('button[title="Open devtools"]')
-        .click();
+      // The ⋯ menu is anchored outside the pill: there is one open at a time.
+      await app.openDeviceMore(index);
+      await app.page.locator('button[title="Open devtools"]').click();
     };
 
     await openOn(0);

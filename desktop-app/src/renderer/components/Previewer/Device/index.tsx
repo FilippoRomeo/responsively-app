@@ -4,9 +4,11 @@ import {CONTEXT_MENUS} from 'main/webview-context-menu/common';
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {
+  selectActiveSuite,
   selectDeviceBrowser,
   selectIndividualRotations,
   setIndividualRotation,
+  setSuiteDevices,
 } from 'renderer/store/features/device-manager';
 import {BrowserPicker, runtimeLabel, SimulatorScreen} from 'renderer/components/IosSafari';
 import {
@@ -36,6 +38,7 @@ import Toolbar from './Toolbar';
 import useDeviceNavigation from './useDeviceNavigation';
 import useDevtoolsBridge from './useDevtoolsBridge';
 import useWebviewLifecycle from './useWebviewLifecycle';
+import {useDeviceScheme} from './scheme';
 
 interface Props {
   device: IDevice;
@@ -53,6 +56,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
   const layout = useSelector(selectLayout);
   const canvasOptions = useSelector(selectCanvasOptions);
   const isPresenting = useSelector(selectIsPresenting);
+  const activeSuite = useSelector(selectActiveSuite);
   const dispatch = useDispatch();
   const [activeSimulation, setActiveSimulation] = useState<string | undefined>(undefined);
   const [flashing, setFlashing] = useState<boolean>(false);
@@ -80,7 +84,12 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
 
   const {webviewReady} = useWebviewLifecycle(ref, {isMobileCapable: device.isMobileCapable});
   const navigation = useDeviceNavigation({ref, isPrimary, webviewReady, address});
-  const {openDevTools, inspectElement} = useDevtoolsBridge({ref, webviewReady, zoomfactor});
+  const scheme = useDeviceScheme(getWebview, webviewReady);
+  const {openDevTools, inspectElement, inspectingHere, toggleInspectHere} = useDevtoolsBridge({
+    ref,
+    webviewReady,
+    zoomfactor,
+  });
 
   const isIndividualLayout = layout === PREVIEW_LAYOUTS.INDIVIDUAL;
   const isCanvasLayout = layout === PREVIEW_LAYOUTS.CANVAS;
@@ -246,6 +255,17 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
       flashing={flashing}
       initialSrc={initialAddress.current}
       webviewRef={setWebviewRef}
+      onRemove={
+        isCanvasLayout || activeSuite.devices.length < 2
+          ? undefined
+          : () =>
+              dispatch(
+                setSuiteDevices({
+                  suite: activeSuite.id,
+                  devices: activeSuite.devices.filter((id) => id !== device.id),
+                })
+              )
+      }
       browserBadge={
         iosRuntime ? (
           <span
@@ -282,12 +302,16 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
             onRotate={onRotateHandler}
             onIndividualLayoutHandler={onIndividualLayoutHandler}
             isIndividualLayout={isIndividualLayout}
-            isDeviceRotationEnabled={isDeviceRotationEnabled}
             rulerActive={rulerActive}
             designOverlay={designOverlay}
             resolution={resolution}
             variant={isCanvasLayout ? 'canvas' : 'grid'}
             browserPicker={<BrowserPicker deviceId={device.id} deviceName={device.name} />}
+            inspectingHere={inspectingHere}
+            onInspectHere={toggleInspectHere}
+            ownScheme={scheme.own}
+            effectiveScheme={scheme.effective}
+            onCycleScheme={scheme.cycle}
           />
         )
       }

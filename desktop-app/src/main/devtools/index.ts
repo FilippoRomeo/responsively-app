@@ -85,6 +85,43 @@ const onDebuggerEvent = async (
   }
 };
 
+// Devices showing a light/dark override: their debugger stays attached, or
+// Chromium drops the emulation.
+const schemes = new Map<number, 'light' | 'dark'>();
+
+/** One attach per webview, shared by the inspector and the colour-scheme override. */
+const attachDebugger = (webviewId: number, dbg: Electron.Debugger) => {
+  if (dbg.isAttached()) return;
+  dbg.attach();
+  dbg.on('message', (__: any, method: string, params: any) => {
+    onDebuggerEvent(__, method, params, dbg, webviewId);
+  });
+};
+
+export interface SetDeviceSchemeArgs {
+  webviewId: number;
+  /** null: back to the window-wide setting (Appearance). */
+  scheme: 'light' | 'dark' | null;
+}
+
+const setDeviceScheme = async (_: any, args: SetDeviceSchemeArgs) => {
+  const {webviewId, scheme} = args;
+  if (scheme !== null && scheme !== 'light' && scheme !== 'dark') throw new Error('Unknown scheme');
+  if (!isRegisteredWebview(webviewId)) return {status: false};
+  const contents = webContents.fromId(webviewId);
+  if (contents === undefined) return {status: false};
+  attachDebugger(webviewId, contents.debugger);
+  await contents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+    features: [{name: 'prefers-color-scheme', value: scheme ?? ''}],
+  });
+  if (scheme === null) schemes.delete(webviewId);
+  else if (!schemes.has(webviewId)) {
+    schemes.set(webviewId, scheme);
+    contents.once('destroyed', () => schemes.delete(webviewId));
+  } else schemes.set(webviewId, scheme);
+  return {status: true};
+};
+
 const enableInspector = async (
   _: any,
   args: ToggleInspectorArgs
@@ -99,12 +136,7 @@ const enableInspector = async (
   }
 
   const dbg = webViewContents.debugger;
-  if (!dbg.isAttached()) {
-    dbg.attach();
-    dbg.on('message', (__: any, method: string, params: any) => {
-      onDebuggerEvent(__, method, params, dbg, webviewId);
-    });
-  }
+  attachDebugger(webviewId, dbg);
   await dbg.sendCommand('DOM.enable');
   await dbg.sendCommand('Overlay.enable');
   await dbg.sendCommand('Overlay.setInspectMode', {
@@ -140,7 +172,7 @@ const disableInspector = async (
       highlightConfig: {},
     });
 
-    dbg.removeAllListeners().detach();
+    if (!schemes.has(webviewId)) dbg.removeAllListeners().detach();
   } catch (err) {
     log.warn('Error detaching debugger', err);
   }
@@ -273,4 +305,7 @@ export const initDevtoolsHandlers = (_mainWindow: BrowserWindow | undefined) => 
 
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.DISABLE_INSPECTOR_OVERLAY);
   ipcMain.handle(IPC_MAIN_CHANNELS.DISABLE_INSPECTOR_OVERLAY, disableInspector);
+
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.SET_DEVICE_COLOR_SCHEME);
+  ipcMain.handle(IPC_MAIN_CHANNELS.SET_DEVICE_COLOR_SCHEME, setDeviceScheme);
 };

@@ -12,7 +12,7 @@ test.describe('Device Toolbar', () => {
   test('refresh view button reloads the individual webview', async ({app}) => {
     await app.dismissModals();
 
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     const refreshViewBtn = app.page.locator('button[title="Refresh this device"]').first();
     await expect(refreshViewBtn).toBeVisible();
 
@@ -27,7 +27,7 @@ test.describe('Device Toolbar', () => {
   test('scroll to top button scrolls the webview to top', async ({app}) => {
     await app.dismissModals();
 
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     const scrollToTopBtn = app.page.locator('button[title="Scroll to top"]').first();
     await expect(scrollToTopBtn).toBeVisible();
 
@@ -40,7 +40,7 @@ test.describe('Device Toolbar', () => {
     await app.dismissModals();
     await app.page.locator('[data-testid="layout-FLEX"]').click();
 
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     const focusBtn = app.page.locator('button[title="Focus this device"]').first();
     await expect(focusBtn).toBeVisible();
     await focusBtn.click();
@@ -48,19 +48,23 @@ test.describe('Device Toolbar', () => {
     // In the focus (individual) layout the container centers one device.
     const centeredContainer = app.page.locator('.flex.gap-4.overflow-auto.p-4.justify-center');
     await expect(centeredContainer).toBeVisible({timeout: 5_000});
-    await expect(focusBtn).toHaveAttribute('aria-pressed', 'true');
+    await app.openDeviceMore();
+    await expect(focusBtn).toHaveAttribute('aria-checked', 'true');
+    await app.page.keyboard.press('Escape');
   });
 
   test('focus this device toggles back to a multi-device view', async ({app}) => {
     await app.dismissModals();
 
     // Still in the focus layout from the previous test.
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     const focusBtn = app.page.locator('button[title="Focus this device"]').first();
-    await expect(focusBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(focusBtn).toHaveAttribute('aria-checked', 'true');
     await focusBtn.click();
 
-    await expect(focusBtn).toHaveAttribute('aria-pressed', 'false');
+    await app.openDeviceMore();
+    await expect(focusBtn).toHaveAttribute('aria-checked', 'false');
+    await app.page.keyboard.press('Escape');
     const centeredContainer = app.page.locator('.flex.gap-4.overflow-auto.p-4.justify-center');
     await expect(centeredContainer).toBeHidden();
     expect(await app.webviews.count()).toBeGreaterThanOrEqual(1);
@@ -107,7 +111,7 @@ test.describe('Device Toolbar', () => {
   test('ruler toggle shows rulers on the device', async ({app}) => {
     await app.dismissModals();
 
-    await app.revealDevicePill();
+    await app.openDeviceMore();
     const rulerBtn = app.page.locator('button[title="Show rulers"]').first();
     await expect(rulerBtn).toBeVisible();
 

@@ -36,6 +36,11 @@ const schema = {
         type: 'boolean',
         default: false,
       },
+      // Dark theme colours (App.css): graphite unless the user picks another.
+      palette: {
+        enum: ['graphite', 'stone', 'black', 'midnight'],
+        default: 'graphite',
+      },
       announcements: {
         type: 'object',
         properties: {

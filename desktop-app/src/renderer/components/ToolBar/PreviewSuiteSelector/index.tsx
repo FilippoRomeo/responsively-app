@@ -41,47 +41,61 @@ export const PreviewSuiteSelector = () => {
     );
   };
 
+  const count = `${activeDeviceIds.length} device${activeDeviceIds.length === 1 ? '' : 's'}`;
   return (
-    <div className="flex flex-shrink-0 items-center gap-[6px]" data-testid="suite-selector">
-      {suites.map((suite) => {
-        const isActive = suite.id === activeSuite.id;
-        return (
-          <button
-            key={suite.id}
-            type="button"
-            aria-pressed={isActive}
-            title={`${suite.name} suite`}
-            data-testid={`suite-chip-${suite.id}`}
-            onClick={() => dispatch(setActiveSuite(suite.id))}
-            className={cx(
-              'flex h-7 items-center gap-[6px] rounded-full border px-3 text-[12.5px] font-bold transition-colors',
-              'focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-              isActive
-                ? 'border-accent bg-accent-soft text-accent'
-                : 'border-line text-fg hover:bg-hover'
-            )}
-          >
-            <span className="pointer-events-none contents">
-              {suite.name}
-              <span className="text-[11px] font-normal text-muted">{suite.devices.length}</span>
-            </span>
-          </button>
-        );
-      })}
-
+    <div className="flex flex-shrink-0 items-center" data-testid="suite-selector">
       <Popover
-        triggerTitle="Edit suite"
+        triggerTitle={`Devices: ${activeSuite.name}, ${count}`}
         anchor="bottom end"
-        triggerClassName="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-line text-sm text-muted transition-colors hover:bg-hover hover:text-fg"
-        className="w-[264px] p-[6px]"
+        triggerClassName="flex h-[30px] items-center gap-2 rounded-full border border-line px-[11px] text-[12.5px] text-fg transition-colors hover:bg-hover data-[open]:border-accent data-[open]:bg-accent-soft focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        className="w-[300px] p-[6px]"
         trigger={
-          <span className="pointer-events-none contents">
-            <Icon icon="lucide:plus" />
+          <span
+            className="pointer-events-none flex items-center gap-2"
+            data-testid="devices-button"
+          >
+            <Icon icon="lucide:monitor-smartphone" fontSize={15} />
+            <span className="font-bold max-[1180px]:hidden">{activeSuite.name}</span>
+            <span className="text-[11px] text-muted">
+              <span className="min-[1181px]:hidden">{activeDeviceIds.length}</span>
+              <span className="max-[1180px]:hidden">{count}</span>
+            </span>
+            <Icon icon="lucide:chevron-down" fontSize={12} className="text-muted" />
           </span>
         }
       >
         {({close}) => (
           <>
+            <div className="px-[10px] pb-1 pt-2 text-[10.5px] font-bold tracking-[0.08em] text-muted">
+              SUITE
+            </div>
+            {suites.map((suite) => {
+              const isActive = suite.id === activeSuite.id;
+              return (
+                <button
+                  key={suite.id}
+                  type="button"
+                  aria-pressed={isActive}
+                  title={`${suite.name} suite`}
+                  data-testid={`suite-chip-${suite.id}`}
+                  onClick={() => dispatch(setActiveSuite(suite.id))}
+                  className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-[7px] text-[13px] text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover"
+                >
+                  <span className="pointer-events-none contents">
+                    <Icon
+                      icon="lucide:check"
+                      fontSize={14}
+                      className={cx('text-accent', {'opacity-0': !isActive})}
+                    />
+                    <span className={cx('truncate', {'font-bold': isActive})}>{suite.name}</span>
+                    <span className="ml-auto font-mono text-[11px] text-muted">
+                      {suite.devices.length}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            <div className="mx-1 my-[6px] border-t border-line-soft" />
             <div className="px-[10px] pb-1 pt-2 text-[10.5px] font-bold tracking-[0.08em] text-muted">
               DEVICES IN “{activeSuite.name.toUpperCase()}”
             </div>

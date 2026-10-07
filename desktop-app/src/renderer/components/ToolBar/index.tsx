@@ -21,9 +21,11 @@ import {APP_VIEWS, selectClassicToolbar, setAppView} from 'renderer/store/featur
 import NavigationControls from './NavigationControls';
 import Menu from './Menu';
 import AddressBar from './AddressBar';
-import {IconButton, ToolbarAction, ToolbarGroup} from './primitives';
+import {IconButton, ToolbarAction, ToolbarDivider, ToolbarGroup} from './primitives';
 import ColorSchemeToggle from './ColorSchemeToggle';
 import AudioMuteToggle from './AudioMuteToggle';
+import SoundMenu from './SoundMenu';
+import AppearanceMenu from './AppearanceMenu';
 import ModalLoader from '../ModalLoader';
 import {PreviewSuiteSelector} from './PreviewSuiteSelector';
 import useKeyboardShortcut, {
@@ -31,7 +33,7 @@ import useKeyboardShortcut, {
 } from '../KeyboardShortcutsManager/useKeyboardShortcut';
 import McpPanel from './McpPanel';
 import {AddonsButton} from '../Addons';
-import {SessionsButton, SessionsShowRequest} from '../Sessions';
+import {SessionsButton, SessionsDialog, SessionsShowRequest} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
 
 const ToolBar = ({
@@ -137,8 +139,9 @@ const ToolBar = ({
         {classic ? 'Capture' : null}
       </Tool>
       <ColorBlindnessControls iconOnly={!classic} />
-      <ColorSchemeToggle iconOnly={!classic} />
-      <AudioMuteToggle compact={!classic} />
+      {/* The icon bar keeps the previews' scheme in Appearance and sound in its own menu. */}
+      {classic ? <ColorSchemeToggle /> : null}
+      {classic ? <AudioMuteToggle /> : <SoundMenu />}
     </>
   );
 
@@ -167,31 +170,39 @@ const ToolBar = ({
         }}
       >
         {classic ? (
-          <AudioMuteToggle compact />
+          <>
+            <AudioMuteToggle compact />
+            <SessionsButton showRequest={sessionsRequest} onShown={onSessionsShown} tools={tools} />
+            <AddonsButton />
+            <McpPanel />
+            <PreviewSuiteSelector />
+            <IconButton
+              onClick={() => {
+                dispatch(setAppView(APP_VIEWS.DEVICE_MANAGER));
+              }}
+              title="Device Manager"
+            >
+              <Icon icon="lucide:plus" width={16} />
+            </IconButton>
+          </>
         ) : (
-          <div data-testid="toolbar-tools" className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-              All devices
-            </span>
-            <ToolbarGroup>{tools}</ToolbarGroup>
-          </div>
+          <>
+            <PreviewSuiteSelector />
+            <ToolbarDivider />
+            <div data-testid="toolbar-tools" className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted max-[1180px]:hidden">
+                All devices
+              </span>
+              <ToolbarGroup>{tools}</ToolbarGroup>
+            </div>
+            <ToolbarDivider />
+            <AddonsButton />
+            <McpPanel />
+            <AppearanceMenu />
+            {/* Sessions live in ⋮ (and ⌘⇧M): the tab strip already names this one. */}
+            <SessionsDialog showRequest={sessionsRequest} onShown={onSessionsShown} />
+          </>
         )}
-        <SessionsButton
-          showRequest={sessionsRequest}
-          onShown={onSessionsShown}
-          tools={classic ? tools : undefined}
-        />
-        <AddonsButton />
-        <McpPanel />
-        <PreviewSuiteSelector />
-        <IconButton
-          onClick={() => {
-            dispatch(setAppView(APP_VIEWS.DEVICE_MANAGER));
-          }}
-          title="Device Manager"
-        >
-          <Icon icon="lucide:plus" width={16} />
-        </IconButton>
       </div>
       <Menu />
       <ModalLoader isOpen={isCapturingScreenshot} onClose={handleClose} title="Screenshot" />

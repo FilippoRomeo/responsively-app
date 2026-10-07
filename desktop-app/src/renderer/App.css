@@ -57,6 +57,58 @@
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
+/* Dark palettes (Settings: Appearance). Midnight is the original blue. */
+:root[data-palette='graphite']:not([data-theme='light']) {
+  --titlebar: #0e0e10;
+  --titlebar-fg: #9a9aa3;
+  --bg: #18181b;
+  --dot: #2c2c31;
+  --panel: #111113;
+  --card: #1c1c1f;
+  --line: #303036;
+  --line-soft: #232326;
+  --fg: #e4e4e7;
+  --muted: #a1a1aa;
+  --input: #0c0c0e;
+  --hover: #2a2a2e;
+  --active: #36363c;
+  --control-off: #6b6b74;
+}
+
+:root[data-palette='stone']:not([data-theme='light']) {
+  --titlebar: #110f0d;
+  --titlebar-fg: #a39c96;
+  --bg: #1c1917;
+  --dot: #34302b;
+  --panel: #141210;
+  --card: #211d1a;
+  --line: #3a342f;
+  --line-soft: #29241f;
+  --fg: #e7e5e4;
+  --muted: #a8a29e;
+  --input: #0f0d0b;
+  --hover: #2e2925;
+  --active: #3b3530;
+  --control-off: #75706b;
+}
+
+:root[data-palette='black']:not([data-theme='light']) {
+  --titlebar: #000000;
+  --titlebar-fg: #9b9b9b;
+  --bg: #0a0a0a;
+  --dot: #262626;
+  --panel: #000000;
+  --card: #111111;
+  --line: #262626;
+  --line-soft: #1a1a1a;
+  --fg: #ededed;
+  --muted: #a3a3a3;
+  --input: #050505;
+  --hover: #1f1f1f;
+  --active: #2b2b2b;
+  --control-off: #6b6b6b;
+}
+
 :root[data-theme='light'] {
   color-scheme: light;
   --titlebar: #e8e9ec;

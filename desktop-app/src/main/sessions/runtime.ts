@@ -40,6 +40,18 @@ let panelCreate = false;
 let panelError = '';
 let panelAttention = '';
 /** A marker beside the menu-bar icon while a Session an agent could not use awaits you. */
+// Painted before the page loads: the panel colour of the palette in App.css.
+const PANEL: Record<string, string> = {
+  graphite: '#111113',
+  stone: '#141210',
+  black: '#000000',
+  midnight: '#0d1420',
+};
+const windowBackground = () =>
+  store.get('ui.darkMode')
+    ? (PANEL[store.get('ui.palette') as string] ?? PANEL.graphite)
+    : '#ffffff';
+
 const setAttentionBadge = (on: boolean) => {
   if (tray && !tray.isDestroyed()) tray.setTitle(on ? ' !' : '');
 };
@@ -105,6 +117,7 @@ export const showSessions = (
       error,
       attention,
       darkMode: Boolean(store.get('ui.darkMode')),
+      palette: store.get('ui.palette') as string,
     });
     return;
   }
@@ -117,7 +130,7 @@ export const showSessions = (
     frame: false,
     resizable: false,
     skipTaskbar: true,
-    backgroundColor: store.get('ui.darkMode') ? '#0d1420' : '#ffffff',
+    backgroundColor: windowBackground(),
     webPreferences: {
       preload:
         app.isPackaged || process.env.E2E_TEST === 'true'
@@ -166,7 +179,7 @@ export const showNewSessionPlaceholder = (bounds: WindowBounds) => {
     title: 'New Session',
     minWidth: 360,
     minHeight: 300,
-    backgroundColor: store.get('ui.darkMode') ? '#0d1420' : '#ffffff',
+    backgroundColor: windowBackground(),
     webPreferences: {
       preload:
         app.isPackaged || process.env.E2E_TEST === 'true'
@@ -411,6 +424,7 @@ export const initSessions = (
         attention: '',
         placeholder: true,
         darkMode: Boolean(store.get('ui.darkMode')),
+        palette: store.get('ui.palette') as string,
       };
       return;
     }
@@ -419,6 +433,7 @@ export const initSessions = (
       error: panelError,
       attention: panelAttention,
       darkMode: Boolean(store.get('ui.darkMode')),
+      palette: store.get('ui.palette') as string,
     };
   });
   ipcMain.on(IPC_MAIN_CHANNELS.SESSIONS_PANEL_DISMISS, (event) => {
