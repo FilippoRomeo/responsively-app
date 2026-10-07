@@ -48,6 +48,15 @@ const schema = {
       },
     },
   },
+  // The add-on stack this window uses (the add-ons themselves are shared by
+  // every Session, in the Sessions root).
+  addons: {
+    type: 'object',
+    properties: {
+      stackId: {type: 'string', default: 'default'},
+    },
+    default: {},
+  },
   renderer: {
     type: 'object',
     properties: {

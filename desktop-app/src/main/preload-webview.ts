@@ -1,5 +1,20 @@
-import {ipcRenderer} from 'electron';
+import {ipcRenderer, webFrame} from 'electron';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
+
+// Add-on page scripts run in the page's own world before its scripts, so a
+// tool can hook into the page (e.g. three.js' __THREE_DEVTOOLS__) with no
+// change to the project.
+try {
+  const scripts: string[] = ipcRenderer.sendSync(
+    IPC_MAIN_CHANNELS.ADDONS_PAGE_SCRIPTS,
+    window.location.href
+  );
+  scripts.forEach((code) => {
+    webFrame.executeJavaScript(code).catch((error) => console.warn('[add-on]', error));
+  });
+} catch (error) {
+  console.warn('[add-on] page scripts unavailable', error);
+}
 
 window.onerror = function logError(errorMsg, url, lineNumber) {
   console.log(`Unhandled error: ${errorMsg} ${url} ${lineNumber}`);

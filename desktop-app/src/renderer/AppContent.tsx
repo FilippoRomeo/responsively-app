@@ -16,6 +16,7 @@ import {selectLayout} from './store/features/renderer';
 import {selectIsPresenting, setPresenting} from './store/features/ui';
 import {useSessionsShowRequest} from './components/Sessions';
 import McpBridge from './components/McpBridge';
+import {AddonDock} from './components/Addons';
 import AnnouncementCard from './components/AnnouncementCard';
 import {AboutDialog} from './components/AboutDialog';
 
@@ -39,8 +40,11 @@ const Browser = () => {
       {presenting ? null : (
         <ToolBar sessionsRequest={sessionsRequest} onSessionsShown={sessionsShown} />
       )}
-      <div className="min-h-0 flex-1">
-        <Previewer />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
+          <Previewer />
+        </div>
+        {presenting ? null : <AddonDock />}
       </div>
       {presenting ? null : <StatusBar />}
     </div>
