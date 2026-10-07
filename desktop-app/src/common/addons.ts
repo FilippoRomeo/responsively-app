@@ -50,6 +50,15 @@ export type AddonPart =
   /** A premade prompt agents can use (e.g. "check this page on real iOS Safari"). */
   | {id: string; kind: 'prompt'; label: string; name: string; description: string; text: string};
 
+export type PythonEnvKind = 'uv' | 'conda' | 'venv' | 'none';
+
+/** A Python project's own environment, kept in Responsively's folder, never the project's. */
+export interface AddonPython {
+  env: PythonEnvKind;
+  /** What declares its packages. */
+  file: 'requirements.txt' | 'pyproject.toml' | 'environment.yml';
+}
+
 export interface Addon {
   id: string;
   name: string;
@@ -60,6 +69,8 @@ export interface Addon {
   dir?: string;
   /** Command that turns its source into what the parts use, run from `dir`. */
   buildCommand?: string;
+  /** Its build, start command and MCP server run inside this environment. */
+  python?: AddonPython;
   parts: AddonPart[];
   /** What the user allowed at install, in plain words. */
   permissions: string[];
@@ -94,13 +105,17 @@ export type AddonsRequest =
   | {operation: 'install'; addon: Addon}
   | {operation: 'cancel-install'; id: string}
   /** Runs in the add-on's folder: installed (by id) or still being inspected (dir). */
-  | {operation: 'run'; id: string; command: string; dir?: string}
+  | {operation: 'run'; id: string; command: string; dir?: string; python?: AddonPython}
   | {operation: 'uninstall'; id: string}
   | {operation: 'use-stack'; stackId: string}
   | {operation: 'save-stack'; name: string}
   | {operation: 'set-enabled'; addonId: string; enabled: boolean}
   | {operation: 'set-part'; addonId: string; partId: string; on: boolean}
+  /** Bytes per add-on: its files (folders Responsively made) and its Python environment. */
   | {operation: 'sizes'}
+  | {operation: 'delete-env'; id: string}
+  /** uv, conda and python3 on this Mac's login shell, with their versions. */
+  | {operation: 'python-tools'}
   | {operation: 'set-auto-cleanup'; on: boolean}
   | {operation: 'stale'}
   /** Answer to the six-month alert: keep it, the clock restarts. */
@@ -113,6 +128,39 @@ export interface AddonLog {
   done?: boolean;
   code?: number | null;
 }
+
+/** Reply to `sizes`: bytes of each add-on's own files and of its Python environment. */
+export type AddonSizes = Record<string, {files: number; env: number}>;
+
+export type PythonTools = Partial<Record<'uv' | 'conda' | 'python3', string>>;
+
+/** The build command a Python project needs, inside its environment. */
+export const suggestPythonBuild = ({env, file}: AddonPython) => {
+  if (file === 'environment.yml') return 'python --version';
+  const pip = env === 'uv' ? 'uv pip' : 'pip';
+  return file === 'requirements.txt' ? `${pip} install -r requirements.txt` : `${pip} install -e .`;
+};
+
+const sh = (text: string) => `'${text.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * Shell lines run before an add-on's command: make its environment if asked
+ * (the build) and put it first on PATH (build, start, MCP server).
+ */
+export const pythonEnvScript = ({env, file}: AddonPython, dir: string, create: boolean) => {
+  if (env === 'none') return '';
+  const at = sh(dir);
+  const make = {
+    uv: `uv venv ${at}`,
+    venv: `python3 -m venv ${at}`,
+    conda:
+      file === 'environment.yml'
+        ? `conda env create -p ${at} -f environment.yml`
+        : `conda create -y -p ${at} python pip`,
+  }[env];
+  const prefix = env === 'conda' ? 'CONDA_PREFIX' : 'VIRTUAL_ENV';
+  return `${create ? `{ [ -d ${at} ] || ${make}; } && ` : ''}export ${prefix}=${at} PATH=${at}/bin:"$PATH" && `;
+};
 
 export const SIX_MONTHS_MS = 182 * 24 * 60 * 60 * 1000;
 

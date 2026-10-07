@@ -1,8 +1,20 @@
 import {Icon} from '@iconify/react';
 import cx from 'classnames';
-import {Addon, AddonLog, AddonPart, AddonsRequest, AddonsState, partOn} from 'common/addons';
+import {
+  Addon,
+  AddonLog,
+  AddonPart,
+  AddonPython,
+  AddonSizes,
+  AddonsRequest,
+  AddonsState,
+  partOn,
+  PythonEnvKind,
+  PythonTools,
+  suggestPythonBuild,
+} from 'common/addons';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useId, useRef, useState} from 'react';
 import DialogShell from 'renderer/components/DialogShell';
 import Field, {inputClass} from 'renderer/components/Field';
 import SectionCaption from 'renderer/components/SectionCaption';
@@ -26,7 +38,7 @@ export const useAddons = () => {
   return {state, refresh};
 };
 
-const formatSize = (bytes: number) => {
+export const formatSize = (bytes: number) => {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
   if (bytes >= 1e6) return `${Math.round(bytes / 1e6)} MB`;
   return `${Math.round(bytes / 1e3)} KB`;
@@ -343,6 +355,77 @@ const PartEditor = ({
   );
 };
 
+const ENVS: {id: PythonEnvKind; name: string; tool?: keyof PythonTools; about: string}[] = [
+  {id: 'uv', name: 'uv', tool: 'uv', about: 'A fast virtual environment'},
+  {
+    id: 'conda',
+    name: 'conda',
+    tool: 'conda',
+    about: 'For packages that need conda, or an environment.yml',
+  },
+  {id: 'venv', name: 'venv', tool: 'python3', about: 'Plain python3 -m venv, no extra tools'},
+  {id: 'none', name: 'None', about: 'Use whatever python your shell finds'},
+];
+
+/** The environment a Python add-on runs in; tools this Mac lacks can't be picked. */
+const PythonEnv = ({
+  python,
+  onChange,
+}: {
+  python: AddonPython;
+  onChange: (python: AddonPython) => void;
+}) => {
+  const id = useId();
+  const [tools, setTools] = useState<PythonTools | null>(null);
+  useEffect(() => {
+    addonsRequest<PythonTools>({operation: 'python-tools'})
+      .then(setTools)
+      .catch(() => setTools({}));
+  }, []);
+  return (
+    <fieldset className="m-0 flex flex-col rounded-card border border-line bg-card p-0">
+      <legend className="sr-only">Python environment</legend>
+      <SectionCaption className="px-3 pb-2 pt-[10px]">
+        Python environment · {python.file}
+      </SectionCaption>
+      {ENVS.map((e) => {
+        const found = e.tool ? tools?.[e.tool] : undefined;
+        const missing = tools !== null && e.tool !== undefined && !found;
+        return (
+          <div
+            key={e.id}
+            className={cx(
+              'flex items-start gap-[10px] border-t border-line-soft px-3 py-[9px] text-body',
+              {'opacity-60': missing, 'bg-hover': python.env === e.id}
+            )}
+          >
+            <input
+              id={`${id}-${e.id}`}
+              type="radio"
+              name="python-env"
+              checked={python.env === e.id}
+              disabled={missing}
+              onChange={() => onChange({...python, env: e.id})}
+              className="mt-[3px] accent-accent"
+            />
+            <label htmlFor={`${id}-${e.id}`} className={cx('flex-1', {'cursor-pointer': !missing})}>
+              <b>{e.name}</b>
+              <span className="block text-small text-muted">
+                {found ? `${found} · ` : ''}
+                {missing ? 'Not found on this Mac' : e.about}
+              </span>
+            </label>
+          </div>
+        );
+      })}
+      <p className="m-0 border-t border-line-soft px-3 py-2 text-small text-muted">
+        Kept in Responsively&apos;s own folder, not in the add-on&apos;s. Its build, start command
+        and MCP server run inside it; Settings › Storage shows its size.
+      </p>
+    </fieldset>
+  );
+};
+
 /** Source → what it adds (editable, with an optional build) → permission. */
 const Install = ({onDone}: {onDone: () => void}) => {
   const [step, setStep] = useState(0);
@@ -413,6 +496,7 @@ const Install = ({onDone}: {onDone: () => void}) => {
         id: addon.id,
         command: addon.buildCommand,
         dir: addon.dir,
+        python: addon.python,
       });
       setRun({runId});
     } catch (e) {
@@ -448,6 +532,14 @@ const Install = ({onDone}: {onDone: () => void}) => {
                   text: `Run "${p.command}" on this Mac and give its tools to your agents`,
                 }
           ),
+        ...(addon.python && addon.python.env !== 'none'
+          ? [
+              {
+                high: false,
+                text: `Make a ${addon.python.env} Python environment for it, kept in Responsively`,
+              },
+            ]
+          : []),
         ...addon.parts
           .filter((p): p is Extract<AddonPart, {kind: 'script'}> => p.kind === 'script')
           .map((p) => ({high: false, text: `Run its code in previews on ${p.matches.join(', ')}`})),
@@ -550,10 +642,30 @@ const Install = ({onDone}: {onDone: () => void}) => {
                 + Prompt
               </button>
             </div>
+            {addon.python ? (
+              <PythonEnv
+                python={addon.python}
+                onChange={(python) =>
+                  // The build command follows the environment unless it was edited.
+                  setAddon({
+                    ...addon,
+                    python,
+                    buildCommand:
+                      addon.buildCommand === suggestPythonBuild(addon.python!)
+                        ? suggestPythonBuild(python)
+                        : addon.buildCommand,
+                  })
+                }
+              />
+            ) : null}
             <div className="flex flex-col gap-2 rounded-card border border-line bg-card p-3">
               <Field
                 label="Build command"
-                hint="Runs in its folder in your shell. For Python, set up its environment here (conda or venv)."
+                hint={
+                  addon.python && addon.python.env !== 'none'
+                    ? 'Runs in its folder, inside the Python environment above.'
+                    : 'Runs in its folder in your shell.'
+                }
               >
                 {(control) => (
                   <div className="flex gap-2">
@@ -682,8 +794,10 @@ const Manager = ({state}: {state: AddonsState}) => {
   const enabled = Boolean(addon && stack?.addons[addon.id]?.enabled);
 
   useEffect(() => {
-    addonsRequest<Record<string, number>>({operation: 'sizes'})
-      .then(setSizes)
+    addonsRequest<AddonSizes>({operation: 'sizes'})
+      .then((all) =>
+        setSizes(Object.fromEntries(Object.entries(all).map(([id, s]) => [id, s.files + s.env])))
+      )
       .catch(() => {});
     addonsRequest<Addon[]>({operation: 'stale'})
       .then(setStale)

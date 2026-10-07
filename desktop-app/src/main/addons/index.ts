@@ -13,12 +13,16 @@ import {
   Addon,
   AddonLog,
   AddonPart,
+  AddonPython,
   AddonsRequest,
   AddonsState,
   matchesSite,
   parseSkill,
   partOn,
+  pythonEnvScript,
+  PythonTools,
   SIX_MONTHS_MS,
+  suggestPythonBuild,
   Stack,
 } from '../../common/addons';
 import store from '../../store';
@@ -34,6 +38,9 @@ const exec = promisify(execFile);
 const root = () => path.join(sessionsRoot(), 'addons');
 const libraryFile = () => path.join(root(), 'library.json');
 const stagingDir = (id: string) => path.join(root(), '.staging', id);
+// Python environments live here, never in the add-on's (or the user's) folder.
+const envDir = (id: string) => path.join(root(), 'envs', id);
+const logDir = (id: string) => path.join(root(), 'logs', id);
 const DEFAULT_STACK: Stack = {id: 'default', name: 'Default', addons: {}};
 
 type Library = {addons: Addon[]; stacks: Stack[]; autoCleanup: boolean};
@@ -147,7 +154,11 @@ const detect = (dir: string) => {
   if (bin && mcpish) {
     parts.push({id: 'mcp', kind: 'mcp', label: 'MCP server', command: `node ${bin}`});
   }
+  const pythonFile = (['environment.yml', 'requirements.txt', 'pyproject.toml'] as const).find(
+    (f) => fs.existsSync(path.join(dir, f))
+  );
   return {
+    pythonFile,
     name: (pkg?.name as string | undefined) ?? path.basename(dir),
     about: (pkg?.description as string | undefined) ?? '',
     parts,
@@ -215,6 +226,47 @@ const RECIPES: Record<string, (dir: string) => Pick<Addon, 'about' | 'buildComma
   },
 };
 
+// uv, conda and python3 as the user's login shell finds them (cached: inspect asks often).
+let tools: Promise<PythonTools> | undefined;
+const pythonTools = () => {
+  tools ??= exec(
+    process.env.SHELL || '/bin/zsh',
+    [
+      '-lc',
+      'for t in uv conda python3; do command -v $t >/dev/null 2>&1 && echo "$t $($t --version 2>&1 | head -n 1)"; done',
+    ],
+    {env: shellEnv()}
+  )
+    .then(({stdout}) =>
+      Object.fromEntries(
+        stdout
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          // "uv 0.11.21 (5aa65dd7a 2026-06-11 …)" → "uv 0.11.21"
+          .map((line) => [
+            line.split(' ')[0],
+            line.slice(line.indexOf(' ') + 1).replace(/\s*\(.*$/, ''),
+          ])
+      )
+    )
+    .catch(() => ({}));
+  return tools;
+};
+
+// A Python project gets its own environment: conda for an environment.yml,
+// else uv when it is installed, else a plain venv.
+const withPython = async <T extends ReturnType<typeof detect>>(found: T) => {
+  const {pythonFile, ...rest} = found;
+  if (!pythonFile) return rest;
+  const have = await pythonTools();
+  const python: AddonPython = {
+    file: pythonFile,
+    env: pythonFile === 'environment.yml' ? 'conda' : have.uv ? 'uv' : 'venv',
+  };
+  return {...rest, python, buildCommand: rest.buildCommand ?? suggestPythonBuild(python)};
+};
+
 const inspect = async (raw: string): Promise<Addon> => {
   const source = raw.trim();
   const now = new Date().toISOString();
@@ -237,7 +289,7 @@ const inspect = async (raw: string): Promise<Addon> => {
     };
   }
   if (path.isAbsolute(folder) && fs.existsSync(folder)) {
-    const {pkg: _pkg, ...found} = detect(folder);
+    const {pkg: _pkg, ...found} = await withPython(detect(folder));
     return {...base, ...found, id: uniqueId(found.name), sourceKind: 'folder', dir: folder};
   }
   if (github) {
@@ -249,7 +301,7 @@ const inspect = async (raw: string): Promise<Addon> => {
     fs.mkdirSync(path.dirname(dir), {recursive: true});
     // gh uses the user's GitHub sign-in, so private repos work too.
     await exec('gh', ['repo', 'clone', `${owner}/${repo}`, dir, '--', '--depth', '1']);
-    const {pkg: _pkg, ...found} = detect(dir);
+    const {pkg: _pkg, ...found} = await withPython(detect(dir));
     const recipe = RECIPES[`${owner}/${repo}`.toLowerCase()]?.(dir);
     return {...base, ...found, ...recipe, name: repo, id, sourceKind: 'github', dir};
   }
@@ -261,7 +313,7 @@ const inspect = async (raw: string): Promise<Addon> => {
     fs.mkdirSync(dir, {recursive: true});
     const {stdout} = await exec('npm', ['pack', name, '--pack-destination', dir, '--silent']);
     await exec('tar', ['-xzf', path.join(dir, stdout.trim().split('\n').pop() ?? ''), '-C', dir]);
-    const {pkg, ...found} = detect(path.join(dir, 'package'));
+    const {pkg, ...found} = await withPython(detect(path.join(dir, 'package')));
     // npx brings the package's dependencies; a packed tarball has none.
     const parts = found.parts.map((p) =>
       p.kind === 'mcp' ? {...p, command: `npx -y ${pkg?.name}@${pkg?.version}`} : p
@@ -295,6 +347,9 @@ const permissionsFor = (addon: Addon) => [
     if (p.kind === 'rule') return [`Give agents the rule "${p.name}"`];
     return [`Offer agents the prompt "${p.name}"`];
   }),
+  ...(addon.python && addon.python.env !== 'none'
+    ? [`Make a ${addon.python.env} Python environment for it, kept in Responsively`]
+    : []),
   ...(addon.buildCommand ? [`Run "${addon.buildCommand}" to build it`] : []),
 ];
 
@@ -326,6 +381,8 @@ const uninstall = async (id: string) => {
   if (!addon) return;
   stopStarts((key) => key.startsWith(`${id}:`));
   if (ownsDir(addon)) fs.rmSync(path.join(root(), addon.id), {recursive: true, force: true});
+  fs.rmSync(envDir(id), {recursive: true, force: true});
+  fs.rmSync(logDir(id), {recursive: true, force: true});
   await session.fromPartition(`persist:addon-${id}`).clearStorageData();
   updateLibrary((lib) => {
     lib.addons = lib.addons.filter((a) => a.id !== id);
@@ -357,6 +414,11 @@ const shellEnv = () =>
 // Build commands run in a login shell so the user's PATH (node, conda,
 // python) is there; output streams to the window that asked.
 let runCount = 0;
+// What a command runs in: the add-on's Python environment first on PATH
+// (made first when `create`, i.e. for the build).
+const inEnv = (addon: {id: string; python?: AddonPython}, command: string, create = false) =>
+  addon.python ? pythonEnvScript(addon.python, envDir(addon.id), create) + command : command;
+
 const run = (sender: WebContents, addon: {dir?: string}, command: string) => {
   runCount += 1;
   const runId = `run-${runCount}`;
@@ -406,12 +468,18 @@ const syncStarts = () => {
       answers(part.url)
         .then((up) => {
           if (up || starts.has(key)) return;
-          const out = fs.openSync(path.join(addon.dir ?? os.tmpdir(), `${part.id}.log`), 'a');
-          const child = spawn(process.env.SHELL || '/bin/zsh', ['-lc', part.command], {
-            cwd: addon.dir,
-            env: shellEnv(),
-            stdio: ['ignore', out, out],
-          });
+          // Logs stay in Responsively's folder: a folder add-on is the user's own.
+          fs.mkdirSync(logDir(addon.id), {recursive: true});
+          const out = fs.openSync(path.join(logDir(addon.id), `${part.id}.log`), 'a');
+          const child = spawn(
+            process.env.SHELL || '/bin/zsh',
+            ['-lc', inEnv(addon, part.command)],
+            {
+              cwd: addon.dir,
+              env: shellEnv(),
+              stdio: ['ignore', out, out],
+            }
+          );
           child.on('exit', () => starts.delete(key));
           starts.set(key, child);
           return undefined;
@@ -469,6 +537,7 @@ const handle = async (sender: WebContents, req: AddonsRequest): Promise<unknown>
       return install(req.addon);
     case 'cancel-install':
       fs.rmSync(stagingDir(req.id), {recursive: true, force: true});
+      fs.rmSync(envDir(req.id), {recursive: true, force: true});
       return {done: true};
     case 'run': {
       // A source being inspected is not in the library yet: its folder is
@@ -476,7 +545,8 @@ const handle = async (sender: WebContents, req: AddonsRequest): Promise<unknown>
       const installed = readLibrary().addons.find((a) => a.id === req.id);
       const dir = installed?.dir ?? req.dir;
       if (!dir || !fs.existsSync(dir)) throw new Error('Unknown add-on folder');
-      return {runId: run(sender, {dir}, req.command)};
+      const python = installed ? installed.python : req.python;
+      return {runId: run(sender, {dir}, inEnv({id: req.id, python}, req.command, true))};
     }
     case 'uninstall':
       await uninstall(req.id);
@@ -512,10 +582,21 @@ const handle = async (sender: WebContents, req: AddonsRequest): Promise<unknown>
     case 'sizes': {
       const {addons} = readLibrary();
       const sizes = await Promise.all(
-        addons.map(async (a) => [a.id, a.dir && ownsDir(a) ? await dirBytes(a.dir) : 0])
+        addons.map(async (a) => [
+          a.id,
+          {
+            files: a.dir && ownsDir(a) ? await dirBytes(a.dir) : 0,
+            env: fs.existsSync(envDir(a.id)) ? await dirBytes(envDir(a.id)) : 0,
+          },
+        ])
       );
       return Object.fromEntries(sizes);
     }
+    case 'delete-env':
+      fs.rmSync(envDir(req.id), {recursive: true, force: true});
+      return {done: true};
+    case 'python-tools':
+      return pythonTools();
     case 'set-auto-cleanup':
       updateLibrary((lib) => {
         lib.autoCleanup = req.on;
@@ -583,7 +664,7 @@ const connect = (entry: Enabled<'mcp'>) => {
       ? new StreamableHTTPClientTransport(new URL(part.url))
       : new StdioClientTransport({
           command: process.env.SHELL || '/bin/zsh',
-          args: ['-lc', part.command ?? ''],
+          args: ['-lc', inEnv(addon, part.command ?? '')],
           cwd: addon.dir,
           env: shellEnv(),
           stderr: 'ignore',

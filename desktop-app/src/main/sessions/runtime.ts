@@ -8,6 +8,7 @@ import {
   Tray,
   webContents,
 } from 'electron';
+import {execFile} from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import {z} from 'zod';
@@ -461,6 +462,23 @@ export const initSessions = (
       return created;
     }
     return sessionRequest({...request, source: 'user'});
+  });
+  // Settings › Storage: disk use of each Session's profile (read only; Reset
+  // goes through SESSIONS_REQUEST like everywhere else).
+  ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_PROFILE_SIZES, async () => {
+    const profiles = path.join(sessionsRoot(), 'profiles');
+    const ids = fs.existsSync(profiles) ? fs.readdirSync(profiles) : [];
+    const sizes = await Promise.all(
+      ids.map(
+        (id) =>
+          new Promise<[string, number]>((resolve) => {
+            execFile('du', ['-sk', path.join(profiles, id)], (error, stdout) =>
+              resolve([id, error ? 0 : Number(stdout.split('\t')[0]) * 1024])
+            );
+          })
+      )
+    );
+    return Object.fromEntries(sizes);
   });
   // A tab's ✕: this window's own tab closes the window (like ⌘W); another tab stops it.
   ipcMain.handle(IPC_MAIN_CHANNELS.SESSION_CLOSE_TAB, async (event, id: unknown) => {

@@ -59,6 +59,7 @@ const testOrder = [
   'ios-safari.spec.ts',
   'addons.spec.ts',
   'addons-agents.spec.ts',
+  'storage.spec.ts',
 ];
 
 export default defineConfig({
