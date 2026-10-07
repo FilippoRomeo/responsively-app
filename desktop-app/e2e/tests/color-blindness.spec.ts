@@ -60,7 +60,7 @@ async function disableSimulation(app: {
   page: any;
 }) {
   await app.openColorBlindnessDropdown();
-  await app.page.getByText('Disable tool').click();
+  await app.page.getByText('Off — normal vision').click();
   await app.page.waitForTimeout(500);
 }
 
@@ -99,7 +99,7 @@ test.describe('Color Blindness Simulation', () => {
     await selectSimulation(app, 'deuteranopia');
   });
 
-  test('selecting "Disable tool" removes the filter', async ({app}) => {
+  test('selecting "Off — normal vision" removes the filter', async ({app}) => {
     await app.dismissModals();
     await disableSimulation(app);
   });
