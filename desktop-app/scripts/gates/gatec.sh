@@ -290,6 +290,12 @@ log "node $(node --version) at $(command -v node); $(git --version)"
 [ "$NODE_MAJOR" -ge 24 ] || { log "FAIL: Node >= 24 required by desktop-app/package.json"; exit 1; }
 shasum -a 256 "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "$DRIVER" | tee "$EV/package-inputs.sha256"
 
+# Three checks need your answers; without a terminal they would fail after the whole build.
+if ! { : < /dev/tty; } 2>/dev/null; then
+  log "FAIL: no terminal to ask you in. Run Gate C in a Terminal window (not through an agent or a ! command)."
+  exit 1
+fi
+
 # Isolation can only be proven if your app stays untouched for the whole run.
 PIDS="$(real_app_pids)"
 if [ -n "${PIDS// /}" ]; then
