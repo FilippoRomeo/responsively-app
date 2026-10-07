@@ -144,7 +144,7 @@ const DeviceForm = ({
         <input
           id={`${id}-name`}
           aria-label="Device Name"
-          className={cx(fieldClass, {'border-red-500': nameError != null})}
+          className={cx(fieldClass, {'border-danger': nameError != null})}
           placeholder="e.g. Kiosk 1080p"
           value={name}
           onChange={(e) => {
@@ -153,7 +153,7 @@ const DeviceForm = ({
           }}
         />
         {nameError != null ? (
-          <p role="alert" className="text-xs text-red-500">
+          <p role="alert" className="text-xs text-danger">
             {nameError}
           </p>
         ) : null}
@@ -337,7 +337,7 @@ const DeviceForm = ({
             await onRemove(device);
             onClose();
           }}
-          className="flex items-center gap-2 py-[2px] text-[12.5px] text-red-500 focus:outline-none"
+          className="flex items-center gap-2 py-[2px] text-[12.5px] text-danger focus:outline-none"
         >
           <span className="pointer-events-none contents">
             <Icon icon="carbon:trash-can" fontSize={14} />

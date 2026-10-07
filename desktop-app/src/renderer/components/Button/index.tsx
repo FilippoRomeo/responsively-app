@@ -26,7 +26,7 @@ const Button = ({
   isPrimary = false,
   isTextButton = false,
   isActionButton = false,
-  subtle = false,
+  subtle: _subtle = false,
   disableHoverEffects = false,
   disabled = false,
   children,
@@ -46,29 +46,21 @@ const Button = ({
     prevLoadingState.current = isLoading;
   }, [isLoading]);
 
-  let hoverBg = 'hover:bg-slate-400';
-  let hoverBgDark = 'dark:hover:bg-slate-600';
-  if (subtle) {
-    hoverBg = 'hover:bg-slate-200';
-    hoverBgDark = 'dark:hover:bg-slate-700';
-  } else if (isPrimary) {
-    hoverBg = 'hover:bg-emerald-600';
-    hoverBgDark = 'dark:hover:bg-emerald-600';
-  }
+  // Theme tokens (App.css) — one value per theme, no dark: variants. `subtle`
+  // is kept for callers; the token hover is already the subtle one.
+  const hoverBg = isPrimary ? 'hover:brightness-110' : 'hover:bg-hover';
 
   return (
     <button
       className={cx(
         {[className]: className?.length},
         `flex items-center justify-center rounded-sm p-1 ${
-          disableHoverEffects === false ? `${hoverBg} ${hoverBgDark}` : ''
-        } focus:outline-none`,
+          disableHoverEffects === false ? hoverBg : ''
+        } focus:outline-none focus-visible:ring-1 focus-visible:ring-accent`,
         {
-          'bg-slate-400/60': isActive && !isPrimary,
-          'dark:bg-slate-600/60': isActive && !isPrimary,
-          'bg-emerald-500 text-white': isPrimary,
-          'bg-slate-200': isActionButton,
-          'dark:bg-slate-700': isActionButton,
+          'bg-active': isActive && !isPrimary,
+          'bg-accent text-on-accent': isPrimary,
+          'bg-active text-fg': isActionButton,
           'px-2': isActionButton || isTextButton,
           'cursor-not-allowed opacity-40': disabled,
           'hover:bg-transparent dark:hover:bg-transparent': disabled,

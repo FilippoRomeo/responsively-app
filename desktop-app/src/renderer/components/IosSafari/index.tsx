@@ -9,7 +9,9 @@ import {
 } from 'common/ios-simulator';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
+import MenuRow from 'renderer/components/MenuRow';
 import Popover from 'renderer/components/Popover';
+import SectionCaption from 'renderer/components/SectionCaption';
 import {selectDeviceBrowser, setDeviceBrowser} from 'renderer/store/features/device-manager';
 import {selectAddress} from 'renderer/store/features/renderer';
 
@@ -27,9 +29,6 @@ const Check = ({on}: {on: boolean}) => (
     className={cx('shrink-0 text-accent', {'opacity-0': !on})}
   />
 );
-
-const rowClass =
-  'flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-[7px] text-left text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent';
 
 /** The header chip that picks Chromium or real iOS Safari for one device. */
 export const BrowserPicker = ({deviceId, deviceName}: {deviceId: string; deviceName: string}) => {
@@ -66,28 +65,18 @@ export const BrowserPicker = ({deviceId, deviceName}: {deviceId: string; deviceN
             <div className="text-[13.5px] font-bold">Browser for this device</div>
             <div className="mt-[2px] text-[11.5px] text-muted">Other devices keep their own</div>
           </div>
-          <button
-            type="button"
-            className={rowClass}
+          <MenuRow
             onClick={() => {
               pick(undefined);
               close();
             }}
-          >
-            <span className="pointer-events-none contents">
-              <Check on={!runtime} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-bold">Chromium</span>
-                <span className="block text-[11.5px] text-muted">
-                  Built in · instant · mirrors clicks across devices
-                </span>
-              </span>
-            </span>
-          </button>
+            leading={<Check on={!runtime} />}
+            label="Chromium"
+            bold
+            sub="Built in · instant · mirrors clicks across devices"
+          />
           <div className="mx-1 my-[6px] border-t border-line-soft" />
-          <div className="px-[10px] pb-[2px] pt-[6px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-            iOS Safari — real Safari in the iOS Simulator
-          </div>
+          <SectionCaption>iOS Safari — real Safari in the iOS Simulator</SectionCaption>
           {state === null ? (
             <div className="px-[10px] py-[7px] text-[12px] text-muted">
               Looking for iOS versions…
@@ -102,46 +91,32 @@ export const BrowserPicker = ({deviceId, deviceName}: {deviceId: string; deviceN
             </div>
           ) : null}
           {runtimes.map((r) => (
-            <button
+            <MenuRow
               key={r.id}
-              type="button"
-              className={rowClass}
               onClick={() => {
                 pick(r.id);
                 close();
               }}
-            >
-              <span className="pointer-events-none contents">
-                <Check on={runtime === r.id} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px]">{r.name}</span>
-                  <span className="block text-[11.5px] text-muted">
-                    Installed · {formatGB(r.sizeBytes)}
-                  </span>
-                </span>
-              </span>
-            </button>
+              leading={<Check on={runtime === r.id} />}
+              label={r.name}
+              sub={`Installed · ${formatGB(r.sizeBytes)}`}
+            />
           ))}
-          <button type="button" className={rowClass} disabled>
-            <span className="pointer-events-none contents">
-              <Check on={false} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px]">Other iOS versions…</span>
-                <span className="block text-[11.5px] text-muted">
-                  Downloads come in the next step
-                </span>
-              </span>
-            </span>
-          </button>
+          <MenuRow
+            disabled
+            leading={<Check on={false} />}
+            label="Other iOS versions…"
+            sub="Downloads come in the next step"
+          />
           <div className="mx-1 my-[6px] border-t border-line-soft" />
           {['Desktop Safari', 'Firefox'].map((name) => (
-            <button key={name} type="button" className={rowClass} disabled>
-              <span className="pointer-events-none contents">
-                <Check on={false} />
-                <span className="min-w-0 flex-1 text-[13px]">{name}</span>
-                <span className="text-[11px] text-muted">Later</span>
-              </span>
-            </button>
+            <MenuRow
+              key={name}
+              disabled
+              leading={<Check on={false} />}
+              label={name}
+              trailing={<span className="text-caption text-muted">Later</span>}
+            />
           ))}
           <div className="mx-1 my-[6px] border-t border-line-soft" />
           <div className="px-[10px] pb-2 pt-[6px] text-[11.5px] leading-normal text-muted">

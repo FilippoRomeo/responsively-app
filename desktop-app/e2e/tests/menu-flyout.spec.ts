@@ -28,7 +28,7 @@ test.describe('Menu Flyout', () => {
     await app.openMenuFlyout();
 
     await expect(app.page.getByText('Dock devtools')).toBeVisible();
-    await expect(app.page.getByRole('checkbox', {name: 'Dock devtools'})).toBeAttached();
+    await expect(app.page.getByRole('switch', {name: 'Dock devtools'})).toBeAttached();
 
     await app.closeMenuFlyout();
   });

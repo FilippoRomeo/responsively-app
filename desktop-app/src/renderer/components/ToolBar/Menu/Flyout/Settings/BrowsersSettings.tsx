@@ -2,6 +2,7 @@ import cx from 'classnames';
 import type {IosSimRequest, IosSimState} from 'common/ios-simulator';
 import {useCallback, useEffect, useState} from 'react';
 import {formatGB, iosSim, runtimeLabel} from 'renderer/components/IosSafari';
+import SectionCaption from 'renderer/components/SectionCaption';
 
 const btn = 'h-7 whitespace-nowrap rounded-[7px] border px-3 text-[12.5px] disabled:opacity-50';
 
@@ -13,7 +14,7 @@ const DeleteButton = ({sizeBytes, onDelete}: {sizeBytes: number; onDelete: () =>
       type="button"
       onClick={() => (asking ? onDelete() : setAsking(true))}
       onBlur={() => setAsking(false)}
-      className={cx(btn, 'border-red-500 text-red-400 hover:bg-hover')}
+      className={cx(btn, 'border-danger text-danger hover:bg-hover')}
     >
       {asking ? `Delete ${formatGB(sizeBytes)}?` : 'Delete'}
     </button>
@@ -65,9 +66,7 @@ export const BrowsersSettings = () => {
         </span>
       </div>
       <div className="rounded-[10px] border border-line bg-card">
-        <div className="px-3 pb-2 pt-[10px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-          iOS versions
-        </div>
+        <SectionCaption className="px-3 pb-2 pt-[10px]">iOS versions</SectionCaption>
         {state.runtimes.length === 0 ? (
           <div className="border-t border-line-soft px-3 py-[10px] text-muted">
             None installed. Add one in Xcode › Settings › Components.
@@ -90,9 +89,7 @@ export const BrowsersSettings = () => {
         ))}
       </div>
       <div className="rounded-[10px] border border-line bg-card">
-        <div className="px-3 pb-2 pt-[10px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-          Simulators
-        </div>
+        <SectionCaption className="px-3 pb-2 pt-[10px]">Simulators</SectionCaption>
         {state.devices.length === 0 ? (
           <div className="border-t border-line-soft px-3 py-[10px] text-muted">
             None yet — pick iOS Safari on a device to make one.

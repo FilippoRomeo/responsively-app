@@ -41,20 +41,20 @@ describe('Button Component', () => {
   it('applies primary button styles', () => {
     render(<Button isPrimary>Click me</Button>);
     const buttonElement = screen.getByRole('button', {name: /click me/i});
-    expect(buttonElement).toHaveClass('bg-emerald-500');
-    expect(buttonElement).toHaveClass('text-white');
+    expect(buttonElement).toHaveClass('bg-accent');
+    expect(buttonElement).toHaveClass('text-on-accent');
   });
 
   it('applies action button styles', () => {
     render(<Button isActionButton>Click me</Button>);
     const buttonElement = screen.getByRole('button', {name: /click me/i});
-    expect(buttonElement).toHaveClass('bg-slate-200');
+    expect(buttonElement).toHaveClass('bg-active');
   });
 
   it('applies subtle hover styles', () => {
     render(<Button subtle>Click me</Button>);
     const buttonElement = screen.getByRole('button', {name: /click me/i});
-    expect(buttonElement).toHaveClass('hover:bg-slate-200');
+    expect(buttonElement).toHaveClass('hover:bg-hover');
   });
 
   it('disables hover effects when disableHoverEffects is true', () => {
@@ -64,7 +64,7 @@ describe('Button Component', () => {
       </Button>
     );
     const buttonElement = screen.getByRole('button', {name: /click me/i});
-    expect(buttonElement).not.toHaveClass('hover:bg-slate-200');
+    expect(buttonElement).not.toHaveClass('hover:bg-hover');
   });
 
   it('renders children correctly when not loading or loading done', () => {

@@ -1,10 +1,12 @@
-import {Dialog, DialogPanel, DialogTitle} from '@headlessui/react';
 import {Icon} from '@iconify/react';
 import cx from 'classnames';
 import {Addon, AddonLog, AddonPart, AddonsRequest, AddonsState, partOn} from 'common/addons';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {useCallback, useEffect, useRef, useState} from 'react';
-import useOverlayRegistry from 'renderer/hooks/useOverlayRegistry';
+import DialogShell from 'renderer/components/DialogShell';
+import Field, {inputClass} from 'renderer/components/Field';
+import SectionCaption from 'renderer/components/SectionCaption';
+import Toggle from 'renderer/components/Toggle';
 
 export const addonsRequest = <T,>(req: AddonsRequest) =>
   window.electron.ipcRenderer.invoke<AddonsRequest, T>(IPC_MAIN_CHANNELS.ADDONS, req);
@@ -43,30 +45,12 @@ const partDetail = (part: AddonPart) => {
 };
 
 const btn =
-  'h-[30px] whitespace-nowrap rounded-[7px] border border-line px-3 text-[12.5px] text-fg hover:bg-hover disabled:opacity-50';
+  'h-control whitespace-nowrap rounded-control border border-line px-3 text-body text-fg hover:bg-hover disabled:opacity-50 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent';
 const primary =
-  'h-[30px] whitespace-nowrap rounded-[7px] bg-accent px-3 text-[12.5px] font-bold text-on-accent disabled:opacity-50';
-
-const Switch = ({on, label, onChange}: {on: boolean; label: string; onChange: () => void}) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={on}
-    aria-label={label}
-    onClick={onChange}
-    className={cx(
-      'relative h-[18px] w-8 shrink-0 rounded-full transition-colors',
-      on ? 'bg-accent' : 'bg-line'
-    )}
-  >
-    <span
-      className={cx(
-        'absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-[left]',
-        on ? 'left-4' : 'left-[2px]'
-      )}
-    />
-  </button>
-);
+  'h-control whitespace-nowrap rounded-control bg-accent px-3 text-body font-bold text-on-accent disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel';
+const danger =
+  'h-control whitespace-nowrap rounded-control border border-danger px-3 text-body text-danger hover:bg-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-danger';
+const mono = cx(inputClass, 'font-mono text-small');
 
 /** Streams one build command's output; `onDone` gets its exit code. */
 const Terminal = ({runId, onDone}: {runId: string; onDone: (code: number | null) => void}) => {
@@ -87,13 +71,173 @@ const Terminal = ({runId, onDone}: {runId: string; onDone: (code: number | null)
     box.current?.scrollTo(0, box.current.scrollHeight);
   }, [text]);
   return (
+    // Focusable so keyboard users can scroll a long log (WCAG 2.1.1).
     <pre
       ref={box}
+      role="log"
+      aria-label="Build output"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
       data-testid="addon-terminal"
-      className="m-0 h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-[#05080e] p-2 font-mono text-[11px] text-[#c7d0dc]"
+      className="m-0 h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-input p-2 font-mono text-small text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
     >
       {text || '…'}
     </pre>
+  );
+};
+
+const STEPS = ['Source', 'What it adds', 'Allow'];
+
+const Steps = ({step}: {step: number}) => (
+  <ol className="m-0 flex list-none gap-4 p-0">
+    {STEPS.map((label, i) => (
+      <li
+        key={label}
+        aria-current={i === step ? 'step' : undefined}
+        className={cx(
+          'flex items-center gap-[6px] text-small',
+          i === step ? 'font-bold text-fg' : 'text-muted'
+        )}
+      >
+        <span
+          className={cx(
+            'flex h-5 w-5 items-center justify-center rounded-full text-caption font-bold',
+            i < step && 'bg-accent text-on-accent',
+            i === step && 'border-2 border-accent text-accent',
+            i > step && 'border border-line text-muted'
+          )}
+        >
+          {i < step ? <Icon icon="lucide:check" fontSize={12} /> : i + 1}
+        </span>
+        {label}
+      </li>
+    ))}
+  </ol>
+);
+
+/** One part of an add-on being installed, with visible labelled fields. */
+const PartEditor = ({
+  part,
+  onChange,
+  onRemove,
+}: {
+  part: AddonPart;
+  onChange: (part: AddonPart) => void;
+  onRemove: () => void;
+}) => {
+  const [advanced, setAdvanced] = useState(false);
+  return (
+    <div className="flex flex-col gap-3 border-t border-line-soft px-3 py-3 first:border-t-0">
+      <div className="flex items-center gap-2 text-body font-bold">
+        {KIND[part.kind]}
+        <span className="flex-1" />
+        <button
+          type="button"
+          className="text-small font-normal text-muted hover:text-fg"
+          onClick={onRemove}
+        >
+          Remove
+        </button>
+      </div>
+      {part.kind === 'panel' ? (
+        <Field label="Panel address" hint="A web app shown in its own tab beside the previews">
+          {(control) => (
+            <input
+              {...control}
+              value={part.url}
+              onChange={(e) => onChange({...part, url: e.target.value})}
+              className={mono}
+            />
+          )}
+        </Field>
+      ) : null}
+      {part.kind === 'script' ? (
+        <>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,220px)] gap-3">
+            <Field label="Script file" hint="In the add-on's folder">
+              {(control) => (
+                <input
+                  {...control}
+                  value={part.file}
+                  onChange={(e) => onChange({...part, file: e.target.value})}
+                  className={mono}
+                />
+              )}
+            </Field>
+            <Field label="Runs on sites" hint="e.g. localhost:*, *.example.com, *">
+              {(control) => (
+                <input
+                  {...control}
+                  value={part.matches.join(', ')}
+                  onChange={(e) =>
+                    onChange({
+                      ...part,
+                      matches: e.target.value
+                        .split(',')
+                        .map((m) => m.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  className={mono}
+                />
+              )}
+            </Field>
+          </div>
+          <button
+            type="button"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced(!advanced)}
+            className="flex w-fit items-center gap-1 text-small text-muted hover:text-fg"
+          >
+            <Icon
+              icon="lucide:chevron-right"
+              className={cx('transition-transform', {'rotate-90': advanced})}
+            />
+            Advanced: when it runs, a line to run after it loads
+          </button>
+          {advanced ? (
+            <div className="grid grid-cols-[minmax(0,220px)_minmax(0,1fr)] gap-3">
+              <Field label="When it runs" hint="Hooks such as three.js' need “before”">
+                {(control) => (
+                  <select
+                    {...control}
+                    value={part.when ?? 'ready'}
+                    onChange={(e) => onChange({...part, when: e.target.value as 'ready' | 'start'})}
+                    className={inputClass}
+                  >
+                    <option value="ready">When the page is ready</option>
+                    <option value="start">Before the page&apos;s scripts</option>
+                  </select>
+                )}
+              </Field>
+              <Field label="Then run" hint="Optional, e.g. eruda.init()">
+                {(control) => (
+                  <input
+                    {...control}
+                    value={part.init ?? ''}
+                    onChange={(e) => onChange({...part, init: e.target.value || undefined})}
+                    className={mono}
+                  />
+                )}
+              </Field>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {part.kind === 'start' ? (
+        <Field label="Start command" hint="Runs on this Mac while a window uses the add-on">
+          {(control) => (
+            <input
+              {...control}
+              value={part.command}
+              placeholder="python main.py"
+              onChange={(e) => onChange({...part, command: e.target.value})}
+              className={mono}
+            />
+          )}
+        </Field>
+      ) : null}
+    </div>
   );
 };
 
@@ -125,31 +269,17 @@ const Install = ({onDone}: {onDone: () => void}) => {
   const setPart = (index: number, part: AddonPart) =>
     setAddon((a) => a && {...a, parts: a.parts.map((p, i) => (i === index ? part : p))});
   const addPart = (kind: AddonPart['kind']) =>
-    setAddon(
-      (a) =>
-        a && {
-          ...a,
-          parts: [
-            ...a.parts,
-            kind === 'script'
-              ? {
-                  id: `script-${a.parts.length}`,
-                  kind,
-                  label: 'Page script',
-                  file: 'dist/index.js',
-                  matches: ['localhost:*'],
-                }
-              : kind === 'panel'
-                ? {
-                    id: `panel-${a.parts.length}`,
-                    kind,
-                    label: 'Panel',
-                    url: 'http://127.0.0.1:8188/',
-                  }
-                : {id: `start-${a.parts.length}`, kind, label: 'Start command', command: ''},
-          ],
-        }
-    );
+    setAddon((a) => {
+      if (!a) return a;
+      const id = `${kind}-${a.parts.length}`;
+      const part: AddonPart =
+        kind === 'script'
+          ? {id, kind, label: 'Page script', file: 'dist/index.js', matches: ['localhost:*']}
+          : kind === 'panel'
+            ? {id, kind, label: 'Panel', url: 'http://127.0.0.1:8188/'}
+            : {id, kind, label: 'Start command', command: ''};
+      return {...a, parts: [...a.parts, part]};
+    });
   const cancel = () => {
     if (addon?.dir && step > 0 && addon.sourceKind !== 'folder' && addon.sourceKind !== 'url')
       addonsRequest({operation: 'cancel-install', id: addon.id}).catch(() => {});
@@ -180,221 +310,187 @@ const Install = ({onDone}: {onDone: () => void}) => {
       setBusy(false);
     }
   };
+  // Riskiest first: commands on this Mac, then code in pages, then panels.
+  const risks = addon
+    ? [
+        ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'start'}> => p.kind === 'start')
+          .map((p) => ({
+            high: true,
+            text: `Run "${p.command}" on this Mac while a window uses it`,
+          })),
+        ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'script'}> => p.kind === 'script')
+          .map((p) => ({high: false, text: `Run its code in previews on ${p.matches.join(', ')}`})),
+        ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'panel'}> => p.kind === 'panel')
+          .map((p) => ({high: false, text: `Show ${p.url} inside Responsively`})),
+      ]
+    : [];
+  const sourceName =
+    addon?.sourceKind === 'folder' ? (addon.dir?.split('/').pop() ?? addon.source) : addon?.source;
 
-  const steps = ['Source', 'What it adds', 'Allow'];
   return (
-    <div data-testid="addon-install" className="flex flex-col gap-4 p-5">
-      <div className="flex gap-4">
-        {steps.map((label, i) => (
-          <span
-            key={label}
-            className={cx(
-              'flex items-center gap-[6px] text-[12px]',
-              i === step ? 'text-fg' : 'text-muted'
-            )}
-          >
-            <span
-              className={cx(
-                'flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold',
-                i <= step ? 'bg-accent text-on-accent' : 'bg-line text-muted'
-              )}
+    <div data-testid="addon-install" className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        <Steps step={step} />
+
+        {step === 0 ? (
+          <>
+            <Field
+              label="Where is it?"
+              hint="A web address, a GitHub repo (owner/repo), npm:package, or a folder on this Mac. Used as it is — nothing to convert."
             >
-              {i + 1}
-            </span>
-            {label}
-          </span>
-        ))}
-      </div>
+              {(control) => (
+                <input
+                  {...control}
+                  data-testid="addon-source"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && source && look()}
+                  placeholder="github.com/owner/repo"
+                  className={cx(mono, 'h-9')}
+                />
+              )}
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-small text-muted">Try:</span>
+              {['npm:eruda', 'http://127.0.0.1:8188', 'FilippoRomeo/compose3d'].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  className={cx(btn, 'h-control-sm font-mono text-small')}
+                  onClick={() => setSource(example)}
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
 
-      {step === 0 ? (
-        <>
-          <label htmlFor="addon-source" className="text-[13px]">
-            Where is it?
-          </label>
-          <input
-            id="addon-source"
-            data-testid="addon-source"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && source && look()}
-            placeholder="github.com/owner/repo · npm:package · http://127.0.0.1:8188 · /path/to/folder"
-            className="h-9 rounded-lg border border-line bg-card px-3 font-mono text-[12.5px] text-fg"
-          />
-          <p className="m-0 text-[11.5px] leading-relaxed text-muted">
-            Responsively uses it as it is and shows what it found — nothing to convert.
-          </p>
-        </>
-      ) : null}
-
-      {step === 1 && addon ? (
-        <>
-          <div className="text-[13px]">
-            Found <b>{addon.name}</b>{' '}
-            <span className="text-muted">— {addon.about || addon.source}</span>
-          </div>
-          <div className="flex flex-col rounded-[10px] border border-line bg-card">
-            {addon.parts.length === 0 ? (
-              <div className="px-3 py-[10px] text-[12.5px] text-muted">
-                Nothing ready to use yet — build it, or add a part below.
-              </div>
-            ) : null}
-            {addon.parts.map((part, i) => (
-              <div
-                key={part.id}
-                className="flex flex-col gap-2 border-t border-line-soft px-3 py-[10px] first:border-t-0"
-              >
-                <div className="flex items-center gap-2 text-[13px] font-bold">
-                  {KIND[part.kind]}
-                  <span className="flex-1" />
-                  <button
-                    type="button"
-                    className="text-[11.5px] font-normal text-muted hover:text-fg"
-                    onClick={() =>
-                      setAddon({...addon, parts: addon.parts.filter((_, j) => j !== i)})
-                    }
-                  >
-                    Remove
-                  </button>
+        {step === 1 && addon ? (
+          <>
+            <div className="text-body">
+              Found <b>{addon.name}</b>{' '}
+              <span className="text-muted">— {addon.about || addon.source}</span>
+            </div>
+            <div className="flex flex-col rounded-card border border-line bg-card">
+              {addon.parts.length === 0 ? (
+                <div className="px-3 py-[10px] text-body text-muted">
+                  Nothing ready to use yet — build it, or add a part below.
                 </div>
-                {part.kind === 'panel' ? (
-                  <input
-                    aria-label="Panel address"
-                    value={part.url}
-                    onChange={(e) => setPart(i, {...part, url: e.target.value})}
-                    className="h-8 rounded-md border border-line bg-panel px-2 font-mono text-[12px]"
-                  />
-                ) : null}
-                {part.kind === 'script' ? (
-                  <div className="flex gap-2">
-                    <input
-                      aria-label="Script file"
-                      value={part.file}
-                      onChange={(e) => setPart(i, {...part, file: e.target.value})}
-                      className="h-8 flex-1 rounded-md border border-line bg-panel px-2 font-mono text-[12px]"
-                    />
-                    <select
-                      aria-label="When it runs"
-                      value={part.when ?? 'ready'}
-                      onChange={(e) =>
-                        setPart(i, {...part, when: e.target.value as 'ready' | 'start'})
-                      }
-                      className="h-8 rounded-md border border-line bg-panel px-2 text-[12px]"
-                    >
-                      <option value="ready">When the page is ready</option>
-                      <option value="start">Before the page&apos;s scripts</option>
-                    </select>
-                    <input
-                      aria-label="Then run"
-                      placeholder="then run, e.g. eruda.init()"
-                      value={part.init ?? ''}
-                      onChange={(e) => setPart(i, {...part, init: e.target.value || undefined})}
-                      className="h-8 w-48 rounded-md border border-line bg-panel px-2 font-mono text-[12px]"
-                    />
-                    <input
-                      aria-label="Runs on sites"
-                      value={part.matches.join(', ')}
-                      onChange={(e) =>
-                        setPart(i, {
-                          ...part,
-                          matches: e.target.value
-                            .split(',')
-                            .map((m) => m.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      className="h-8 w-44 rounded-md border border-line bg-panel px-2 font-mono text-[12px]"
-                    />
-                  </div>
-                ) : null}
-                {part.kind === 'start' ? (
-                  <input
-                    aria-label="Start command"
-                    value={part.command}
-                    placeholder="python main.py"
-                    onChange={(e) => setPart(i, {...part, command: e.target.value})}
-                    className="h-8 rounded-md border border-line bg-panel px-2 font-mono text-[12px]"
-                  />
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button type="button" className={btn} onClick={() => addPart('script')}>
-              + Page script
-            </button>
-            <button type="button" className={btn} onClick={() => addPart('panel')}>
-              + App panel
-            </button>
-            <button type="button" className={btn} onClick={() => addPart('start')}>
-              + Start command
-            </button>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="addon-build" className="text-[12.5px] text-muted">
-              Build command (run in its folder; for Python, set up its environment here — conda or
-              venv)
-            </label>
+              ) : null}
+              {addon.parts.map((part, i) => (
+                <PartEditor
+                  key={part.id}
+                  part={part}
+                  onChange={(next) => setPart(i, next)}
+                  onRemove={() =>
+                    setAddon({...addon, parts: addon.parts.filter((_, j) => j !== i)})
+                  }
+                />
+              ))}
+            </div>
             <div className="flex gap-2">
-              <input
-                id="addon-build"
-                value={addon.buildCommand ?? ''}
-                placeholder="npm install && npm run build"
-                onChange={(e) => setAddon({...addon, buildCommand: e.target.value || undefined})}
-                className="h-8 flex-1 rounded-md border border-line bg-card px-2 font-mono text-[12px]"
-              />
-              <button
-                type="button"
-                className={btn}
-                disabled={!addon.buildCommand || (run !== null && run.code === undefined)}
-                onClick={runBuild}
-              >
-                Run
+              <button type="button" className={btn} onClick={() => addPart('script')}>
+                + Page script
+              </button>
+              <button type="button" className={btn} onClick={() => addPart('panel')}>
+                + App panel
+              </button>
+              <button type="button" className={btn} onClick={() => addPart('start')}>
+                + Start command
               </button>
             </div>
-            {run ? (
-              <Terminal runId={run.runId} onDone={(code) => setRun((r) => r && {...r, code})} />
-            ) : null}
-            {run && run.code !== undefined ? (
-              <span className={cx('text-[12px]', run.code === 0 ? 'text-accent' : 'text-red-400')}>
-                {run.code === 0 ? 'Built.' : `Stopped with code ${run.code}.`}
+            <div className="flex flex-col gap-2 rounded-card border border-line bg-card p-3">
+              <Field
+                label="Build command"
+                hint="Runs in its folder in your shell. For Python, set up its environment here (conda or venv)."
+              >
+                {(control) => (
+                  <div className="flex gap-2">
+                    <input
+                      {...control}
+                      value={addon.buildCommand ?? ''}
+                      placeholder="npm install && npm run build"
+                      onChange={(e) =>
+                        setAddon({...addon, buildCommand: e.target.value || undefined})
+                      }
+                      className={cx(mono, 'flex-1')}
+                    />
+                    <button
+                      type="button"
+                      className={btn}
+                      disabled={!addon.buildCommand || (run !== null && run.code === undefined)}
+                      onClick={runBuild}
+                    >
+                      Run
+                    </button>
+                  </div>
+                )}
+              </Field>
+              {run ? (
+                <Terminal runId={run.runId} onDone={(code) => setRun((r) => r && {...r, code})} />
+              ) : null}
+              <span
+                role="status"
+                className={cx('text-small', run?.code === 0 ? 'text-accent' : 'text-danger')}
+              >
+                {run && run.code !== undefined
+                  ? run.code === 0
+                    ? 'Built.'
+                    : `Stopped with code ${run.code}.`
+                  : ''}
               </span>
-            ) : null}
-          </div>
-        </>
-      ) : null}
+            </div>
+          </>
+        ) : null}
 
-      {step === 2 && addon ? (
-        <div className="flex flex-col gap-3">
-          <div className="rounded-[10px] border border-amber-400/60 bg-amber-400/5 p-3">
-            <div className="text-[13.5px] font-bold">{addon.name} will be able to</div>
-            <ul className="mb-0 mt-2 pl-5 text-[12.5px] leading-7">
-              {addon.parts.map((p) => (
-                <li key={p.id}>
-                  {p.kind === 'panel' ? `Show ${p.url} inside Responsively` : null}
-                  {p.kind === 'script'
-                    ? `Run its code in previews on ${p.matches.join(', ')}`
-                    : null}
-                  {p.kind === 'start'
-                    ? `Run "${p.command}" on this Mac while a window uses it`
-                    : null}
+        {step === 2 && addon ? (
+          <div className="flex flex-col gap-3">
+            <div className="text-title font-bold">
+              Allow <span className="text-accent">{addon.name}</span> to:
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {risks.map((r) => (
+                <li
+                  key={r.text}
+                  className={cx(
+                    'flex items-start gap-2 rounded-card border px-3 py-2 text-body',
+                    r.high ? 'bg-danger/5 border-danger' : 'border-line bg-card'
+                  )}
+                >
+                  <Icon
+                    icon={r.high ? 'lucide:terminal-square' : 'lucide:shield-check'}
+                    className={cx('mt-[2px] shrink-0', r.high ? 'text-danger' : 'text-muted')}
+                  />
+                  <span>
+                    {r.text}
+                    {r.high ? (
+                      <span className="block text-small text-muted">
+                        Runs with your user&apos;s access to this Mac.
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
-              {addon.buildCommand ? <li>Keep its build command: {addon.buildCommand}</li> : null}
             </ul>
-            <div className="mt-2 text-[11.5px] text-muted">
-              From {addon.source}. It joins this window&apos;s stack, switched on.
-            </div>
+            <p className="m-0 text-small text-muted" title={addon.source}>
+              From {sourceName}. It joins this window&apos;s stack, switched on; you can switch any
+              part off later.
+            </p>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {error ? (
-        <p role="alert" className="m-0 text-[12.5px] text-red-400">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p role="alert" className="m-0 text-body text-danger">
+            {error}
+          </p>
+        ) : null}
+      </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 border-t border-line-soft px-5 py-3">
         <button
           type="button"
           className={btn}
@@ -428,12 +524,11 @@ const Install = ({onDone}: {onDone: () => void}) => {
 };
 
 /** The add-ons manager: each add-on and part switchable per stack, stacks, storage. */
-const Manager = ({state, onClose}: {state: AddonsState; onClose: () => void}) => {
+const Manager = ({state}: {state: AddonsState}) => {
   const [selected, setSelected] = useState<string | undefined>(state.addons[0]?.id);
   const [installing, setInstalling] = useState(state.addons.length === 0);
   const [sizes, setSizes] = useState<Record<string, number>>({});
   const [stale, setStale] = useState<Addon[]>([]);
-  const [naming, setNaming] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const stack = state.stacks.find((s) => s.id === state.stackId);
   const addon = state.addons.find((a) => a.id === selected) ?? state.addons[0];
@@ -450,280 +545,281 @@ const Manager = ({state, onClose}: {state: AddonsState; onClose: () => void}) =>
   useEffect(() => setConfirm(false), [addon?.id]);
 
   const total = Object.values(sizes).reduce((a, b) => a + b, 0);
+  if (installing) return <Install onDone={() => setInstalling(false)} />;
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-line-soft px-4 py-3">
-        <DialogTitle className="m-0 text-[15px] font-bold">Add-ons</DialogTitle>
-        <span className="flex-1" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted">Stack</span>
-        {naming === null ? (
-          <>
-            <select
-              aria-label="Stack for this window"
-              value={state.stackId}
-              onChange={(e) => addonsRequest({operation: 'use-stack', stackId: e.target.value})}
-              className="h-[30px] rounded-[7px] border border-line bg-card px-2 text-[12.5px] font-bold text-fg"
-            >
-              {state.stacks.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <button type="button" className={btn} onClick={() => setNaming('')}>
-              Save as stack…
-            </button>
-          </>
-        ) : (
-          <>
-            <input
-              aria-label="New stack name"
-              value={naming}
-              onChange={(e) => setNaming(e.target.value)}
-              placeholder="Web 3D dev"
-              className="h-[30px] w-40 rounded-[7px] border border-line bg-card px-2 text-[12.5px]"
-            />
-            <button
-              type="button"
-              className={primary}
-              disabled={!naming.trim()}
-              onClick={() => {
-                addonsRequest({operation: 'save-stack', name: naming.trim()}).catch(() => {});
-                setNaming(null);
-              }}
-            >
-              Save
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-fg"
-        >
-          <Icon icon="lucide:x" />
-        </button>
-      </div>
-
       {stale.length > 0 ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center gap-2 border-b border-line-soft bg-amber-400/5 px-4 py-2 text-[12.5px]"
+          className="bg-hover/40 flex flex-col gap-2 border-b border-line-soft px-4 py-3 text-body"
         >
-          <Icon icon="lucide:clock" className="text-amber-400" />
-          <span className="flex-1">
-            Not used for six months: {stale.map((a) => a.name).join(', ')}. Delete them and their
-            data?
+          <span className="flex items-center gap-2 font-bold">
+            <Icon icon="lucide:clock" className="text-muted" />
+            Not used for six months — delete them and their data?
           </span>
-          <button
-            type="button"
-            className={btn}
-            onClick={() =>
-              stale.forEach((a) => addonsRequest({operation: 'keep', id: a.id}).catch(() => {}))
-            }
-          >
-            Keep
-          </button>
-          <button
-            type="button"
-            className={cx(btn, 'border-red-500 text-red-400')}
-            onClick={() =>
-              stale.forEach((a) =>
-                addonsRequest({operation: 'uninstall', id: a.id}).catch(() => {})
-              )
-            }
-          >
-            Delete
-          </button>
+          {stale.map((a) => (
+            <div key={a.id} className="flex items-center gap-2">
+              <span className="flex-1">
+                {a.name}
+                <span className="text-muted">
+                  {' '}
+                  · {sizes[a.id] ? formatSize(sizes[a.id]) : 'no files of its own'}
+                </span>
+              </span>
+              <button
+                type="button"
+                className={cx(btn, 'h-control-sm')}
+                onClick={() => addonsRequest({operation: 'keep', id: a.id}).catch(() => {})}
+              >
+                Keep
+              </button>
+              <button
+                type="button"
+                className={cx(danger, 'h-control-sm')}
+                onClick={() => addonsRequest({operation: 'uninstall', id: a.id}).catch(() => {})}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
         </div>
       ) : null}
-
-      {installing ? (
-        <Install onDone={() => setInstalling(false)} />
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          <div className="flex w-[300px] shrink-0 flex-col gap-[2px] overflow-y-auto border-r border-line-soft p-2">
-            {state.addons.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setSelected(a.id)}
-                className={cx(
-                  'flex w-full items-center gap-[10px] rounded-lg px-[10px] py-[9px] text-left',
-                  a.id === addon?.id ? 'bg-hover' : 'hover:bg-hover'
-                )}
-              >
-                <span
-                  className={cx(
-                    'h-2 w-2 shrink-0 rounded-full',
-                    stack?.addons[a.id]?.enabled ? 'bg-accent' : 'bg-line'
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13.5px] font-bold">{a.name}</span>
-                  <span className="block truncate text-[11.5px] text-muted">{a.source}</span>
-                </span>
-              </button>
-            ))}
-            <span className="flex-1" />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex w-[300px] shrink-0 flex-col gap-[2px] overflow-y-auto border-r border-line-soft p-2">
+          {state.addons.map((a) => (
             <button
+              key={a.id}
               type="button"
-              className={cx(primary, 'h-[34px]')}
-              onClick={() => setInstalling(true)}
+              aria-current={a.id === addon?.id ? 'true' : undefined}
+              onClick={() => setSelected(a.id)}
+              className={cx(
+                'flex w-full items-center gap-[10px] rounded-lg px-[10px] py-[9px] text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                a.id === addon?.id ? 'bg-active' : 'hover:bg-hover'
+              )}
             >
-              + Install add-on
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'h-2 w-2 shrink-0 rounded-full',
+                  stack?.addons[a.id]?.enabled ? 'bg-accent' : 'bg-control-off'
+                )}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-body font-bold">{a.name}</span>
+                <span className="text-fg/70 block truncate text-small">{a.source}</span>
+              </span>
             </button>
-            <div className="px-1 pt-2 text-[11px] text-muted">
-              {formatSize(total)} on disk ·{' '}
-              <label className="inline-flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={state.autoCleanup}
-                  onChange={(e) =>
-                    addonsRequest({operation: 'set-auto-cleanup', on: e.target.checked})
-                  }
-                />
-                offer to delete add-ons unused for 6 months
-              </label>
+          ))}
+          <span className="flex-1" />
+          <button
+            type="button"
+            className={cx(primary, 'h-control-lg')}
+            onClick={() => setInstalling(true)}
+          >
+            + Install add-on
+          </button>
+          <div className="px-1 pt-2 text-caption text-muted">
+            {formatSize(total)} on disk ·{' '}
+            <label className="inline-flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={state.autoCleanup}
+                onChange={(e) =>
+                  addonsRequest({operation: 'set-auto-cleanup', on: e.target.checked})
+                }
+              />
+              offer to delete add-ons unused for 6 months
+            </label>
+          </div>
+        </div>
+
+        {addon ? (
+          <div
+            data-testid="addon-detail"
+            className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
+          >
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-heading font-bold">{addon.name}</div>
+                <div className="mt-1 truncate font-mono text-small text-muted">{addon.source}</div>
+                {addon.about ? (
+                  <div className="mt-2 text-body text-muted">{addon.about}</div>
+                ) : null}
+              </div>
+              <Toggle
+                isOn={enabled}
+                aria-label={`${addon.name} on in this stack`}
+                onChange={() =>
+                  addonsRequest({operation: 'set-enabled', addonId: addon.id, enabled: !enabled})
+                }
+              />
+            </div>
+            <div className="rounded-card border border-line bg-card">
+              <SectionCaption className="px-3 pb-2 pt-[10px]">
+                What it adds — switch each part
+              </SectionCaption>
+              {addon.parts.map((part) => {
+                const on = partOn(stack, addon.id, part.id);
+                return (
+                  <div
+                    key={part.id}
+                    className="flex items-center gap-3 border-t border-line-soft px-3 py-3"
+                  >
+                    <span className={cx('min-w-0 flex-1', {'opacity-60': !enabled})}>
+                      <span className="block text-body font-bold">{KIND[part.kind]}</span>
+                      <span className="block truncate text-small text-muted">
+                        {partDetail(part)}
+                      </span>
+                    </span>
+                    <Toggle
+                      isOn={on}
+                      disabled={!enabled}
+                      aria-label={`${KIND[part.kind]} on`}
+                      onChange={() =>
+                        addonsRequest({
+                          operation: 'set-part',
+                          addonId: addon.id,
+                          partId: part.id,
+                          on: !on,
+                        })
+                      }
+                    />
+                  </div>
+                );
+              })}
+              {!enabled ? (
+                <div className="border-t border-line-soft px-3 py-2 text-small text-muted">
+                  Turn the add-on on to change its parts.
+                </div>
+              ) : null}
+            </div>
+            <details className="rounded-card border border-line bg-card">
+              <summary className="cursor-pointer px-3 py-[10px] text-small font-bold uppercase tracking-[0.08em] text-muted">
+                Allowed when you installed it
+              </summary>
+              {addon.permissions.map((p) => (
+                <div
+                  key={p}
+                  className="flex items-center gap-2 border-t border-line-soft px-3 py-2 text-body"
+                >
+                  <Icon icon="lucide:shield-check" className="text-muted" />
+                  {p}
+                </div>
+              ))}
+            </details>
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-small text-muted">
+                {sizes[addon.id] ? `${formatSize(sizes[addon.id])} · ` : ''}last used{' '}
+                {new Date(addon.lastUsedAt).toLocaleDateString()}
+              </span>
+              <button
+                type="button"
+                className={danger}
+                onClick={() =>
+                  confirm
+                    ? addonsRequest({operation: 'uninstall', id: addon.id}).catch(() => {})
+                    : setConfirm(true)
+                }
+              >
+                {confirm ? 'Uninstall, with its data?' : 'Uninstall'}
+              </button>
             </div>
           </div>
-
-          {addon ? (
-            <div
-              data-testid="addon-detail"
-              className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
-            >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[18px] font-bold">{addon.name}</div>
-                  <div className="mt-1 truncate font-mono text-[11.5px] text-muted">
-                    {addon.source}
-                  </div>
-                  {addon.about ? (
-                    <div className="mt-2 text-[12.5px] text-muted">{addon.about}</div>
-                  ) : null}
-                </div>
-                <Switch
-                  on={enabled}
-                  label={`${addon.name} on in this stack`}
-                  onChange={() =>
-                    addonsRequest({operation: 'set-enabled', addonId: addon.id, enabled: !enabled})
-                  }
-                />
-              </div>
-              <div
-                className={cx('rounded-[10px] border border-line bg-card', {
-                  'opacity-50': !enabled,
-                })}
-              >
-                <div className="px-3 pb-2 pt-[10px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-                  What it adds — switch each part
-                </div>
-                {addon.parts.map((part) => {
-                  const on = partOn(stack, addon.id, part.id);
-                  return (
-                    <div
-                      key={part.id}
-                      className="flex items-center gap-3 border-t border-line-soft px-3 py-3"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-bold">{KIND[part.kind]}</span>
-                        <span className="block truncate text-[11.5px] text-muted">
-                          {partDetail(part)}
-                        </span>
-                      </span>
-                      <Switch
-                        on={on}
-                        label={`${KIND[part.kind]} on`}
-                        onChange={() =>
-                          enabled &&
-                          addonsRequest({
-                            operation: 'set-part',
-                            addonId: addon.id,
-                            partId: part.id,
-                            on: !on,
-                          })
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="rounded-[10px] border border-line bg-card">
-                <div className="px-3 pb-2 pt-[10px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-                  Allowed when you installed it
-                </div>
-                {addon.permissions.map((p) => (
-                  <div
-                    key={p}
-                    className="flex items-center gap-2 border-t border-line-soft px-3 py-2 text-[12.5px]"
-                  >
-                    <Icon icon="lucide:shield-check" className="text-muted" />
-                    {p}
-                  </div>
-                ))}
-                <div className="flex items-center gap-2 border-t border-line-soft px-3 py-2">
-                  <span className="flex-1 text-[11.5px] text-muted">
-                    {sizes[addon.id] ? `${formatSize(sizes[addon.id])} · ` : ''}last used{' '}
-                    {new Date(addon.lastUsedAt).toLocaleDateString()}
-                  </span>
-                  <button
-                    type="button"
-                    className={cx(btn, 'border-red-500 text-red-400')}
-                    onClick={() =>
-                      confirm
-                        ? addonsRequest({operation: 'uninstall', id: addon.id}).catch(() => {})
-                        : setConfirm(true)
-                    }
-                  >
-                    {confirm ? 'Uninstall, with its data?' : 'Uninstall'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+        ) : null}
+      </div>
     </>
   );
 };
 
-/** Toolbar button: this window's stack and how many add-ons are on. */
+/** Stack picker and "save as stack" in the dialog's title row. */
+const StackActions = ({state}: {state: AddonsState}) => {
+  const [naming, setNaming] = useState<string | null>(null);
+  if (naming !== null)
+    return (
+      <>
+        <input
+          aria-label="New stack name"
+          value={naming}
+          onChange={(e) => setNaming(e.target.value)}
+          placeholder="Web 3D dev"
+          className={cx(inputClass, 'w-40')}
+        />
+        <button
+          type="button"
+          className={primary}
+          disabled={!naming.trim()}
+          onClick={() => {
+            addonsRequest({operation: 'save-stack', name: naming.trim()}).catch(() => {});
+            setNaming(null);
+          }}
+        >
+          Save
+        </button>
+        <button type="button" className={btn} onClick={() => setNaming(null)}>
+          Cancel
+        </button>
+      </>
+    );
+  return (
+    <>
+      <SectionCaption className="">Stack</SectionCaption>
+      <select
+        aria-label="Stack for this window"
+        value={state.stackId}
+        onChange={(e) => addonsRequest({operation: 'use-stack', stackId: e.target.value})}
+        className={cx(inputClass, 'h-control font-bold')}
+      >
+        {state.stacks.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.id === 'default' ? 'Default stack' : s.name}
+          </option>
+        ))}
+      </select>
+      <button type="button" className={btn} onClick={() => setNaming('')}>
+        Save these switches as a stack…
+      </button>
+    </>
+  );
+};
+
+/** Toolbar button: an icon with a count; the stack's name is in its tooltip. */
 export const AddonsButton = () => {
   const {state} = useAddons();
   const [open, setOpen] = useState(false);
-  useOverlayRegistry(open);
   const stack = state?.stacks.find((s) => s.id === state.stackId);
   const on = Object.values(stack?.addons ?? {}).filter((a) => a.enabled).length;
+  const stackName = stack && stack.id !== 'default' ? stack.name : 'Default stack';
   return (
     <>
       <button
         type="button"
-        title="Add-ons"
+        title={`Add-ons — ${stackName}, ${on} on`}
+        aria-label={`Add-ons, ${on} on`}
         data-testid="addons-button"
         onClick={() => setOpen(true)}
         className={cx(
-          'flex h-[30px] items-center gap-[7px] rounded-[9px] border px-[11px] text-[12.5px]',
-          on > 0
-            ? 'border-accent bg-accent-soft font-bold text-accent'
-            : 'border-line text-fg hover:bg-hover'
+          'w-control relative flex h-control items-center justify-center rounded-lg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+          on > 0 ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-hover hover:text-fg'
         )}
       >
         <span className="pointer-events-none contents">
-          <Icon icon="lucide:puzzle" fontSize={15} />
-          {stack && stack.id !== 'default' ? stack.name : 'Add-ons'}
-          {on > 0 ? <span className="text-[11px] font-normal">{on} on</span> : null}
+          <Icon icon="lucide:puzzle" fontSize={16} />
+          {on > 0 ? (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-on-accent">
+              {on}
+            </span>
+          ) : null}
         </span>
       </button>
-      <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-6">
-          <DialogPanel className="flex h-[min(700px,90vh)] w-[min(1060px,94vw)] flex-col overflow-hidden rounded-xl border border-line bg-panel text-fg shadow-elevated">
-            {state ? <Manager state={state} onClose={() => setOpen(false)} /> : null}
-          </DialogPanel>
-        </div>
-      </Dialog>
+      <DialogShell
+        open={open}
+        onClose={() => setOpen(false)}
+        size="lg"
+        title="Add-ons"
+        actions={state ? <StackActions state={state} /> : null}
+      >
+        {state ? <Manager state={state} /> : null}
+      </DialogShell>
     </>
   );
 };
@@ -742,11 +838,13 @@ export const AddonDock = () => {
   );
   if (panels.length === 0) return null;
   const active = panels.find((p) => p.key === tab) ?? panels[0];
+  const tabId = (key: string) => `addon-tab-${key.replace(/[^a-z0-9-]/gi, '-')}`;
   if (hidden)
     return (
       <button
         type="button"
         title="Show add-on panels"
+        aria-label="Show add-on panels"
         onClick={() => setHidden(false)}
         className="flex w-7 shrink-0 items-start justify-center border-l border-line-soft bg-panel pt-3 text-muted hover:text-fg"
       >
@@ -759,23 +857,35 @@ export const AddonDock = () => {
       className="flex w-[520px] shrink-0 flex-col border-l border-line-soft bg-panel"
     >
       <div className="flex items-center gap-1 border-b border-line-soft px-2 py-[6px]">
-        {panels.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => setTab(p.key)}
-            className={cx(
-              'h-[30px] rounded-[7px] px-3 text-[12.5px]',
-              p.key === active.key ? 'bg-hover font-bold text-fg' : 'text-muted hover:text-fg'
-            )}
-          >
-            {p.addon.name}
-          </button>
-        ))}
-        <span className="flex-1" />
+        <div role="tablist" aria-label="Add-on panels" className="flex flex-1 gap-1">
+          {panels.map((p) => (
+            <button
+              key={p.key}
+              id={tabId(p.key)}
+              type="button"
+              role="tab"
+              aria-selected={p.key === active.key}
+              aria-controls={`${tabId(p.key)}-panel`}
+              tabIndex={p.key === active.key ? 0 : -1}
+              onClick={() => setTab(p.key)}
+              onKeyDown={(e) => {
+                const i = panels.findIndex((x) => x.key === active.key);
+                const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+                if (next !== null) setTab(panels[(next + panels.length) % panels.length].key);
+              }}
+              className={cx(
+                'h-control rounded-control px-3 text-body focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                p.key === active.key ? 'bg-hover font-bold text-fg' : 'text-muted hover:text-fg'
+              )}
+            >
+              {p.addon.name}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           title="Hide panels"
+          aria-label="Hide panels"
           onClick={() => setHidden(true)}
           className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-fg"
         >
@@ -784,13 +894,20 @@ export const AddonDock = () => {
       </div>
       {/* Every panel stays mounted (its app keeps state); only the active one shows. */}
       {panels.map((p) => (
-        <webview
+        <div
           key={p.key}
-          src={p.part.url}
-          /* eslint-disable-next-line react/no-unknown-property */
-          partition={`persist:addon-${p.addon.id}`}
-          className={cx('min-h-0 flex-1 bg-white', {hidden: p.key !== active.key})}
-        />
+          id={`${tabId(p.key)}-panel`}
+          role="tabpanel"
+          aria-labelledby={tabId(p.key)}
+          className={cx('flex min-h-0 flex-1', {hidden: p.key !== active.key})}
+        >
+          <webview
+            src={p.part.url}
+            /* eslint-disable-next-line react/no-unknown-property */
+            partition={`persist:addon-${p.addon.id}`}
+            className="min-h-0 flex-1 bg-white"
+          />
+        </div>
       ))}
     </div>
   );

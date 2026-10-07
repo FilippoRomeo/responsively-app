@@ -46,12 +46,12 @@ const Modal = ({isOpen, onClose, title, description, children}: Props) => {
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel
-                className={`flex w-fit min-w-[320px] flex-col gap-4 rounded bg-slate-200 text-light-normal dark:bg-slate-800 dark:text-dark-normal ${
+                className={`flex w-fit min-w-[320px] flex-col gap-4 rounded-dialog border border-line bg-panel text-fg shadow-elevated ${
                   title ? 'p-8' : 'px-8 py-4'
                 }`}
               >
                 <div>
-                  <DialogTitle className="text-xl font-medium leading-6">{title}</DialogTitle>
+                  <DialogTitle className="text-title font-bold leading-6">{title}</DialogTitle>
                   <Description>{description}</Description>
                 </div>
 

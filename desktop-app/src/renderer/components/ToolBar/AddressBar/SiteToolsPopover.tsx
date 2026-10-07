@@ -1,6 +1,8 @@
 import {Icon} from '@iconify/react';
 import {useState} from 'react';
 import Popover from 'renderer/components/Popover';
+import MenuRow from 'renderer/components/MenuRow';
+import SectionCaption from 'renderer/components/SectionCaption';
 import Toggle from 'renderer/components/Toggle';
 
 const hostLabel = (address: string): string => {
@@ -52,13 +54,12 @@ const SiteToolsPopover = ({address, actions, onShowPermissions}: Props) => {
     >
       {({close}) => (
         <>
-          <div className="px-[10px] pb-1 pt-2 text-[11px] font-bold tracking-[0.08em] text-muted">
-            SITE DATA — {hostLabel(address)}
-          </div>
+          <SectionCaption className="px-[10px] pb-1 pt-2">
+            Site data — {hostLabel(address)}
+          </SectionCaption>
           {actions.map((action) => (
-            <button
+            <MenuRow
               key={action.title}
-              type="button"
               title={action.title}
               onClick={() => {
                 // Close first: the action's loading state re-renders this
@@ -67,18 +68,16 @@ const SiteToolsPopover = ({address, actions, onShowPermissions}: Props) => {
                 close();
                 action.run();
               }}
-              className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-2 text-[13.5px] text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover"
-            >
-              <span className="pointer-events-none contents">
+              leading={
                 <Icon
                   icon={action.isLoading ? 'line-md:loading-twotone-loop' : action.icon}
                   className="text-muted"
                   fontSize={16}
                 />
-                {action.label}
-                <span className="ml-auto text-xs text-muted">{action.note}</span>
-              </span>
-            </button>
+              }
+              label={action.label}
+              trailing={<span className="text-caption text-muted">{action.note}</span>}
+            />
           ))}
           <div className="mx-1 my-[6px] border-t border-line-soft" />
           <div
@@ -98,20 +97,15 @@ const SiteToolsPopover = ({address, actions, onShowPermissions}: Props) => {
               }}
             />
           </div>
-          <button
-            type="button"
+          <MenuRow
             title="Site permissions"
             onClick={() => {
               close();
               onShowPermissions();
             }}
-            className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-2 text-[13.5px] text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover"
-          >
-            <span className="pointer-events-none contents">
-              <Icon icon="mdi:shield-key-outline" className="text-muted" fontSize={16} />
-              Site permissions
-            </span>
-          </button>
+            leading={<Icon icon="mdi:shield-key-outline" className="text-muted" fontSize={16} />}
+            label="Site permissions"
+          />
         </>
       )}
     </Popover>

@@ -27,13 +27,13 @@ const Input = ({
         id={id}
         className={cx(
           'rounded-md border bg-input p-1 px-1 text-fg focus:outline-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent',
-          error != null ? 'border-red-500' : 'border-line'
+          error != null ? 'border-danger' : 'border-line'
         )}
         aria-invalid={error != null || undefined}
         {...props}
       />
       {error != null && (
-        <p role="alert" className="text-sm text-red-500">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

@@ -32,6 +32,9 @@ module.exports = {
         accent: 'var(--accent)',
         'accent-soft': 'var(--accent-soft)',
         'on-accent': 'var(--on-accent)',
+        danger: 'var(--danger)',
+        warning: 'var(--warning)',
+        'control-off': 'var(--control-off)',
         overlay: '#ec4899',
         'overlay-soft': 'rgba(236,72,153,.12)',
         heart: 'var(--heart)',
@@ -42,6 +45,24 @@ module.exports = {
       },
       boxShadow: {
         elevated: 'var(--shadow)',
+      },
+      // Scales for new UI (older components move over as they are touched).
+      fontSize: {
+        caption: ['11px', '1.4'],
+        small: ['12px', '1.45'],
+        body: ['13px', '1.45'],
+        title: ['15px', '1.3'],
+        heading: ['18px', '1.25'],
+      },
+      borderRadius: {
+        control: '7px',
+        card: '10px',
+        dialog: '12px',
+      },
+      height: {
+        'control-sm': '24px',
+        control: '30px',
+        'control-lg': '36px',
       },
       fontFamily: {
         sans: ['Lato', ...defaultTheme.fontFamily.sans],

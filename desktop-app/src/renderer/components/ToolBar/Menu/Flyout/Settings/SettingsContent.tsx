@@ -26,7 +26,7 @@ const WindowDataCard = () => {
         <span
           className={cx('flex-1 text-[22px] font-bold tabular-nums', {
             'text-accent': done,
-            'text-amber-400': !done && total > 30e6,
+            'text-warning': !done && total > 30e6,
           })}
         >
           {usage ? `${formatBytes(total)}${done ? ' — cleared' : ''}` : 'Measuring…'}
@@ -38,14 +38,14 @@ const WindowDataCard = () => {
           onClick={() => clear()}
           className={cx(
             'h-[30px] whitespace-nowrap rounded-[7px] border px-3 text-[13px] disabled:opacity-60',
-            done ? 'border-accent text-accent' : 'border-red-500 text-red-400 hover:bg-hover'
+            done ? 'border-accent text-accent' : 'border-danger text-danger hover:bg-hover'
           )}
         >
           {done ? 'Cleared ✓' : 'Clear everything'}
         </button>
       </div>
       {usage ? <WindowDataRows usage={usage} peak={peak} done={done} bars /> : null}
-      <p className="text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-sm text-muted">
         This window&apos;s cache and cookies, and the storage and service workers of the sites open
         in it. Clearing empties every site&apos;s; ⌘⇧R does the same and reloads.
       </p>
@@ -104,7 +104,7 @@ export const SettingsContent = ({onClose}: Props) => {
               data-testid="settings-screenshot_location-input"
               type="text"
               id={id}
-              className="mt-2 rounded-md border border-gray-300 px-4 py-2 text-base focus-visible:outline-gray-400 dark:border-gray-500 dark:bg-slate-900"
+              className="mt-2 rounded-md border border-line bg-input px-4 py-2 text-base text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
               value={screenshotSaveLocation}
               aria-invalid={locationError || undefined}
               onChange={(e) => {
@@ -114,13 +114,11 @@ export const SettingsContent = ({onClose}: Props) => {
             />
           </label>
           {locationError && (
-            <p role="alert" className="text-sm text-red-500">
+            <p role="alert" className="text-sm text-danger">
               Please enter a valid location.
             </p>
           )}
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            The location where screenshots will be saved.
-          </p>
+          <p className="text-sm text-muted">The location where screenshots will be saved.</p>
         </div>
       </div>
 
@@ -131,7 +129,7 @@ export const SettingsContent = ({onClose}: Props) => {
           <select
             data-testid="settings-popup_behavior-select"
             id={`${id}-popup-behavior`}
-            className="mt-2 rounded-md border border-gray-300 px-4 py-2 text-base focus-visible:outline-gray-400 dark:border-gray-500 dark:bg-slate-900"
+            className="mt-2 rounded-md border border-line bg-input px-4 py-2 text-base text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
             value={popupBehavior}
             onChange={(e) => setPopupBehavior(e.target.value)}
           >
@@ -139,7 +137,7 @@ export const SettingsContent = ({onClose}: Props) => {
             <option value="external">Open it in the default browser</option>
           </select>
         </label>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted">
           Applies to links with target=&quot;_blank&quot; and window.open calls.
         </p>
       </div>

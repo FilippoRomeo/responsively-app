@@ -355,7 +355,7 @@ export default function SessionsManager({
         </p>
       )}
       {listError && (
-        <div role="alert" className="px-3 pt-2 text-xs text-red-700 dark:text-red-300">
+        <div role="alert" className="px-3 pt-2 text-xs text-danger">
           Sessions could not be refreshed: {listError}{' '}
           <button type="button" className="underline" onClick={() => void refresh()}>
             Retry
@@ -363,7 +363,7 @@ export default function SessionsManager({
         </div>
       )}
       {actionError && (
-        <p role="alert" className="break-words px-3 pt-2 text-xs text-red-700 dark:text-red-300">
+        <p role="alert" className="break-words px-3 pt-2 text-xs text-danger">
           {actionError}
         </p>
       )}
@@ -404,7 +404,7 @@ export default function SessionsManager({
             </>
           )}
           {errors[editing] && (
-            <p role="alert" className="break-words text-red-700 dark:text-red-300">
+            <p role="alert" className="break-words text-danger">
               {errors[editing]}
             </p>
           )}
@@ -436,7 +436,7 @@ export default function SessionsManager({
               : 'Its browser data will move to Trash and it will be removed from Sessions.'}
           </p>
           {errors[confirming.id] && (
-            <p role="alert" className="break-words text-red-700 dark:text-red-300">
+            <p role="alert" className="break-words text-danger">
               {errors[confirming.id]}
             </p>
           )}
@@ -546,10 +546,7 @@ export default function SessionsManager({
                       'Devices saved with this Session'}
                   </p>
                   {(errors[item.id] || item.error) && (
-                    <p
-                      role="alert"
-                      className="mt-2 break-words text-xs text-red-700 dark:text-red-300"
-                    >
+                    <p role="alert" className="mt-2 break-words text-xs text-danger">
                       {errors[item.id] || item.error}
                     </p>
                   )}
@@ -715,7 +712,7 @@ function AttentionView({
           Session&apos;s. Unsaved page state in its window can be lost; its browser data stays.
         </p>
         {error && (
-          <p role="alert" className="break-words text-red-700 dark:text-red-300">
+          <p role="alert" className="break-words text-danger">
             {error}
           </p>
         )}
@@ -740,7 +737,7 @@ function AttentionView({
     <div className="grid gap-3 overflow-y-auto p-3 text-sm" data-testid="session-attention">
       <h3 className="break-words font-semibold">“{item.name}” needs attention</h3>
       <p>An agent tried to use this Session, but it is not available.</p>
-      <p role="alert" className="break-words text-red-700 dark:text-red-300">
+      <p role="alert" className="break-words text-danger">
         {item.status === 'running'
           ? 'It is running again.'
           : item.hung
@@ -748,7 +745,7 @@ function AttentionView({
             : [stopped ? 'It is stopped.' : item.error, cause].filter(Boolean).join(' ')}
       </p>
       {error && (
-        <p role="alert" className="break-words text-red-700 dark:text-red-300">
+        <p role="alert" className="break-words text-danger">
           {error}
         </p>
       )}
