@@ -11,6 +11,9 @@ import {
 } from 'renderer/components/WindowData';
 import {selectClassicToolbar, setClassicToolbar} from 'renderer/store/features/ui';
 import {StorageSettings} from './StorageSettings';
+
+/** The commit this build comes from (set at build time; every build has the same version). */
+const BUILD_COMMIT = process.env.BUILD_COMMIT || 'development';
 import {SettingsContentHeaders} from './SettingsContentHeaders';
 
 const WindowDataCard = () => {
@@ -166,6 +169,10 @@ export const SettingsContent = ({onClose}: Props) => {
           {classicToolbar ? 'Use the icon toolbar' : 'Reset toolbar'}
         </Button>
       </div>
+
+      <p data-testid="settings-build" className="text-small text-muted" title={BUILD_COMMIT}>
+        Build {BUILD_COMMIT.slice(0, 8)}
+      </p>
 
       <Button
         data-testid="settings-save-button"

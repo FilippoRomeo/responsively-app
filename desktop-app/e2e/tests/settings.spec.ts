@@ -141,6 +141,14 @@ test.describe('Settings', () => {
     expect(storedValue).toBe('fr-FR,en-US');
   });
 
+  test('shows the commit the build comes from', async ({app}) => {
+    await app.dismissModals();
+    await app.openSettings();
+    const {execSync} = await import('child_process');
+    const head = execSync('git rev-parse HEAD').toString().trim();
+    await expect(app.page.getByTestId('settings-build')).toHaveText(`Build ${head.slice(0, 8)}`);
+  });
+
   test('settings modal can be closed', async ({app}) => {
     await app.dismissModals();
 

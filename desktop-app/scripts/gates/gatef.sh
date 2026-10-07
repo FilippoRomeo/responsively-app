@@ -8,12 +8,15 @@
 #       ~/ResponsivelyGateC/<gatec-run>/tested.env says RESULT=PASS, and unless
 #       the new bridge is byte-identical to the one Gate C tested.
 #   bash gatef.sh backup <install-run>
-#       requires the app fully quit and unchanged since prepare; copies the app
-#       and both data folders and verifies every file by SHA-256.
+#       requires the app fully quit and unchanged since prepare; keeps the app
+#       as a zip and copies both data folders, verifying every file and link.
 #   bash gatef.sh replace <install-run>
-#       stages, swaps, verifies; the old app is kept in the backup as .replaced.
+#       stages, swaps, verifies; then moves the old app and the build output to
+#       the Trash (the zip in the backup is the rollback copy).
 #
-# Nothing is ever deleted. Everything lives under $HOME/ResponsivelyGateF/<install-run>/.
+# No unpacked copy of the app is left behind: macOS launches any bundle with
+# the same ID, so a backup could open instead of the installed app. Nothing
+# else is deleted. Everything lives under $HOME/ResponsivelyGateF/<install-run>/.
 set -euo pipefail
 
 usage() {
@@ -106,7 +109,19 @@ quit_check() {
   log "app fully quit: no app processes, no live leases, no open files in the data folders"
 }
 
-manifest() { (cd "$1" && find . -type f -print0 | xargs -0 shasum -a 256 | sort -k2); }
+# Every file's SHA-256 and every symlink's target (app frameworks are full of links).
+manifest() {
+  (cd "$1" && {
+    find . -type f -print0 | xargs -0 shasum -a 256
+    find . -type l | while IFS= read -r link; do printf 'link:%s  %s\n' "$(readlink "$link")" "$link"; done
+  } | sort -k2)
+}
+
+# To Finder's Trash (recoverable), never rm.
+to_trash() {
+  /usr/bin/osascript -e 'on run argv' -e 'tell application "Finder"' -e 'repeat with p in argv' \
+    -e 'delete (POSIX file (p as text) as alias)' -e 'end repeat' -e 'end tell' -e 'end run' "$@" > /dev/null
+}
 
 copy_verified() { # src dest-name
   local dest="$BACKUP/$2"
@@ -115,6 +130,18 @@ copy_verified() { # src dest-name
   manifest "$dest" > "$EV/backup-$2.copy.sha256"
   cmp -s "$EV/backup-$2.source.sha256" "$EV/backup-$2.copy.sha256" || fail "backup of $1 does not match its source"
   log "backed up and verified $(wc -l < "$EV/backup-$2.source.sha256" | tr -d ' ') files: $1 -> $dest"
+}
+
+zip_verified() { # app dest-zip-name: a zip macOS can't launch, checked by unpacking it
+  local zip="$BACKUP/$2" check="$RUN/.zip-check"
+  /usr/bin/ditto -c -k --keepParent "$1" "$zip"
+  rm -rf "$check" && mkdir -p "$check"
+  /usr/bin/ditto -x -k "$zip" "$check"
+  manifest "$1" > "$EV/backup-$2.source.sha256"
+  manifest "$check/$(basename "$1")" > "$EV/backup-$2.copy.sha256"
+  rm -rf "$check"
+  cmp -s "$EV/backup-$2.source.sha256" "$EV/backup-$2.copy.sha256" || fail "zip of $1 does not match its source"
+  log "backed up and verified $(wc -l < "$EV/backup-$2.source.sha256" | tr -d ' ') files and links: $1 -> $zip"
 }
 
 case "$PHASE" in
@@ -197,7 +224,7 @@ case "$PHASE" in
     [ -d "$INSTALL" ] || fail "no installed app at $INSTALL"
     # The backup must be of the app prepare saw, not one swapped in since.
     [ "$(sha "$INSTALL/Contents/Resources/app.asar")" = "$(val "$TARGET" INSTALLED_ASAR)" ] || fail "the installed app changed since prepare"
-    copy_verified "$INSTALL" ResponsivelyMCP.app
+    zip_verified "$INSTALL" ResponsivelyMCP.app.zip
     if [ -d "$DATA_MCP" ]; then copy_verified "$DATA_MCP" ResponsivelyMCP; else log "no $DATA_MCP"; fi
     if [ -d "$DATA_SESSIONS" ]; then copy_verified "$DATA_SESSIONS" ResponsivelySessions; else log "no $DATA_SESSIONS"; fi
     echo "$BACKUP" > "$RUN/backup.ok"
@@ -213,6 +240,8 @@ case "$PHASE" in
     quit_check replace
     [ -e "$STAGE" ] && fail "$STAGE already exists; inspect it, then move it aside"
     [ -e "$BACKUP/ResponsivelyMCP.app.replaced" ] && fail "old app already moved aside"
+    # Only the app the backup zipped may be moved aside (and then trashed).
+    [ "$(sha "$INSTALL/Contents/Resources/app.asar")" = "$(val "$TARGET" INSTALLED_ASAR)" ] || fail "the installed app changed since backup"
     /usr/bin/ditto "$NEW" "$STAGE"
     [ "$(/usr/bin/defaults read "$STAGE/Contents/Info.plist" CFBundleIdentifier)" = "$APP_ID" ] || fail "staged bundle id"
     /usr/bin/codesign --verify --deep --strict "$STAGE" || fail "staged codesign"
@@ -224,9 +253,15 @@ case "$PHASE" in
     [ "$(sha "$INSTALL/Contents/Resources/app.asar")" = "$(sha "$NEW/Contents/Resources/app.asar")" ] || fail "installed app.asar"
     /usr/bin/codesign --verify --deep --strict "$INSTALL" || fail "installed codesign"
     echo "done" > "$RUN/replace.ok"
-    log "REPLACE PASS. Old app kept at $BACKUP/ResponsivelyMCP.app.replaced"
+    # Unpacked copies with the same bundle ID could be launched instead of the new app.
+    if to_trash "$BACKUP/ResponsivelyMCP.app.replaced" "$NEW"; then
+      log "moved the old app and the build output to the Trash"
+    else
+      log "WARNING: move these to the Trash before opening Responsively: $BACKUP/ResponsivelyMCP.app.replaced $NEW"
+    fi
+    log "REPLACE PASS. Old app kept as a verified zip: $BACKUP/ResponsivelyMCP.app.zip"
     log "Rollback, if ever needed (quit the app first):"
-    log "  mv \"$INSTALL\" \"$RUN/rolled-back-${EXPECTED_SHA:0:7}.app\" && mv \"$BACKUP/ResponsivelyMCP.app.replaced\" \"$INSTALL\""
+    log "  osascript -e 'tell application \"Finder\" to delete POSIX file \"$INSTALL\"' && ditto -x -k \"$BACKUP/ResponsivelyMCP.app.zip\" \"$(dirname "$INSTALL")\""
     log "Next: restart Claude Desktop (loads the new bridge), open Responsively, then run the smoke test"
     ;;
 
