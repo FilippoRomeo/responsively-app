@@ -49,6 +49,15 @@ jobs:
         working-directory: ./responsively-mcp
         run: npm test
 
+      # Instrumentation for the Session-stop flake (throwaway branch, never merged):
+      # a read-only watcher records each runtime's port-close and exit timing,
+      # process state, CPU, memory pressure and swap, and samples a slow exit.
+      - name: Start stop-timing watcher
+        run: |
+          mkdir -p "$RUNNER_TEMP/stop-watch"
+          nohup node scripts/ci/stop-watcher.js "$RUNNER_TEMP/stop-watch" > "$RUNNER_TEMP/stop-watch/watcher.out" 2>&1 &
+          echo $! > "$RUNNER_TEMP/stop-watch/watcher.pid"
+
       - name: E2E Tests
         timeout-minutes: 15
         run: yarn test:e2e
@@ -56,6 +65,21 @@ jobs:
           CI: true
           E2E_TEST: true
           E2E_HEADLESS: true
+
+      - name: Stop the watcher and collect the controller log
+        if: always()
+        run: |
+          kill -TERM "$(cat "$RUNNER_TEMP/stop-watch/watcher.pid")" || true
+          sleep 3
+          cp ~/Library/Logs/ResponsivelyApp/main.log "$RUNNER_TEMP/stop-watch/controller-main.log" || true
+
+      - name: Upload stop-timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stop-watch
+          path: ${{ runner.temp }}/stop-watch/
+          retention-days: 14
 
       - name: Upload E2E Report
         uses: actions/upload-artifact@v4
