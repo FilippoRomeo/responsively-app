@@ -79,7 +79,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['github'], ['html', {open: 'never'}]] : [['html', {open: 'never'}]],
   use: {
-    trace: 'on-first-retry',
+    // CI keeps the trace of every failed attempt: flakes that pass on retry
+    // otherwise leave no trace of the attempt that actually failed.
+    trace: process.env.CI ? 'retain-on-failure' : 'on-first-retry',
     screenshot: 'only-on-failure',
   },
 });
