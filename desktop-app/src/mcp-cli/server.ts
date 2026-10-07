@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import {MCP_SERVER_NAME} from '../common/mcp';
+import {MCP_AGENT_INSTRUCTIONS, MCP_SERVER_NAME} from '../common/mcp';
 import {createBackend} from './backend';
 import {readBeacon, resolveTargetPort} from './beacon';
 import {log} from './log';
@@ -47,7 +47,7 @@ export const startBridge = async () => {
   const port = resolveTargetPort(process.env, readBeacon());
   const server = new Server(
     {name: MCP_SERVER_NAME, version: manifest.version},
-    {capabilities: {tools: {}}}
+    {capabilities: {tools: {}}, instructions: MCP_AGENT_INSTRUCTIONS}
   );
   // The agent app that started this bridge, known once it has initialized.
   const agentName = () => server.getClientVersion()?.name;

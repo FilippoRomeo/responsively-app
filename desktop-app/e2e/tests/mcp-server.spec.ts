@@ -68,11 +68,16 @@ test.describe('MCP server', () => {
   test('lists the available tools', async () => {
     const {tools} = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      'call_addon_tool',
       'click',
       'create_session',
+      'evaluate',
       'focus_session',
       'get_app_state',
+      'get_prompts',
+      'get_rules',
       'get_session',
+      'list_addon_tools',
       'list_devices',
       'list_sessions',
       'navigate',

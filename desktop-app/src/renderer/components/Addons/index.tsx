@@ -36,12 +36,19 @@ const KIND: Record<AddonPart['kind'], string> = {
   panel: 'App panel',
   script: 'Page script',
   start: 'Start command',
+  mcp: 'MCP server',
+  rule: 'Rule',
+  prompt: 'Prompt',
 };
 
 const partDetail = (part: AddonPart) => {
   if (part.kind === 'panel') return `${part.url} · its own tab beside the previews`;
   if (part.kind === 'script') return `${part.file} · runs on ${part.matches.join(', ')}`;
-  return `Runs "${part.command}" while this window is open`;
+  if (part.kind === 'start') return `Runs "${part.command}" while this window is open`;
+  if (part.kind === 'mcp') return `${part.url ?? part.command} · its tools reach your agents`;
+  if (part.kind === 'rule')
+    return `${part.name} · ${part.mode === 'always' ? 'always given to agents' : 'on demand'}${part.description ? ` — ${part.description}` : ''}`;
+  return `${part.name}${part.description ? ` — ${part.description}` : ''}`;
 };
 
 const btn =
@@ -224,6 +231,101 @@ const PartEditor = ({
           ) : null}
         </>
       ) : null}
+      {part.kind === 'mcp' ? (
+        <Field
+          label="MCP server — a command or an http(s) address"
+          hint="Agents reach its tools with list_addon_tools and call_addon_tool"
+        >
+          {(control) => (
+            <input
+              {...control}
+              value={part.url ?? part.command ?? ''}
+              placeholder="npx -y some-mcp-server  ·  http://127.0.0.1:8000/mcp"
+              onChange={(e) =>
+                onChange(
+                  /^https?:\/\//i.test(e.target.value)
+                    ? {...part, url: e.target.value, command: undefined}
+                    : {...part, command: e.target.value, url: undefined}
+                )
+              }
+              className={mono}
+            />
+          )}
+        </Field>
+      ) : null}
+      {part.kind === 'rule' || part.kind === 'prompt' ? (
+        <div className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)] gap-3">
+          <Field label={part.kind === 'rule' ? 'Rule name' : 'Prompt name'}>
+            {(control) => (
+              <input
+                {...control}
+                value={part.name}
+                onChange={(e) => onChange({...part, name: e.target.value})}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label="Description" hint="Agents see this to decide when it applies">
+            {(control) => (
+              <input
+                {...control}
+                value={part.description}
+                onChange={(e) => onChange({...part, description: e.target.value})}
+                className={inputClass}
+              />
+            )}
+          </Field>
+        </div>
+      ) : null}
+      {part.kind === 'rule' ? (
+        <>
+          <Field label="Give it to agents">
+            {(control) => (
+              <select
+                {...control}
+                value={part.mode}
+                onChange={(e) =>
+                  onChange({...part, mode: e.target.value as 'always' | 'on-demand'})
+                }
+                className={cx(inputClass, 'w-fit')}
+              >
+                <option value="on-demand">
+                  On demand — name and description, the rest when asked
+                </option>
+                <option value="always">Always — in full, for every task</option>
+              </select>
+            )}
+          </Field>
+          {part.file ? (
+            <p className="m-0 text-small text-muted">Text from {part.file} (SKILL.md format)</p>
+          ) : (
+            <Field label="Rule" hint="Markdown, like the body of a SKILL.md">
+              {(control) => (
+                <textarea
+                  {...control}
+                  rows={5}
+                  value={part.body ?? ''}
+                  onChange={(e) => onChange({...part, body: e.target.value})}
+                  className={cx(inputClass, 'h-auto py-2 font-mono text-small')}
+                />
+              )}
+            </Field>
+          )}
+        </>
+      ) : null}
+      {part.kind === 'prompt' ? (
+        <Field label="Prompt" hint="What the agent should do when you ask for it">
+          {(control) => (
+            <textarea
+              {...control}
+              rows={5}
+              value={part.text}
+              onChange={(e) => onChange({...part, text: e.target.value})}
+              className={cx(inputClass, 'h-auto py-2 text-small')}
+            />
+          )}
+        </Field>
+      ) : null}
       {part.kind === 'start' ? (
         <Field label="Start command" hint="Runs on this Mac while a window uses the add-on">
           {(control) => (
@@ -272,12 +374,29 @@ const Install = ({onDone}: {onDone: () => void}) => {
     setAddon((a) => {
       if (!a) return a;
       const id = `${kind}-${a.parts.length}`;
-      const part: AddonPart =
-        kind === 'script'
-          ? {id, kind, label: 'Page script', file: 'dist/index.js', matches: ['localhost:*']}
-          : kind === 'panel'
-            ? {id, kind, label: 'Panel', url: 'http://127.0.0.1:8188/'}
-            : {id, kind, label: 'Start command', command: ''};
+      const fresh: Record<AddonPart['kind'], AddonPart> = {
+        script: {
+          id,
+          kind: 'script',
+          label: 'Page script',
+          file: 'dist/index.js',
+          matches: ['localhost:*'],
+        },
+        panel: {id, kind: 'panel', label: 'Panel', url: 'http://127.0.0.1:8188/'},
+        start: {id, kind: 'start', label: 'Start command', command: ''},
+        mcp: {id, kind: 'mcp', label: 'MCP server', command: ''},
+        rule: {
+          id,
+          kind: 'rule',
+          label: 'Rule',
+          name: '',
+          description: '',
+          body: '',
+          mode: 'on-demand',
+        },
+        prompt: {id, kind: 'prompt', label: 'Prompt', name: '', description: '', text: ''},
+      };
+      const part = fresh[kind];
       return {...a, parts: [...a.parts, part]};
     });
   const cancel = () => {
@@ -320,11 +439,30 @@ const Install = ({onDone}: {onDone: () => void}) => {
             text: `Run "${p.command}" on this Mac while a window uses it`,
           })),
         ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'mcp'}> => p.kind === 'mcp')
+          .map((p) =>
+            p.url
+              ? {high: false, text: `Give your agents the tools at ${p.url}`}
+              : {
+                  high: true,
+                  text: `Run "${p.command}" on this Mac and give its tools to your agents`,
+                }
+          ),
+        ...addon.parts
           .filter((p): p is Extract<AddonPart, {kind: 'script'}> => p.kind === 'script')
           .map((p) => ({high: false, text: `Run its code in previews on ${p.matches.join(', ')}`})),
         ...addon.parts
           .filter((p): p is Extract<AddonPart, {kind: 'panel'}> => p.kind === 'panel')
           .map((p) => ({high: false, text: `Show ${p.url} inside Responsively`})),
+        ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'rule'}> => p.kind === 'rule')
+          .map((p) => ({
+            high: false,
+            text: `Give your agents the rule "${p.name}"${p.mode === 'always' ? ' with every task' : ''}`,
+          })),
+        ...addon.parts
+          .filter((p): p is Extract<AddonPart, {kind: 'prompt'}> => p.kind === 'prompt')
+          .map((p) => ({high: false, text: `Offer your agents the prompt "${p.name}"`})),
       ]
     : [];
   const sourceName =
@@ -401,6 +539,15 @@ const Install = ({onDone}: {onDone: () => void}) => {
               </button>
               <button type="button" className={btn} onClick={() => addPart('start')}>
                 + Start command
+              </button>
+              <button type="button" className={btn} onClick={() => addPart('mcp')}>
+                + MCP server
+              </button>
+              <button type="button" className={btn} onClick={() => addPart('rule')}>
+                + Rule
+              </button>
+              <button type="button" className={btn} onClick={() => addPart('prompt')}>
+                + Prompt
               </button>
             </div>
             <div className="flex flex-col gap-2 rounded-card border border-line bg-card p-3">

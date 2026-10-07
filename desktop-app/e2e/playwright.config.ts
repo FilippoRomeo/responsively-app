@@ -58,6 +58,7 @@ const testOrder = [
   'app-launch.spec.ts',
   'ios-safari.spec.ts',
   'addons.spec.ts',
+  'addons-agents.spec.ts',
 ];
 
 export default defineConfig({

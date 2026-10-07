@@ -273,3 +273,30 @@ export const typeText = async (
     pageTitle: targetContents.getTitle(),
   };
 };
+
+const MAX_EVALUATE_CHARS = 20_000;
+
+/**
+ * Runs an expression in a device preview's page (its own world, so page
+ * globals such as window.__COMPOSE3D__ are reachable). Promises are awaited;
+ * the result comes back as JSON, capped.
+ */
+export const evaluateInPage = async (
+  getMainWindow: GetMainWindow,
+  expression: string,
+  device?: string
+) => {
+  const {deviceName, targetContents} = await resolveTarget(getMainWindow, device);
+  const script = `(async () => {
+    const value = await (0, eval)(${JSON.stringify(expression)});
+    try { return JSON.stringify(value, null, 2) ?? String(value); } catch { return String(value); }
+  })()`;
+  const result = await executeInPage<string>(targetContents, script);
+  return {
+    device: deviceName,
+    result:
+      result.length > MAX_EVALUATE_CHARS
+        ? `${result.slice(0, MAX_EVALUATE_CHARS)}… (truncated)`
+        : result,
+  };
+};

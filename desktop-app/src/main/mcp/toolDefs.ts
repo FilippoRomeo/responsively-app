@@ -82,6 +82,42 @@ export const toolDefs = {
         .describe('Installed iOS version for ios-safari, e.g. "26.1"'),
     },
   },
+  evaluate: {
+    description:
+      'Run a JavaScript expression in a Chromium device preview and return its result as JSON ' +
+      "(promises are awaited). The page's own globals are reachable, e.g. an add-on's " +
+      'window.__COMPOSE3D__. Defaults to the primary device.',
+    inputSchema: {
+      expression: z.string().min(1).describe('JavaScript expression, e.g. "document.title"'),
+      device: z.string().optional().describe('Optional device id or exact name'),
+    },
+  },
+  list_addon_tools: {
+    description:
+      "List the tools of the MCP-server add-ons switched on in this Session's stack (the user " +
+      'installs and switches them in Responsively). Call them with call_addon_tool.',
+  },
+  call_addon_tool: {
+    description: 'Call a tool of an MCP-server add-on from list_addon_tools.',
+    inputSchema: {
+      addon: z.string().min(1).describe('The add-on id from list_addon_tools'),
+      tool: z.string().min(1).describe('The tool name from list_addon_tools'),
+      arguments: z.record(z.string(), z.unknown()).optional().describe("The tool's arguments"),
+    },
+  },
+  get_rules: {
+    description:
+      'Rules the user set for this Session (written like Claude skills). Without a name: ' +
+      '"always" rules in full — follow them — and the others by name and description; pass a ' +
+      'name to read one when it is relevant to the task.',
+    inputSchema: {name: z.string().optional().describe('A rule name to read in full')},
+  },
+  get_prompts: {
+    description:
+      'Premade prompts the user saved for this Session (e.g. a testing routine). Without a ' +
+      'name: their names and descriptions; pass a name for the full text, then follow it.',
+    inputSchema: {name: z.string().optional().describe('A prompt name to read in full')},
+  },
   read_page: {
     description:
       'Read the page rendered in a Responsively App device preview: the page text plus its ' +

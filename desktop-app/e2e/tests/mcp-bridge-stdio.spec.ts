@@ -6,10 +6,15 @@ import {expect, test} from '../fixtures/electron-app';
 const CLI_PATH = path.join(__dirname, '..', '..', 'release', 'app', 'dist', 'mcp', 'cli.js');
 
 const EXPECTED_TOOLS = [
+  'call_addon_tool',
   'click',
+  'evaluate',
   'focus_session',
   'get_app_state',
+  'get_prompts',
+  'get_rules',
   'get_session',
+  'list_addon_tools',
   'list_devices',
   'list_sessions',
   'navigate',
