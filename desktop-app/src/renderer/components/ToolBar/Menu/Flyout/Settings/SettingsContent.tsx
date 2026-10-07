@@ -10,6 +10,7 @@ import {
   WindowDataRows,
 } from 'renderer/components/WindowData';
 import {selectClassicToolbar, setClassicToolbar} from 'renderer/store/features/ui';
+import {BrowsersSettings} from './BrowsersSettings';
 import {SettingsContentHeaders} from './SettingsContentHeaders';
 
 const WindowDataCard = () => {
@@ -147,6 +148,9 @@ export const SettingsContent = ({onClose}: Props) => {
         acceptLanguage={webRequestHeaderAcceptLanguage}
         setAcceptLanguage={setWebRequestHeaderAcceptLanguage}
       />
+
+      <h2>Browsers</h2>
+      <BrowsersSettings />
 
       <h2>Toolbar</h2>
       <div className="my-4 flex items-center gap-3 text-sm">

@@ -31,6 +31,7 @@ const BROWSER_TOOLS = [
   'navigate',
   'list_devices',
   'set_active_devices',
+  'set_device_browser',
   'read_page',
   'click',
   'type_text',
@@ -396,7 +397,7 @@ try {
     .map((t) => t.name)
     .sort();
   record(
-    'T1 tools/list: session argument on all 8 browser tools',
+    'T1 tools/list: session argument on all 9 browser tools',
     JSON.stringify(withSession) === JSON.stringify([...BROWSER_TOOLS].sort()),
     {withSession, toolCount: tools.length}
   );

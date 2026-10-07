@@ -159,7 +159,10 @@
     "productName": "ResponsivelyApp",
     "appId": "app.responsively",
     "asar": true,
-    "asarUnpack": "**\\*.{node,dll}",
+    "asarUnpack": [
+      "**\\*.{node,dll}",
+      "**/node_modules/serve-sim/**"
+    ],
     "files": [
       "dist",
       "!dist/mcp",

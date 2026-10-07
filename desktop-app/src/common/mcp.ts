@@ -23,7 +23,18 @@ export interface McpBeacon {
 }
 
 export type McpBridgeCommand =
-  'get-app-state' | 'navigate' | 'list-devices' | 'set-active-devices' | 'get-capture-targets';
+  | 'get-app-state'
+  | 'navigate'
+  | 'list-devices'
+  | 'set-active-devices'
+  | 'get-capture-targets'
+  | 'set-device-browser';
+
+export interface McpSetDeviceBrowserPayload {
+  device: string;
+  browser: 'chromium' | 'ios-safari';
+  iosVersion?: string;
+}
 
 export interface McpBridgeRequest {
   requestId: string;
@@ -44,6 +55,8 @@ export interface McpActiveDevice {
   width: number;
   height: number;
   type: string;
+  /** "Chromium", or e.g. "iOS Safari 26.1" for real Safari in the Simulator. */
+  browser: string;
 }
 
 export interface McpAppState {
@@ -88,6 +101,8 @@ export interface McpCaptureTarget {
   height: number;
   webContentsId: number;
   url: string;
+  /** Set when the device shows real iOS Safari: captured from its Simulator. */
+  iosRuntime?: string;
 }
 
 export interface McpSkippedCapture {

@@ -39,6 +39,8 @@ interface Props {
    * shows for the selected frame (the Previewer's selection wrapper reveals it).
    */
   variant: 'grid' | 'canvas';
+  /** Chromium or real iOS Safari for this device; first in the pill. */
+  browserPicker?: React.ReactNode;
 }
 
 interface PillButtonProps {
@@ -129,6 +131,7 @@ const Toolbar = ({
   designOverlay,
   resolution,
   variant,
+  browserPicker,
 }: Props) => {
   const dispatch = useDispatch();
   const [eventMirroringOff, setEventMirroringOff] = useState<boolean>(false);
@@ -218,6 +221,7 @@ const Toolbar = ({
           : 'left-1/2 top-full mt-[10px] -translate-x-1/2'
       )}
     >
+      {browserPicker}
       <PillButton title="Refresh this device" onClick={refreshView}>
         <Icon icon="ic:round-refresh" />
       </PillButton>

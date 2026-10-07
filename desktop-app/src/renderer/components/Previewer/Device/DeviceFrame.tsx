@@ -50,6 +50,10 @@ interface Props {
   /** Callback ref — never a ref object (see Device for why). */
   webviewRef: (element: Electron.WebviewTag | null) => void;
   toolbar: ReactNode;
+  /** Header badge naming a non-Chromium browser (Safari · iOS 26.1). */
+  browserBadge?: ReactNode;
+  /** Replaces the preview with another browser's screen (real iOS Safari). */
+  screenOverride?: ReactNode;
 }
 
 /**
@@ -80,6 +84,8 @@ const DeviceFrame = ({
   initialSrc,
   webviewRef,
   toolbar,
+  browserBadge,
+  screenOverride,
 }: Props) => {
   const scaledHeight = height * zoomfactor;
   const scaledWidth = width * zoomfactor;
@@ -113,8 +119,9 @@ const DeviceFrame = ({
             {simulationName}
           </span>
         ) : null}
+        {browserBadge}
         <span className="flex-1" />
-        {navigation.loading ? <Spinner spinnerHeight={20} /> : null}
+        {navigation.loading && !screenOverride ? <Spinner spinnerHeight={20} /> : null}
       </div>
       {toolbar}
       <div className="flex gap-4">
@@ -250,6 +257,11 @@ const DeviceFrame = ({
                   <div className="text-base font-bold">ERROR: {navigation.error.code}</div>
                   <div className="text-sm">{navigation.error.description}</div>
                 </div>
+              </div>
+            ) : null}
+            {screenOverride ? (
+              <div className="absolute z-[5]" style={{left: rulerOffset, top: rulerOffset}}>
+                {screenOverride}
               </div>
             ) : null}
           </ScaledFrame>

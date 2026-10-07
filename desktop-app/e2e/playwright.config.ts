@@ -56,6 +56,7 @@ const testOrder = [
   'device-manager-extended.spec.ts',
   'device-manager.spec.ts',
   'app-launch.spec.ts',
+  'ios-safari.spec.ts',
 ];
 
 export default defineConfig({

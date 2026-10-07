@@ -1,4 +1,6 @@
 import {Device, getDevicesMap} from 'common/deviceList';
+import {IPC_MAIN_CHANNELS} from 'common/constants';
+import {IosSimRequest, IosSimState, runtimeLabel} from 'common/ios-simulator';
 import {
   McpActiveDevice,
   McpAppState,
@@ -10,9 +12,14 @@ import {
   McpNavigateResult,
   McpSetActiveDevicesPayload,
   McpSetActiveDevicesResult,
+  McpSetDeviceBrowserPayload,
 } from 'common/mcp';
 import {Store} from 'redux';
-import {selectActiveSuite, setSuiteDevices} from 'renderer/store/features/device-manager';
+import {
+  selectActiveSuite,
+  setDeviceBrowser,
+  setSuiteDevices,
+} from 'renderer/store/features/device-manager';
 import {selectZoomFactor, setAddress} from 'renderer/store/features/renderer';
 import type {RootState} from '../../store';
 import {resolveDeviceQuery} from './deviceQuery';
@@ -26,12 +33,18 @@ const sleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-const toActiveDevice = (device: Device): McpActiveDevice => ({
+const toActiveDevice = (
+  device: Device,
+  browsers: Record<string, string> = {}
+): McpActiveDevice => ({
   id: device.id,
   name: device.name,
   width: device.width,
   height: device.height,
   type: device.type,
+  browser: browsers[device.id]
+    ? `iOS Safari ${runtimeLabel(browsers[device.id]).replace(/^iOS /, '')}`
+    : 'Chromium',
 });
 
 const getActiveDevices = (state: RootState): Device[] => {
@@ -52,13 +65,15 @@ const getAppState = (state: RootState): McpAppState => ({
   layout: state.renderer.layout,
   zoomFactor: selectZoomFactor(state),
   activeSuite: selectActiveSuite(state).name,
-  activeDevices: getActiveDevices(state).map(toActiveDevice),
+  activeDevices: getActiveDevices(state).map((d) =>
+    toActiveDevice(d, state.deviceManager.deviceBrowsers)
+  ),
 });
 
 const listDevices = (state: RootState): McpDeviceInfo[] => {
   const activeIds = new Set(selectActiveSuite(state).devices);
   return Object.values(getDevicesMap()).map((device) => ({
-    ...toActiveDevice(device),
+    ...toActiveDevice(device, state.deviceManager.deviceBrowsers),
     isCustom: device.isCustom ?? false,
     isActive: activeIds.has(device.id),
   }));
@@ -96,7 +111,8 @@ const setActiveDevices = async (
   );
   // Give the new webviews a moment to mount before subsequent tool calls.
   await sleep(300);
-  return {activeDevices: resolved.map(toActiveDevice)};
+  const {deviceBrowsers} = store.getState().deviceManager;
+  return {activeDevices: resolved.map((d) => toActiveDevice(d, deviceBrowsers))};
 };
 
 const navigate = async (
@@ -185,6 +201,18 @@ const getCaptureTargets = (
 
   const result: McpCaptureTargetsResult = {targets: [], skipped: []};
   devices.forEach((device) => {
+    const iosRuntime = state.deviceManager.deviceBrowsers[device.id];
+    if (iosRuntime) {
+      result.targets.push({
+        deviceName: device.name,
+        width: device.width,
+        height: device.height,
+        webContentsId: -1,
+        url: state.renderer.address,
+        iosRuntime,
+      });
+      return;
+    }
     const webview = getDeviceWebview(device.name);
     if (webview === null) {
       result.skipped.push({
@@ -208,6 +236,40 @@ const getCaptureTargets = (
   return result;
 };
 
+const setBrowser = async (store: AppStore, payload: McpSetDeviceBrowserPayload) => {
+  const device = resolveDeviceQuery(getDevicesMap(), payload?.device ?? '');
+  if (device === undefined || !getActiveDevices(store.getState()).some((d) => d.id === device.id)) {
+    throw new Error(
+      `"${payload?.device}" is not an active device. Use list_devices and set_active_devices first.`
+    );
+  }
+  if (payload.browser === 'chromium') {
+    store.dispatch(setDeviceBrowser({id: device.id}));
+    return {device: device.name, browser: 'Chromium'};
+  }
+  const sim = await window.electron.ipcRenderer.invoke<IosSimRequest, IosSimState>(
+    IPC_MAIN_CHANNELS.IOS_SIMULATOR,
+    {operation: 'list'}
+  );
+  if (!sim.available) throw new Error(`iOS Safari is not available: ${sim.reason}`);
+  const fits = sim.runtimes.filter((r) => r.deviceNames.includes(device.name));
+  const runtime = payload.iosVersion
+    ? fits.find((r) => r.name === `iOS ${payload.iosVersion}`)
+    : fits[fits.length - 1];
+  if (!runtime) {
+    throw new Error(
+      `No installed iOS ${payload.iosVersion ?? 'version'} runs a "${device.name}" Simulator. ` +
+        `Installed: ${sim.runtimes.map((r) => r.name).join(', ') || 'none'}.`
+    );
+  }
+  store.dispatch(setDeviceBrowser({id: device.id, runtime: runtime.id}));
+  return {
+    device: device.name,
+    browser: `iOS Safari ${runtime.name.replace(/^iOS /, '')}`,
+    note: 'Real Safari in the iOS Simulator; the first start takes about 25 s. Then use navigate and screenshot.',
+  };
+};
+
 export const executeMcpCommand = async (
   store: AppStore,
   command: McpBridgeCommand,
@@ -224,6 +286,8 @@ export const executeMcpCommand = async (
       return navigate(store, payload as McpNavigatePayload);
     case 'get-capture-targets':
       return getCaptureTargets(store.getState(), (payload ?? {}) as McpCaptureTargetsPayload);
+    case 'set-device-browser':
+      return setBrowser(store, payload as McpSetDeviceBrowserPayload);
     default:
       throw new Error(`Unknown MCP command: ${command}`);
   }
