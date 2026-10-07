@@ -2,6 +2,7 @@ import {Icon} from '@iconify/react';
 import {DOCK_POSITION} from 'common/constants';
 import {ReactNode, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
+import MenuRow from 'renderer/components/MenuRow';
 import Modal from 'renderer/components/Modal';
 import Toggle from 'renderer/components/Toggle';
 import {selectDockPosition, setDockPosition} from 'renderer/store/features/devtools';
@@ -20,17 +21,12 @@ interface MenuItemProps {
 
 /** One 232px-panel row (Hybrid Studio kebab menu). */
 export const MenuItem = ({icon, iconClassName, label, trailing, onClick}: MenuItemProps) => (
-  <button
-    type="button"
+  <MenuRow
     onClick={onClick}
-    className="flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-2 text-[13.5px] text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover"
-  >
-    <span className="pointer-events-none contents">
-      <Icon icon={icon} fontSize={15} className={iconClassName ?? 'text-muted'} />
-      {label}
-      {trailing}
-    </span>
-  </button>
+    leading={<Icon icon={icon} fontSize={15} className={iconClassName ?? 'text-muted'} />}
+    label={label}
+    trailing={trailing}
+  />
 );
 
 interface Props {

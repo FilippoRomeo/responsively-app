@@ -32,13 +32,18 @@
   --line: #273246;
   --line-soft: #1d2739;
   --fg: #d3dae4;
-  --muted: #7d8a9c;
+  /* ≥ 4.5:1 on panel, card and hover rows (WCAG 1.4.3). */
+  --muted: #8e9aab;
   --input: #0b111b;
   --hover: #223048;
   --active: #2c3d5c;
   --accent: #2fd9a2;
   --accent-soft: rgba(47, 217, 162, 0.15);
   --on-accent: #07271b;
+  --danger: #f87171;
+  --warning: #f5b84b;
+  /* A switch's off track: ≥ 3:1 against panels (WCAG 1.4.11). */
+  --control-off: #5d6d89;
   --heart: #f66d9b;
   --heart-soft: rgba(246, 109, 155, 0.14);
   --on-heart: #33091a;
@@ -57,13 +62,17 @@
   --line: #d8dce4;
   --line-soft: #e6e9ef;
   --fg: #33404f;
-  --muted: #8b96a5;
+  --muted: #5a6676;
   --input: #f1f3f7;
   --hover: #e7eaf1;
   --active: #dde2ec;
-  --accent: #0e9d6e;
-  --accent-soft: rgba(14, 157, 110, 0.12);
+  /* Text and white-on-accent both ≥ 4.5:1. */
+  --accent: #08724f;
+  --accent-soft: rgba(8, 114, 79, 0.12);
   --on-accent: #ffffff;
+  --danger: #b91c1c;
+  --warning: #8a5100;
+  --control-off: #7f8b9d;
   --heart: #d6336c;
   --heart-soft: rgba(214, 51, 108, 0.1);
   --on-heart: #ffffff;

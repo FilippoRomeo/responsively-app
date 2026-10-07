@@ -34,7 +34,7 @@ const PermissionToggle = ({permission, onToggle}: PermissionToggleProps) => {
       case PERMISSION_STATES.DENIED:
         return {
           text: 'Block',
-          color: 'text-red-600 dark:text-red-400',
+          color: 'text-danger',
           icon: 'mdi:block-helper',
         };
       default:

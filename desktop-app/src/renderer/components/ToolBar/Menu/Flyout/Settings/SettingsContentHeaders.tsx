@@ -23,12 +23,12 @@ export const SettingsContentHeaders: FC<ISettingsContentHeaders> = ({
               type="text"
               id={id}
               placeholder="example: en-US"
-              className="mt-2 rounded-md border border-gray-300 px-4 py-2 text-base focus-visible:outline-gray-400 dark:border-gray-500 dark:bg-slate-900"
+              className="mt-2 rounded-md border border-line bg-input px-4 py-2 text-base text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
               value={acceptLanguage}
               onChange={(e) => setAcceptLanguage(e.target.value)}
             />
           </label>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-muted">
             HTTP request Accept-Language parameter (default: language from OS locale settings)
           </p>
         </div>

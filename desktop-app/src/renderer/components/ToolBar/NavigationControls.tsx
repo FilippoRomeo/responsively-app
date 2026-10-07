@@ -109,7 +109,7 @@ const NavigationControls = () => {
           <div
             className={cx(
               'text-[26px] font-bold tabular-nums',
-              done ? 'text-accent' : 'text-amber-400'
+              done ? 'text-accent' : 'text-warning'
             )}
           >
             {formatBytes(totalBytes(usage))}

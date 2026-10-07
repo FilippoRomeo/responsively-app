@@ -56,6 +56,7 @@ test.describe('Add-ons', () => {
     await app.page.getByTestId('addons-button').click();
     await install(app, markerFolder(), async () => {
       await app.page.getByLabel('Runs on sites').fill('127.0.0.1:*');
+      await app.page.getByRole('button', {name: /Advanced/}).click();
       await app.page.getByLabel('When it runs').selectOption('start');
       // Its build runs in a small terminal, in the add-on's folder.
       await app.page.getByLabel(/Build command/).fill('echo built-$((40 + 2)) && ls dist');
@@ -71,11 +72,10 @@ test.describe('Add-ons', () => {
     // 3. Switching the part off stops it on the next load.
     await app.page.getByTestId('addons-button').click();
     await app.page.getByRole('button', {name: /marker-addon/}).click();
-    await app.page.getByRole('switch', {name: 'Page script on'}).click();
-    await expect(app.page.getByRole('switch', {name: 'Page script on'})).toHaveAttribute(
-      'aria-checked',
-      'false'
-    );
+    const scriptSwitch = app.page.getByRole('switch', {name: 'Page script on'});
+    // Click the visible track, as a person does (the input itself is visually hidden).
+    await scriptSwitch.locator('xpath=..').click();
+    await expect(scriptSwitch).not.toBeChecked();
     await app.page.getByRole('button', {name: 'Close'}).click();
     await app.navigateTo(`${testServerUrl}/test-page.html`);
     await app.navigateTo(`${testServerUrl}/addon-test.html`);
@@ -83,7 +83,7 @@ test.describe('Add-ons', () => {
 
     // 4. A saved stack keeps the set; uninstalling the panel add-on removes its tab.
     await app.page.getByTestId('addons-button').click();
-    await app.page.getByRole('button', {name: 'Save as stack…'}).click();
+    await app.page.getByRole('button', {name: 'Save these switches as a stack…'}).click();
     await app.page.getByLabel('New stack name').fill('E2E stack');
     await app.page.getByRole('button', {name: 'Save', exact: true}).click();
     await expect(app.page.getByLabel('Stack for this window')).toHaveValue(/e2e-stack/);

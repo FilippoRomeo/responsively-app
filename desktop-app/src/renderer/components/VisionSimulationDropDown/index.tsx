@@ -1,6 +1,7 @@
 import {Icon} from '@iconify/react';
 import cx from 'classnames';
 import {useState} from 'react';
+import MenuRow from '../MenuRow';
 import Popover from '../Popover';
 
 export const SIMULATIONS = {
@@ -101,9 +102,6 @@ const Check = ({on}: {on: boolean}) => (
   />
 );
 
-const rowClass =
-  'flex w-full items-center gap-[10px] rounded-[7px] px-[10px] py-[7px] text-left text-fg hover:bg-hover focus:outline-none focus-visible:bg-hover';
-
 const SimulationMenu = ({
   simulationName,
   pick,
@@ -124,62 +122,51 @@ const SimulationMenu = ({
           {isToolbar ? 'Applies to every device in this window' : 'Applies to this device only'}
         </div>
       </div>
-      <button
-        type="button"
+      <MenuRow
         aria-pressed={simulationName === undefined}
         onClick={() => pick(undefined)}
-        className={cx(rowClass, 'text-[13px]')}
-      >
-        <span className="pointer-events-none contents">
-          <Check on={simulationName === undefined} />
-          Off — normal vision
-        </span>
-      </button>
+        leading={<Check on={simulationName === undefined} />}
+        label="Off — normal vision"
+      />
       <div className="mx-1 my-[6px] border-t border-line-soft" />
       {KINDS.map((kind) => {
         const isOpen = open === kind.id;
         return (
           <div key={kind.id}>
-            <button
-              type="button"
+            <MenuRow
               aria-expanded={isOpen}
               onClick={() => setOpen(isOpen ? null : kind.id)}
-              className={rowClass}
-            >
-              <span className="pointer-events-none contents">
+              leading={
                 <Icon
                   icon="lucide:chevron-right"
                   fontSize={14}
                   className={cx('shrink-0 text-muted transition-transform', {'rotate-90': isOpen})}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-bold">{kind.name}</span>
-                  <span className="block text-[11.5px] text-muted">{kind.sub}</span>
-                </span>
-                {kind.options.some((o) => o.value === simulationName) ? (
-                  <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-accent" />
-                ) : null}
-                <span className="text-[11px] text-muted">{kind.options.length}</span>
-              </span>
-            </button>
+              }
+              label={kind.name}
+              bold
+              sub={kind.sub}
+              trailing={
+                <>
+                  {kind.options.some((o) => o.value === simulationName) ? (
+                    <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-accent" />
+                  ) : null}
+                  <span className="text-caption text-muted">{kind.options.length}</span>
+                </>
+              }
+            />
             {isOpen ? (
               <div className="pb-1 pl-[14px]">
                 {kind.options.map((option) => (
-                  <button
+                  <MenuRow
                     key={option.value}
-                    type="button"
                     aria-pressed={simulationName === option.value}
                     onClick={() => pick(option.value)}
-                    className={cx(rowClass, 'py-[5px]')}
-                  >
-                    <span className="pointer-events-none contents">
-                      <Check on={simulationName === option.value} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px]">{option.name}</span>
-                        <span className="block text-[11.5px] text-muted">{option.desc}</span>
-                      </span>
-                    </span>
-                  </button>
+                    className="py-[5px]"
+                    leading={<Check on={simulationName === option.value} />}
+                    label={option.name}
+                    sub={option.desc}
+                  />
                 ))}
               </div>
             ) : null}

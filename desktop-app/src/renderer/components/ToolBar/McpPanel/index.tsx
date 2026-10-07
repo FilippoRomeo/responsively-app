@@ -291,7 +291,7 @@ const McpPanel = () => {
             ))}
         </div>
         {toolError != null ? (
-          <p role="alert" className="px-[10px] py-1 text-[11.5px] text-red-500">
+          <p role="alert" className="px-[10px] py-1 text-[11.5px] text-danger">
             {toolError}
           </p>
         ) : null}
