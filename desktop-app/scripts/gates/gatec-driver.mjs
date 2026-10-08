@@ -18,6 +18,9 @@ const arg = (name) => {
   if (i === -1 || !process.argv[i + 1]) throw new Error(`missing --${name}`);
   return process.argv[i + 1];
 };
+// Without questions (an install's own automated run) the three "your answer" steps are
+// recorded as skipped, not failed; everything measured still runs.
+const NO_QUESTIONS = process.argv.includes('--no-questions');
 const CLI = arg('cli');
 const APP = arg('app');
 const ROOT = arg('root');
@@ -206,6 +209,7 @@ const askText = async (question) => {
 };
 /** A yes/no question you answer; never a pass by itself unless you say yes. */
 const ask = async (question) => {
+  if (NO_QUESTIONS) return 'skipped';
   if (tty === null) return 'not asked (no terminal)';
   if (interrupted) return 'not asked (interrupted)';
   say(`\n>>> ${question}`);
@@ -539,13 +543,14 @@ try {
   const q3 = await ask(
     'Without clicking anything: is there a "!" next to the test app\'s icon in the menu bar (look on every monitor)?'
   );
-  record('Q3 M6: menu-bar attention badge (your answer)', q3 === 'yes', {answer: q3});
+  const answered = (value) => value === 'yes' || (NO_QUESTIONS && value === 'skipped');
+  record('Q3 M6: menu-bar attention badge (your answer)', answered(q3), {answer: q3});
   const q1 = await ask(
     'Did a Sessions panel appear by itself, saying "gatec-m6-A" needs attention and "Stopped by an agent", with Open, Reset… and Delete… buttons? (It may be on another monitor.)'
   );
   record(
     'Q1 M6: attention panel appeared with the reason and actions (your answer)',
-    q1 === 'yes',
+    answered(q1),
     {answer: q1}
   );
   say('Now click Dismiss in that panel (not Open). Then find the window titled "gatec-m6-B".');
@@ -553,7 +558,7 @@ try {
     'In the "gatec-m6-B" window, the Session name is in its tab at the top (no longer on the toolbar). Click ⋮ at the right end of the toolbar, then "Manage Sessions…". Does the tab read "gatec-m6-B", and does a Sessions list open that includes "gatec-m6-B"? (Press Esc to close it.)'
   );
   const q4detail = {answer: q4};
-  if (q4 !== 'yes') {
+  if (q4 !== 'yes' && !NO_QUESTIONS) {
     q4detail.saw = await askText(
       'What did you see instead? (for example: "tab reads Sessions", "no Manage Sessions in ⋮", "list empty")'
     );
@@ -575,7 +580,7 @@ try {
   }
   record(
     'Q4 M2: the tab names the Session and ⋮ › Manage Sessions… lists it (your answer)',
-    q4 === 'yes',
+    answered(q4),
     q4detail
   );
   say('Thanks. The gate continues on its own now; keep this window open.');
