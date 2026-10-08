@@ -16,6 +16,7 @@ import {GetMainWindow, sendBridgeCommand} from './bridge';
 import {clickElement, evaluateInPage, readPage, typeText} from './interactions';
 import {callAddonTool, getPrompts, getRules, listAddonTools} from '../addons';
 import {clearConditions, runTest, setConditions} from '../testing/engine';
+import {askBeforeAgent} from '../testing/approval';
 import {listReports, readReport, reportsDir} from '../testing/reports';
 import {renderReportMarkdown} from '../../common/test-report';
 import type {ColorScheme} from '../../common/test-conditions';
@@ -214,6 +215,10 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       try {
         if (network === undefined && cpu === undefined && scheme === undefined)
           throw new Error('Give at least one of network, cpu or color_scheme.');
+        await askBeforeAgent(
+          getMainWindow,
+          `Put conditions on ${device ?? 'every device'}: ${[network, cpu !== undefined ? `CPU ×${cpu}` : '', scheme].filter(Boolean).join(', ')}.`
+        );
         const applied = [];
         for (const t of await previewIds(device))
           applied.push({
@@ -259,6 +264,10 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       screenshots,
     }) => {
       try {
+        await askBeforeAgent(
+          getMainWindow,
+          `Run a test: ${pages?.length ?? 1} page(s), ${devices?.length ?? 'all'} device(s), networks ${(networks ?? ['none']).join(', ')}, CPU ${(cpu ?? [1]).map((c) => `×${c}`).join(', ')}.`
+        );
         const report = await runTest(getMainWindow, {
           pages,
           devices,

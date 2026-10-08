@@ -6,6 +6,7 @@ import type {SessionInfo, SessionRequest} from 'common/sessions';
 import {useCallback, useEffect, useState} from 'react';
 import {addonsRequest, formatSize} from 'renderer/components/Addons';
 import {iosSim, runtimeLabel} from 'renderer/components/IosSafari';
+import {openReport} from 'renderer/components/Probe/reportViewer';
 import SectionCaption from 'renderer/components/SectionCaption';
 
 const btn =
@@ -32,6 +33,8 @@ export interface StorageRow {
   blocked?: string;
   run: () => Promise<unknown>;
   stop?: () => Promise<unknown>;
+  /** An extra, harmless button before the destructive one (opening a report). */
+  view?: () => void;
 }
 
 interface Data {
@@ -136,6 +139,7 @@ const groupsFor = ({ios, lib, sizes, sessions, profiles, reports}: Data) => [
       detail: `${r.measurements} measurement${r.measurements === 1 ? '' : 's'} · ${r.status} · ${day(r.createdAt)} · the latest 20 are kept`,
       bytes: r.bytes,
       action: 'Delete',
+      view: () => openReport(r.id),
       run: () => window.electron.ipcRenderer.invoke(IPC_MAIN_CHANNELS.TEST_REPORTS_DELETE, r.id),
     })),
   },
@@ -339,6 +343,16 @@ export const StorageSettings = () => {
                   className={cx(btn, 'border-line text-fg hover:bg-hover')}
                 >
                   Stop
+                </button>
+              ) : null}
+              {r.view ? (
+                <button
+                  type="button"
+                  aria-label={`View ${r.name}`}
+                  onClick={r.view}
+                  className={cx(btn, 'border-line text-fg hover:bg-hover')}
+                >
+                  View
                 </button>
               ) : null}
               <ActionButton row={r} onRun={() => act([r.run])} />

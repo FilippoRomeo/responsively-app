@@ -8,7 +8,14 @@ import {
 } from 'common/test-conditions';
 import type {TestReport} from 'common/test-report';
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {openReport} from './reportViewer';
 import {setProbeOpen, useProbeOpen} from './store';
+
+interface PageList {
+  name: string;
+  pages: string[];
+}
+const MAX_PAGES = 10;
 
 type SchemeChoice = 'default' | ColorScheme;
 interface Target {
@@ -87,6 +94,19 @@ const ProbePanel = () => {
   const [pos, setPos] = useState<{x: number; y: number}>({x: 0, y: 0});
   const [floating, setFloating] = useState<{x: number; y: number} | null>(null);
   const plugged = useRef<Target | null>(null);
+  const [lists, setLists] = useState<PageList[]>(
+    () => (window.electron.store.get('testProbe.pageLists') as PageList[] | undefined) ?? []
+  );
+  const [listName, setListName] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{name: string; text: string} | null>(null);
+  const [askFirst, setAskFirst] = useState<boolean>(
+    () => window.electron.store.get('testProbe.askFirst') === true
+  );
+  const pages = lists.find((l) => l.name === listName)?.pages;
+  const saveLists = (next: PageList[]) => {
+    setLists(next);
+    window.electron.store.set('testProbe.pageLists', next);
+  };
 
   // Which previews exist, and where the plugged one is (so the panel can follow it).
   useEffect(() => {
@@ -169,6 +189,15 @@ const ProbePanel = () => {
   };
   const close = () => {
     unplug();
+    // A fresh start next time: choices, matrix and the last report do not linger.
+    setNets(['4g']);
+    setCpus([1]);
+    setSchemes(['default']);
+    setMatrix(false);
+    setReport(null);
+    setError(null);
+    setListName(null);
+    setEditing(null);
     setProbeOpen(false);
   };
   useEffect(() => {
@@ -190,7 +219,8 @@ const ProbePanel = () => {
     };
 
   const deviceCount = plug ? 1 : targets.length;
-  const total = nets.length * cpus.length * schemes.length * Math.max(deviceCount, 1);
+  const total =
+    nets.length * cpus.length * schemes.length * Math.max(deviceCount, 1) * (pages?.length ?? 1);
   const live = plug !== null && !matrix;
   const first = describeConditions({
     network: nets[0],
@@ -205,6 +235,7 @@ const ProbePanel = () => {
     await release();
     try {
       const result = await invoke<TestReport>(IPC_MAIN_CHANNELS.TEST_RUN_START, {
+        pages,
         devices: plug ? [plug] : targets.map((t) => t.name),
         networks: nets,
         cpus,
@@ -314,6 +345,96 @@ const ProbePanel = () => {
         disabled={running}
       />
 
+      <Seg
+        label="Pages"
+        items={['', ...lists.map((l) => l.name)]}
+        isOn={(n) => (n || null) === listName}
+        pick={(n) => {
+          setListName(n || null);
+          setEditing(null);
+        }}
+        text={(n) => n || 'Current page'}
+        disabled={running}
+      />
+      {editing ? (
+        <div className="mt-2 rounded-lg border border-line p-2">
+          <input
+            aria-label="List name"
+            value={editing.name}
+            onChange={(e) => setEditing({...editing, name: e.target.value})}
+            placeholder="Name, for example Checkout"
+            className="mb-2 h-7 w-full rounded-md border border-line bg-transparent px-2 text-[12px]"
+          />
+          <textarea
+            aria-label="Pages, one address per line"
+            value={editing.text}
+            onChange={(e) => setEditing({...editing, text: e.target.value})}
+            placeholder={'One address per line (up to ' + MAX_PAGES + ')\nhttp://localhost:3000/'}
+            rows={4}
+            className="w-full rounded-md border border-line bg-transparent p-2 font-mono text-[11px]"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={!editing.name.trim() || !editing.text.trim()}
+              onClick={() => {
+                const name = editing.name.trim();
+                const list = {
+                  name,
+                  pages: editing.text
+                    .split('\n')
+                    .map((l) => l.trim())
+                    .filter(Boolean)
+                    .slice(0, MAX_PAGES),
+                };
+                saveLists([
+                  ...lists.filter((l) => l.name !== (listName ?? name) && l.name !== name),
+                  list,
+                ]);
+                setListName(name);
+                setEditing(null);
+              }}
+              className="h-7 rounded-md bg-accent px-3 text-[12px] font-bold text-black disabled:opacity-50"
+            >
+              Save list
+            </button>
+            {listName ? (
+              <button
+                type="button"
+                onClick={() => {
+                  saveLists(lists.filter((l) => l.name !== listName));
+                  setListName(null);
+                  setEditing(null);
+                }}
+                className="h-7 rounded-md border border-line px-3 text-[12px] hover:bg-hover"
+              >
+                Delete list
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="h-7 rounded-md border border-line px-3 text-[12px] hover:bg-hover"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={running}
+          onClick={() =>
+            setEditing(
+              pages && listName ? {name: listName, text: pages.join('\n')} : {name: '', text: ''}
+            )
+          }
+          className="mt-2 text-[11.5px] text-accent hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        >
+          {listName ? `Edit ${listName}` : '+ New list of pages'}
+        </button>
+      )}
+
       <div className="mt-4 border-t border-line pt-3">
         <label className="flex items-center gap-2 text-[12px]">
           <input
@@ -354,6 +475,19 @@ const ProbePanel = () => {
         ) : null}
       </div>
 
+      <label className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-[11.5px] text-muted">
+        <input
+          type="checkbox"
+          checked={askFirst}
+          onChange={() => {
+            window.electron.store.set('testProbe.askFirst', !askFirst);
+            setAskFirst(!askFirst);
+          }}
+          className="m-0 accent-accent"
+        />
+        Ask me before an agent runs a test or sets conditions
+      </label>
+
       {report ? (
         <div data-testid="probe-report" className="mt-3 border-t border-line pt-3">
           <div className="mb-1 text-[11.5px]">
@@ -362,6 +496,13 @@ const ProbePanel = () => {
               {report.status} · saved in Settings › Storage › Test reports
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => openReport(report.id)}
+            className="mb-2 text-[11.5px] text-accent hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            Open the full report
+          </button>
           <table className="w-full border-collapse text-[10.5px]">
             <thead>
               <tr className="text-left text-muted">
