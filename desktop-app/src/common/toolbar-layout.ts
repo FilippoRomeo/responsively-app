@@ -5,7 +5,7 @@
  * Devices and ⋮ are not in here: they always stay.
  */
 export const GROUP_TOOLS = ['rotate', 'inspect', 'capture', 'simulate', 'sound'] as const;
-export const RIGHT_TOOLS = ['addons', 'mcp', 'appearance'] as const;
+export const RIGHT_TOOLS = ['addons', 'mcp', 'probe', 'appearance'] as const;
 export type GroupTool = (typeof GROUP_TOOLS)[number];
 export type RightTool = (typeof RIGHT_TOOLS)[number];
 export type ToolId = GroupTool | RightTool;
@@ -36,6 +36,7 @@ export const TOOL_INFO: Record<ToolId, {name: string; icon: string; button: stri
   sound: {name: 'Sound', icon: 'lucide:volume-2', button: 'Sound for each device'},
   addons: {name: 'Add-ons', icon: 'lucide:puzzle', button: 'Add-ons'},
   mcp: {name: 'MCP', icon: 'lucide:plug-zap', button: 'MCP server — connect AI tools'},
+  probe: {name: 'Test probe', icon: 'lucide:gauge', button: 'Test probe'},
   appearance: {name: 'Appearance', icon: 'lucide:contrast', button: 'Appearance'},
 };
 
