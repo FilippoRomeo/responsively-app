@@ -40,9 +40,10 @@ interface Data {
   sizes: AddonSizes;
   sessions: SessionInfo[];
   profiles: Record<string, number>;
+  reports: {id: string; createdAt: string; status: string; measurements: number; bytes: number}[];
 }
 
-const groupsFor = ({ios, lib, sizes, sessions, profiles}: Data) => [
+const groupsFor = ({ios, lib, sizes, sessions, profiles, reports}: Data) => [
   {
     title: 'iOS versions',
     color: 'bg-chart-1',
@@ -125,6 +126,19 @@ const groupsFor = ({ios, lib, sizes, sessions, profiles}: Data) => [
       };
     }),
   },
+  {
+    title: 'Test reports',
+    color: 'bg-accent',
+    empty: "None yet: an agent's run_test, or a test you start, saves one here.",
+    rows: reports.map((r): StorageRow => ({
+      key: r.id,
+      name: `Report ${r.id}`,
+      detail: `${r.measurements} measurement${r.measurements === 1 ? '' : 's'} · ${r.status} · ${day(r.createdAt)} · the latest 20 are kept`,
+      bytes: r.bytes,
+      action: 'Delete',
+      run: () => window.electron.ipcRenderer.invoke(IPC_MAIN_CHANNELS.TEST_REPORTS_DELETE, r.id),
+    })),
+  },
 ];
 
 /** Two clicks: the first asks, with the size, the second acts. */
@@ -181,9 +195,23 @@ export const StorageSettings = () => {
           ),
         {}
       ),
+      read(
+        () =>
+          window.electron.ipcRenderer.invoke<undefined, Data['reports']>(
+            IPC_MAIN_CHANNELS.TEST_REPORTS_LIST
+          ),
+        []
+      ),
     ])
-      .then(([ios, lib, sizes, sessions, profiles]) =>
-        setData({ios, lib, sizes, sessions: Array.isArray(sessions) ? sessions : [], profiles})
+      .then(([ios, lib, sizes, sessions, profiles, reports]) =>
+        setData({
+          ios,
+          lib,
+          sizes,
+          sessions: Array.isArray(sessions) ? sessions : [],
+          profiles,
+          reports: Array.isArray(reports) ? reports : [],
+        })
       )
       .catch((e) => setError(String(e)));
   }, []);

@@ -41,6 +41,7 @@ import useWebviewLifecycle from './useWebviewLifecycle';
 import {useDeviceScheme} from './scheme';
 import BrowserBar from './BrowserBar';
 import useWebviewLocation from './useWebviewLocation';
+import useTestConditions from './useTestConditions';
 
 interface Props {
   device: IDevice;
@@ -90,6 +91,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
   // A live browser bar on laptops only; the page is untouched.
   const barOn = canvasOptions.showBrowserBar && device.type === 'notebook';
   const location = useWebviewLocation(ref, webviewReady, barOn);
+  const conditions = useTestConditions(ref, webviewReady);
   const {openDevTools, inspectElement, inspectingHere, toggleInspectHere} = useDevtoolsBridge({
     ref,
     webviewReady,
@@ -286,6 +288,25 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
               />
             )
           : undefined
+      }
+      conditionsBadge={
+        conditions.label ? (
+          <button
+            type="button"
+            data-testid="conditions-chip"
+            disabled={conditions.running}
+            title={
+              conditions.running
+                ? 'A test is running'
+                : 'Test conditions are on this device: click to clear them'
+            }
+            onClick={conditions.clear}
+            className="flex items-center gap-1 whitespace-nowrap rounded-full bg-accent-soft px-2 py-[2px] text-[10.5px] text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent hover:enabled:bg-hover"
+          >
+            {conditions.label}
+            {conditions.running ? null : <span aria-hidden>✕</span>}
+          </button>
+        ) : null
       }
       browserBadge={
         iosRuntime ? (

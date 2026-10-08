@@ -19,6 +19,7 @@ import McpBridge from './components/McpBridge';
 import {AddonDock} from './components/Addons';
 import AnnouncementCard from './components/AnnouncementCard';
 import {AboutDialog} from './components/AboutDialog';
+import TestRunBar from './components/TestRunBar';
 
 /** Present mode only applies while the canvas layout is active. */
 const usePresenting = (): boolean => {
@@ -40,6 +41,7 @@ const Browser = () => {
       {presenting ? null : (
         <ToolBar sessionsRequest={sessionsRequest} onSessionsShown={sessionsShown} />
       )}
+      {presenting ? null : <TestRunBar />}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
           <Previewer />

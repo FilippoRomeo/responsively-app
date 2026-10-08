@@ -4,6 +4,7 @@ import {DOCK_POSITION, IPC_MAIN_CHANNELS} from '../../common/constants';
 import {DockPosition} from '../../renderer/store/features/devtools';
 import log from '../logging';
 import {isRegisteredWebview} from '../webview-registry';
+import {acquireDebugger, releaseDebugger} from '../cdp';
 
 let devtoolsView: WebContentsView | undefined;
 // A WebContentsView is a native child view: it always paints above the page,
@@ -85,19 +86,6 @@ const onDebuggerEvent = async (
   }
 };
 
-// Devices showing a light/dark override: their debugger stays attached, or
-// Chromium drops the emulation.
-const schemes = new Map<number, 'light' | 'dark'>();
-
-/** One attach per webview, shared by the inspector and the colour-scheme override. */
-const attachDebugger = (webviewId: number, dbg: Electron.Debugger) => {
-  if (dbg.isAttached()) return;
-  dbg.attach();
-  dbg.on('message', (__: any, method: string, params: any) => {
-    onDebuggerEvent(__, method, params, dbg, webviewId);
-  });
-};
-
 export interface SetDeviceSchemeArgs {
   webviewId: number;
   /** null: back to the window-wide setting (Appearance). */
@@ -110,15 +98,12 @@ const setDeviceScheme = async (_: any, args: SetDeviceSchemeArgs) => {
   if (!isRegisteredWebview(webviewId)) return {status: false};
   const contents = webContents.fromId(webviewId);
   if (contents === undefined) return {status: false};
-  attachDebugger(webviewId, contents.debugger);
-  await contents.debugger.sendCommand('Emulation.setEmulatedMedia', {
+  // The override lives in the debugger session: hold it while one is set.
+  const dbg = acquireDebugger(contents, 'scheme');
+  await dbg.sendCommand('Emulation.setEmulatedMedia', {
     features: [{name: 'prefers-color-scheme', value: scheme ?? ''}],
   });
-  if (scheme === null) schemes.delete(webviewId);
-  else if (!schemes.has(webviewId)) {
-    schemes.set(webviewId, scheme);
-    contents.once('destroyed', () => schemes.delete(webviewId));
-  } else schemes.set(webviewId, scheme);
+  if (scheme === null) releaseDebugger(contents, 'scheme');
   return {status: true};
 };
 
@@ -135,8 +120,9 @@ const enableInspector = async (
     return {status: false};
   }
 
-  const dbg = webViewContents.debugger;
-  attachDebugger(webviewId, dbg);
+  const dbg = acquireDebugger(webViewContents, 'inspector', (method, params) => {
+    onDebuggerEvent(null, method, params, webViewContents.debugger, webviewId);
+  });
   await dbg.sendCommand('DOM.enable');
   await dbg.sendCommand('Overlay.enable');
   await dbg.sendCommand('Overlay.setInspectMode', {
@@ -172,7 +158,7 @@ const disableInspector = async (
       highlightConfig: {},
     });
 
-    if (!schemes.has(webviewId)) dbg.removeAllListeners().detach();
+    releaseDebugger(webViewContents, 'inspector');
   } catch (err) {
     log.warn('Error detaching debugger', err);
   }

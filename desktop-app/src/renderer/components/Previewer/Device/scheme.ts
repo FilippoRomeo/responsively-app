@@ -60,6 +60,22 @@ export const useDeviceScheme = (
     applied.current = true;
     applyScheme(webview, effective).catch(() => {});
   }, [getWebview, webviewReady, effective]);
+  // A test clears the page's emulation when it ends: put this device's scheme back.
+  const effectiveRef = useRef(effective);
+  effectiveRef.current = effective;
+  useEffect(
+    () =>
+      window.electron.ipcRenderer.on<number>(IPC_MAIN_CHANNELS.TEST_RESTORE_SCHEME, (id) => {
+        const webview = getWebview();
+        try {
+          if (webview && webview.getWebContentsId() === id)
+            applyScheme(webview, effectiveRef.current).catch(() => {});
+        } catch {
+          /* not ready */
+        }
+      }),
+    [getWebview]
+  );
   const cycle = () => setOwn(own === null ? 'dark' : own === 'dark' ? 'light' : null);
   return {own, effective, cycle};
 };

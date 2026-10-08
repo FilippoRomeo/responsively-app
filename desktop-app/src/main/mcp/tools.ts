@@ -15,6 +15,11 @@ import {simulatorScreenshot} from '../ios-simulator';
 import {GetMainWindow, sendBridgeCommand} from './bridge';
 import {clickElement, evaluateInPage, readPage, typeText} from './interactions';
 import {callAddonTool, getPrompts, getRules, listAddonTools} from '../addons';
+import {clearConditions, runTest, setConditions} from '../testing/engine';
+import {listReports, readReport, reportsDir} from '../testing/reports';
+import {renderReportMarkdown} from '../../common/test-report';
+import type {ColorScheme} from '../../common/test-conditions';
+import path from 'path';
 import {toolDefs} from './toolDefs';
 import {normalizeUrl} from './utils';
 
@@ -186,6 +191,117 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       }
     }
   );
+
+  // The previews a test tool means: one by id or name, or every Chromium preview.
+  const previewIds = async (device?: string) => {
+    const {targets} = await sendBridgeCommand<McpCaptureTargetsResult>(
+      getMainWindow,
+      'get-capture-targets',
+      {device}
+    );
+    const chromium = targets.filter((t) => !t.iosRuntime);
+    if (chromium.length === 0)
+      throw new Error(
+        device ? `${device} has no Chromium preview to throttle.` : 'No Chromium preview is open.'
+      );
+    return chromium;
+  };
+
+  server.registerTool(
+    'set_conditions',
+    toolDefs.set_conditions,
+    async ({device, network, cpu, color_scheme: scheme}) => {
+      try {
+        if (network === undefined && cpu === undefined && scheme === undefined)
+          throw new Error('Give at least one of network, cpu or color_scheme.');
+        const applied = [];
+        for (const t of await previewIds(device))
+          applied.push({
+            device: t.deviceName,
+            conditions: await setConditions(t.webContentsId, {
+              ...(network !== undefined ? {network} : {}),
+              ...(cpu !== undefined ? {cpu} : {}),
+              ...(scheme !== undefined
+                ? {scheme: scheme === 'default' ? null : (scheme as ColorScheme)}
+                : {}),
+            }),
+          });
+        return textResult(applied);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool('clear_conditions', toolDefs.clear_conditions, async ({device}) => {
+    try {
+      const cleared = [];
+      for (const t of await previewIds(device)) {
+        await clearConditions(t.webContentsId);
+        cleared.push(t.deviceName);
+      }
+      return textResult({cleared});
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool(
+    'run_test',
+    toolDefs.run_test,
+    async ({
+      pages,
+      devices,
+      networks,
+      cpu,
+      color_schemes: schemes,
+      settle_ms: settleMs,
+      screenshots,
+    }) => {
+      try {
+        const report = await runTest(getMainWindow, {
+          pages,
+          devices,
+          networks,
+          cpus: cpu,
+          schemes: schemes as ColorScheme[] | undefined,
+          settleMs,
+          screenshots,
+          startedBy: 'agent',
+        });
+        if (report.status === 'failed') throw new Error(report.note ?? 'The test run failed.');
+        return textResult({
+          id: report.id,
+          status: report.status,
+          measurements: report.cells.length,
+          folder: path.join(reportsDir(), report.id),
+          markdown: renderReportMarkdown(report),
+        });
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool('list_reports', toolDefs.list_reports, async () => {
+    try {
+      return textResult(listReports());
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool('get_report', toolDefs.get_report, async ({id, format}) => {
+    try {
+      const report = readReport(id);
+      const folder = path.join(reportsDir(), id);
+      return textResult(
+        format === 'json' ? {folder, report} : {folder, markdown: renderReportMarkdown(report)}
+      );
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
 
   server.registerTool('evaluate', toolDefs.evaluate, async ({expression, device}) => {
     try {
