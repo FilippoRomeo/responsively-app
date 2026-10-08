@@ -320,6 +320,7 @@ Browser tools include:
 - `set_device_browser` (a phone preview can show real iOS Safari from the iOS Simulator)
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
+- `get_console`, `get_network`, `get_styles` (what DevTools shows: console messages since the preview opened, network requests, computed CSS; `get_network` starts capturing on its first call, so pass `reload: true`)
 - `run_test`, `set_conditions`, `clear_conditions`, `list_reports`, `get_report` (see [Test under real conditions](#test-under-real-conditions))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:

@@ -3,6 +3,7 @@ import {matchShortcut, ShortcutChannel} from '../common/shortcuts';
 import store from '../store';
 import log from './logging';
 import {decidePopupAction, PopupBehavior} from './popup-policy';
+import {captureConsole} from './devtools-data';
 
 // Guest webContents ids tracked straight from did-attach-webview, so the set
 // cannot be spoofed through IPC. IPC handlers that take a webContentsId must
@@ -54,6 +55,7 @@ export const wireWebviewSecurity = (hostContents: WebContents, deps: WebviewSecu
   hostContents.on('did-attach-webview', (_event, guestContents) => {
     const {id} = guestContents;
     registeredWebviewIds.add(id);
+    captureConsole(guestContents);
     guestContents.once('destroyed', () => {
       registeredWebviewIds.delete(id);
     });

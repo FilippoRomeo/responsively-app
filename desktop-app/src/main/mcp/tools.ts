@@ -17,6 +17,7 @@ import {clickElement, evaluateInPage, readPage, typeText} from './interactions';
 import {callAddonTool, getPrompts, getRules, listAddonTools} from '../addons';
 import {clearConditions, runTest, setConditions} from '../testing/engine';
 import {askBeforeAgent} from '../testing/approval';
+import {readConsole, readNetwork, startNetwork} from '../devtools-data';
 import {listReports, readReport, reportsDir} from '../testing/reports';
 import {renderReportMarkdown} from '../../common/test-report';
 import type {ColorScheme} from '../../common/test-conditions';
@@ -291,6 +292,85 @@ export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) =
       }
     }
   );
+
+  server.registerTool('get_console', toolDefs.get_console, async ({device, level, clear}) => {
+    try {
+      const out = [];
+      for (const t of await previewIds(device))
+        out.push({device: t.deviceName, entries: readConsole(t.webContentsId, {level, clear})});
+      return textResult(out);
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
+
+  server.registerTool(
+    'get_network',
+    toolDefs.get_network,
+    async ({device, reload, failed_only: failedOnly, url_contains: urlContains}) => {
+      try {
+        const out = [];
+        for (const t of await previewIds(device)) {
+          const contents = webContents.fromId(t.webContentsId);
+          if (!contents || contents.isDestroyed()) continue;
+          await startNetwork(contents);
+          if (reload) {
+            await new Promise<void>((resolve) => {
+              const done = () => {
+                clearTimeout(timer);
+                contents.removeListener('did-stop-loading', done);
+                resolve();
+              };
+              const timer = setTimeout(done, 30_000);
+              contents.once('did-stop-loading', done);
+              contents.reloadIgnoringCache();
+            });
+          }
+          out.push({
+            device: t.deviceName,
+            requests: readNetwork(t.webContentsId, {failedOnly, urlContains}),
+          });
+        }
+        return textResult(out);
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool('get_styles', toolDefs.get_styles, async ({selector, properties, device}) => {
+    try {
+      const props = properties ?? [
+        'display',
+        'position',
+        'width',
+        'height',
+        'margin',
+        'padding',
+        'color',
+        'background-color',
+        'font-family',
+        'font-size',
+        'font-weight',
+        'line-height',
+        'overflow',
+        'z-index',
+        'opacity',
+      ];
+      const expression = `(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) throw new Error('No element matches ' + ${JSON.stringify(selector)});
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const styles = {};
+        for (const p of ${JSON.stringify(props)}) styles[p] = cs.getPropertyValue(p);
+        return {tag: el.tagName.toLowerCase(), box: {x: r.x, y: r.y, width: r.width, height: r.height}, styles};
+      })()`;
+      return textResult(await evaluateInPage(getMainWindow, expression, device));
+    } catch (error) {
+      return errorResult(error);
+    }
+  });
 
   server.registerTool('list_reports', toolDefs.list_reports, async () => {
     try {

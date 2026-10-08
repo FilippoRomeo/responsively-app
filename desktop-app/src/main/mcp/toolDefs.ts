@@ -154,6 +154,41 @@ export const toolDefs = {
       format: z.enum(['markdown', 'json']).optional(),
     },
   },
+  get_console: {
+    description:
+      "Read a preview's browser console as DevTools shows it: errors, warnings and logs, " +
+      'collected since the preview opened (the latest 300). Defaults to every Chromium device.',
+    inputSchema: {
+      device: z.string().optional().describe('Optional device id or exact name'),
+      level: z.enum(['all', 'warning', 'error']).optional().describe('Minimum level; default all'),
+      clear: z.boolean().optional().describe('Empty the console buffer after reading'),
+    },
+  },
+  get_network: {
+    description:
+      "Read a preview's network requests (url, method, type, status, size, time, errors). " +
+      'Capture starts on the first call, so pass reload: true to reload the page and see ' +
+      'everything it loads. Defaults to every Chromium device.',
+    inputSchema: {
+      device: z.string().optional().describe('Optional device id or exact name'),
+      reload: z
+        .boolean()
+        .optional()
+        .describe('Reload the page (cache off) and wait for it to load'),
+      failed_only: z.boolean().optional().describe('Only failed requests and 4xx/5xx responses'),
+      url_contains: z.string().optional().describe('Only requests whose URL contains this text'),
+    },
+  },
+  get_styles: {
+    description:
+      "Computed CSS of the first element matching a selector, like DevTools' Computed tab: " +
+      'the requested properties, or the usual layout and typography set.',
+    inputSchema: {
+      selector: z.string().min(1),
+      properties: z.array(z.string()).max(40).optional(),
+      device: z.string().optional().describe('Optional device id or exact name'),
+    },
+  },
   evaluate: {
     description:
       'Run a JavaScript expression in a Chromium device preview and return its result as JSON ' +
