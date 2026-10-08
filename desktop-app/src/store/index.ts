@@ -358,6 +358,23 @@ const schema = {
     },
     default: [],
   },
+  testProbe: {
+    type: 'object',
+    properties: {
+      askFirst: {type: 'boolean'},
+      pageLists: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: {type: 'string'},
+            pages: {type: 'array', items: {type: 'string'}},
+          },
+        },
+      },
+    },
+    default: {askFirst: false, pageLists: []},
+  },
   sponsorship: {
     type: 'object',
     properties: {

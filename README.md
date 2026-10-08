@@ -121,6 +121,10 @@ The gauge button in the toolbar opens the **test probe**, a small panel you can 
 
 ![The test probe plugged into the iPad: its panel beside the device with Network, CPU and Page colour choices, and the Slow 3G · CPU ×4 chip on the iPad's header](docs/media/test-probe.png)
 
+- **Pages:** a run tests the current page, or a saved list of up to 10 addresses (**+ New list of pages**); pages multiply with devices and conditions, up to 60 measurements.
+- **Reports:** after a run, **Open the full report** (or **Settings › Storage › Test reports › View**) shows every measurement with its screenshot, the problems seen and what could not be measured, with **Show in Finder** for the files.
+- **Ask me first:** switch on _Ask me before an agent runs a test or sets conditions_ in the probe and an agent's `run_test` or `set_conditions` waits for your Allow. It is off by default.
+
 ## Supported build
 
 The validated local build currently targets:

@@ -83,3 +83,22 @@ export const pruneReports = (keep = KEEP_REPORTS) =>
   listReports()
     .slice(keep)
     .forEach((r) => deleteReport(r.id));
+
+/** The report with its screenshots inlined, for the viewer. */
+export const readReportWithImages = (id: string) => {
+  const report = readReport(id);
+  const images: Record<string, string> = {};
+  for (const cell of report.cells) {
+    if (!cell.screenshot) continue;
+    try {
+      const file = path.join(dirOf(id), path.basename(cell.screenshot));
+      images[cell.screenshot] =
+        `data:image/jpeg;base64,${fs.readFileSync(file).toString('base64')}`;
+    } catch {
+      /* a screenshot that was removed: the viewer shows none */
+    }
+  }
+  return {report, images};
+};
+
+export const reportFolder = (id: string) => dirOf(id);

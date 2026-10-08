@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- CDP payloads are untyped by Electron */
-import {ipcMain, webContents, type WebContents} from 'electron';
+import path from 'path';
+import {ipcMain, shell, webContents, type WebContents} from 'electron';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import type {McpCaptureTargetsResult} from '../../common/mcp';
 import {
@@ -25,6 +26,8 @@ import {
   listReports,
   newReportId,
   pruneReports,
+  readReportWithImages,
+  reportFolder,
   saveReport,
   saveScreenshot,
 } from './reports';
@@ -563,6 +566,9 @@ export const initTestEngine = (windowGetter: GetMainWindow) => {
         ? v.filter((x): x is string => typeof x === 'string').slice(0, 8)
         : undefined;
     return runTest(windowGetter, {
+      pages: Array.isArray(req?.pages)
+        ? req.pages.filter((p: unknown): p is string => typeof p === 'string').slice(0, 10)
+        : undefined,
       devices: strings(req?.devices),
       networks: (strings(req?.networks) ?? []).filter((n): n is NetworkPreset =>
         NETWORK_PRESET_IDS.includes(n as NetworkPreset)
@@ -577,6 +583,16 @@ export const initTestEngine = (windowGetter: GetMainWindow) => {
         : undefined,
       startedBy: 'user',
     });
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_REPORT_READ);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TEST_REPORT_READ, (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('Expected a report id');
+    return readReportWithImages(id);
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_REPORT_REVEAL);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TEST_REPORT_REVEAL, (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('Expected a report id');
+    shell.showItemInFolder(path.join(reportFolder(id), 'report.md'));
   });
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_REPORTS_LIST);
   ipcMain.handle(IPC_MAIN_CHANNELS.TEST_REPORTS_LIST, () => listReports());

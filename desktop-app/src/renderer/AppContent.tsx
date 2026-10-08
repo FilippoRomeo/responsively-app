@@ -21,6 +21,7 @@ import AnnouncementCard from './components/AnnouncementCard';
 import {AboutDialog} from './components/AboutDialog';
 import TestRunBar from './components/TestRunBar';
 import ProbePanel from './components/Probe';
+import ReportViewer from './components/Probe/reportViewer';
 
 /** Present mode only applies while the canvas layout is active. */
 const usePresenting = (): boolean => {
@@ -44,6 +45,7 @@ const Browser = () => {
       )}
       {presenting ? null : <TestRunBar />}
       {presenting ? null : <ProbePanel />}
+      <ReportViewer />
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
           <Previewer />
