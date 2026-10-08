@@ -33,11 +33,10 @@ test.describe('Device outlines', () => {
       await expect(app.page.locator('[data-bezel]')).toHaveCount(before.length);
       // The same pixels for every page, framed or not.
       expect(await webviewSizes(app.page)).toEqual(before);
-      // Phone: notch, status and home bar; laptop: camera and base.
-      await expect(app.page.getByTestId('frame-notch')).toHaveCount(1);
-      await expect(app.page.getByTestId('frame-status')).toHaveCount(1);
-      await expect(app.page.getByTestId('frame-camera')).toHaveCount(1);
-      await expect(app.page.getByTestId('frame-base')).toHaveCount(1);
+      // Phone: notch and status bar; laptop: camera and base. The suite's devices
+      // depend on what earlier specs left in this worker, so at least one of each.
+      for (const part of ['frame-notch', 'frame-status', 'frame-camera', 'frame-base'])
+        await expect(app.page.getByTestId(part).first()).toBeAttached();
       // Remembered across restarts.
       expect(
         await app.page.evaluate(() => (window as any).electron.store.get('ui.deviceFrames'))
@@ -61,11 +60,12 @@ test.describe('Device outlines', () => {
     await setSwitch(app.page, 'Browser bar on laptops', true);
     try {
       // Laptops only, with or without frames; the page keeps its size.
-      const bar = app.page.getByTestId('browser-bar');
-      await expect(bar).toHaveCount(1);
+      // One per laptop in the suite (earlier specs may have added more): use the first.
+      const bar = app.page.getByTestId('browser-bar').first();
+      await expect(bar).toBeAttached();
       expect(await webviewSizes(app.page)).toEqual(before);
 
-      const url = app.page.getByTestId('browser-bar-url');
+      const url = app.page.getByTestId('browser-bar-url').first();
       await app.navigateTo(`${testServerUrl}/test-page.html`);
       await expect(url).toHaveText(`${testServerUrl}/test-page.html`, {timeout: 15_000});
       await app.navigateTo(`${testServerUrl}/test-page-2.html`);
@@ -80,7 +80,7 @@ test.describe('Device outlines', () => {
       await expect(forward).toBeEnabled();
       await forward.click();
       await expect(url).toHaveText(`${testServerUrl}/test-page-2.html`, {timeout: 15_000});
-      await expect(app.page.getByTestId('browser-bar-title')).not.toHaveText('');
+      await expect(app.page.getByTestId('browser-bar-title').first()).not.toHaveText('');
       await bar.getByRole('button', {name: 'Reload', exact: true}).click();
       await expect(url).toHaveText(`${testServerUrl}/test-page-2.html`);
     } finally {
