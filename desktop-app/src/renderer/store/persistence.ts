@@ -37,6 +37,7 @@ import {
   setDarkMode,
   setPalette,
   setSupportShownAt,
+  setToolbarLayout,
   setWhatsNewSeen,
 } from './features/ui';
 
@@ -63,6 +64,13 @@ startListening({
     const {showBezels, showBrowserBar} = api.getState().renderer.canvasOptions;
     window.electron.store.set('ui.deviceFrames', showBezels);
     window.electron.store.set('ui.browserBar', showBrowserBar);
+  },
+});
+
+startListening({
+  actionCreator: setToolbarLayout,
+  effect: (_action, api) => {
+    window.electron.store.set('ui.toolbarLayout', api.getState().ui.toolbarLayout);
   },
 });
 

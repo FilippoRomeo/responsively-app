@@ -48,6 +48,7 @@ const testOrder = [
   'device-toolbar.spec.ts',
   'device-tools.spec.ts',
   'device-outlines.spec.ts',
+  'toolbar-customize.spec.ts',
   'zoom-controls.spec.ts',
   'ui-theme.spec.ts',
   'settings.spec.ts',

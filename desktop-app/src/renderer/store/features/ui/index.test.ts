@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {DEFAULT_TOOLBAR_LAYOUT} from 'common/toolbar-layout';
 import reducer, {
   APP_VIEWS,
   closeMenuFlyout,
@@ -6,6 +7,7 @@ import reducer, {
   setAppView,
   setDarkMode,
   setPalette,
+  setToolbarLayout,
   setPresenting,
   setSupportShownAt,
   setWhatsNewSeen,
@@ -21,8 +23,19 @@ describe('ui slice', () => {
       isPresenting: false,
       classicToolbar: false,
       palette: 'graphite',
+      toolbarLayout: DEFAULT_TOOLBAR_LAYOUT,
       announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
     });
+  });
+
+  it('setToolbarLayout keeps only a valid layout', () => {
+    const state = reducer(
+      undefined,
+      setToolbarLayout({group: ['sound', 'bogus'], right: [], hidden: ['mcp', 'nope']} as never)
+    );
+    expect(state.toolbarLayout.group[0]).toBe('sound');
+    expect(state.toolbarLayout.group).toHaveLength(5);
+    expect(state.toolbarLayout.hidden).toEqual(['mcp']);
   });
 
   it('setPalette updates state', () => {

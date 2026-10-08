@@ -1,3 +1,4 @@
+import {Fragment, type ReactNode} from 'react';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {useDispatch, useSelector} from 'react-redux';
 import {
@@ -17,7 +18,13 @@ import {
   prepareFullPageCapture,
   useShutterSound,
 } from 'renderer/hooks/useScreenshot';
-import {APP_VIEWS, selectClassicToolbar, setAppView} from 'renderer/store/features/ui';
+import {
+  APP_VIEWS,
+  selectClassicToolbar,
+  selectToolbarLayout,
+  setAppView,
+} from 'renderer/store/features/ui';
+import type {ToolId} from 'common/toolbar-layout';
 import NavigationControls from './NavigationControls';
 import Menu from './Menu';
 import AddressBar from './AddressBar';
@@ -48,6 +55,7 @@ const ToolBar = ({
   const isCapturingScreenshot = useSelector(selectIsCapturingScreenshot);
   const activeSuite = useSelector(selectActiveSuite);
   const classic = useSelector(selectClassicToolbar);
+  const layout = useSelector(selectToolbarLayout);
   const dispatch = useDispatch();
   const playShutter = useShutterSound();
 
@@ -113,37 +121,62 @@ const ToolBar = ({
   // The icon bar shows the tools in the toolbar; the classic toolbar (Settings →
   // Reset toolbar) keeps them, labelled, in the Session menu.
   const Tool = classic ? ToolbarAction : IconButton;
+  const rotate = (
+    <Tool onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
+      <Icon
+        icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
+        fontSize={16}
+      />
+      {classic ? 'Rotate' : null}
+    </Tool>
+  );
+  const inspect = (
+    <Tool
+      onClick={() => dispatch(setIsInspecting(!isInspecting))}
+      isActive={isInspecting}
+      title="Inspect Elements"
+    >
+      <Icon icon="lucide:inspect" fontSize={15} />
+      {classic ? 'Inspect' : null}
+    </Tool>
+  );
+  const capture = (
+    <Tool
+      onClick={screenshotCaptureHandler}
+      isActive={isCapturingScreenshot}
+      title="Screenshot All WebViews"
+    >
+      <Icon icon="lucide:camera" fontSize={15} />
+      {classic ? 'Capture' : null}
+    </Tool>
+  );
   const tools = (
     <>
-      <Tool onClick={handleRotate} isActive={rotateDevices} title="Rotate Devices">
-        <Icon
-          icon={rotateDevices ? 'mdi:phone-rotate-portrait' : 'mdi:phone-rotate-landscape'}
-          fontSize={16}
-        />
-        {classic ? 'Rotate' : null}
-      </Tool>
-      <Tool
-        onClick={() => dispatch(setIsInspecting(!isInspecting))}
-        isActive={isInspecting}
-        title="Inspect Elements"
-      >
-        <Icon icon="lucide:inspect" fontSize={15} />
-        {classic ? 'Inspect' : null}
-      </Tool>
-      <Tool
-        onClick={screenshotCaptureHandler}
-        isActive={isCapturingScreenshot}
-        title="Screenshot All WebViews"
-      >
-        <Icon icon="lucide:camera" fontSize={15} />
-        {classic ? 'Capture' : null}
-      </Tool>
+      {rotate}
+      {inspect}
+      {capture}
       <ColorBlindnessControls iconOnly={!classic} />
       {/* The icon bar keeps the previews' scheme in Appearance and sound in its own menu. */}
       {classic ? <ColorSchemeToggle /> : null}
       {classic ? <AudioMuteToggle /> : <SoundMenu />}
     </>
   );
+
+  // The icon bar: every button by name, so the saved layout can place or hide it.
+  const iconTools: Record<ToolId, ReactNode> = {
+    rotate,
+    inspect,
+    capture,
+    simulate: <ColorBlindnessControls iconOnly />,
+    sound: <SoundMenu />,
+    addons: <AddonsButton />,
+    mcp: <McpPanel />,
+    appearance: <AppearanceMenu />,
+  };
+  const groupShown = layout.group.filter((id) => !layout.hidden.includes(id));
+  const rightShown = layout.right.filter((id) => !layout.hidden.includes(id));
+  // A hidden button stays mounted, invisible, so ⋮ › More tools can open its real menu.
+  const hiddenTools = [...layout.group, ...layout.right].filter((id) => layout.hidden.includes(id));
 
   return (
     <div className="relative flex h-14 flex-shrink-0 items-center gap-3 border-b border-line-soft bg-panel px-[14px]">
@@ -188,22 +221,41 @@ const ToolBar = ({
         ) : (
           <>
             <PreviewSuiteSelector />
-            <ToolbarDivider />
-            <div data-testid="toolbar-tools" className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted max-[1180px]:hidden">
-                All devices
-              </span>
-              <ToolbarGroup>{tools}</ToolbarGroup>
-            </div>
-            <ToolbarDivider />
-            <AddonsButton />
-            <McpPanel />
-            <AppearanceMenu />
+            {groupShown.length + rightShown.length > 0 ? <ToolbarDivider /> : null}
+            {groupShown.length > 0 ? (
+              <div data-testid="toolbar-tools" className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted max-[1180px]:hidden">
+                  All devices
+                </span>
+                <ToolbarGroup>
+                  {groupShown.map((id) => (
+                    <Fragment key={id}>{iconTools[id]}</Fragment>
+                  ))}
+                </ToolbarGroup>
+              </div>
+            ) : null}
+            {groupShown.length > 0 && rightShown.length > 0 ? <ToolbarDivider /> : null}
+            {rightShown.map((id) => (
+              <Fragment key={id}>{iconTools[id]}</Fragment>
+            ))}
             {/* Sessions live in ⋮ (and ⌘⇧M): the tab strip already names this one. */}
             <SessionsDialog showRequest={sessionsRequest} onShown={onSessionsShown} />
           </>
         )}
       </div>
+      {!classic && hiddenTools.length > 0 ? (
+        <div
+          aria-hidden
+          data-testid="toolbar-hidden-tools"
+          className="invisible absolute right-[44px] top-[26px] h-0 w-0 overflow-hidden"
+        >
+          {hiddenTools.map((id) => (
+            <div key={id} data-tool={id}>
+              {iconTools[id]}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <Menu />
       <ModalLoader isOpen={isCapturingScreenshot} onClose={handleClose} title="Screenshot" />
     </div>
