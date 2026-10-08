@@ -45,6 +45,8 @@ export const IPC_MAIN_CHANNELS = {
   TEST_RUN_STOP: 'test-run-stop',
   TEST_CONDITIONS: 'test-conditions',
   TEST_CONDITIONS_CLEAR: 'test-conditions-clear',
+  TEST_CONDITIONS_SET: 'test-conditions-set',
+  TEST_RUN_START: 'test-run-start',
   TEST_RESTORE_SCHEME: 'test-restore-scheme',
   TEST_REPORTS_LIST: 'test-reports-list',
   TEST_REPORTS_DELETE: 'test-reports-delete',

@@ -115,6 +115,12 @@ Ask an agent (or use the MCP tools) to measure a page the way people meet it: sl
 - `set_conditions` / `clear_conditions` apply the same conditions by hand; a chip on the device header shows them, and clicking it clears them.
 - Reports are kept per Session (the latest 20) and listed in **Settings › Storage › Test reports** with a Delete button. Agents read them with `list_reports` and `get_report`. Real iOS Safari previews are listed as not measured.
 
+### The test probe
+
+The gauge button in the toolbar opens the **test probe**, a small panel you can drag anywhere. **Plug into** a device and the panel moves beside it and applies the network, CPU slowdown and page colour you pick to that device live (shown as a chip on its header; **✕** on the chip, or **Nothing**, takes it off). Tick **Try every combination** to pick several of each, and **Run N measurements** measures them one at a time and shows the report right in the panel. With nothing plugged in, a run covers every device. Agents use the same engine through `run_test`; they don't drive the panel, but its bar and chips show what they are doing.
+
+![The test probe plugged into the iPad: its panel beside the device with Network, CPU and Page colour choices, and the Slow 3G · CPU ×4 chip on the iPad's header](docs/media/test-probe.png)
+
 ## Supported build
 
 The validated local build currently targets:

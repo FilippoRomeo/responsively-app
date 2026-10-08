@@ -7,6 +7,7 @@ import {
   describeConditions,
   expandMatrix,
   isNoConditions,
+  NETWORK_PRESET_IDS,
   networkToCdp,
   NO_CONDITIONS,
   type ColorScheme,
@@ -543,6 +544,39 @@ export const initTestEngine = (windowGetter: GetMainWindow) => {
   ipcMain.handle(IPC_MAIN_CHANNELS.TEST_CONDITIONS_CLEAR, (_e, webContentsId: unknown) => {
     if (typeof webContentsId === 'number') return clearConditions(webContentsId);
     return undefined;
+  });
+  // The probe panel: apply conditions to one preview, or run a list of them.
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_CONDITIONS_SET);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TEST_CONDITIONS_SET, (_e, webContentsId: unknown, next: any) => {
+    if (typeof webContentsId !== 'number') throw new Error('Expected a preview id');
+    const patch: Partial<TestConditions> = {};
+    if (NETWORK_PRESET_IDS.includes(next?.network)) patch.network = next.network;
+    if (typeof next?.cpu === 'number') patch.cpu = next.cpu;
+    if (next?.scheme === 'light' || next?.scheme === 'dark' || next?.scheme === null)
+      patch.scheme = next.scheme;
+    return setConditions(webContentsId, patch);
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_RUN_START);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TEST_RUN_START, (_e, req: any) => {
+    const strings = (v: unknown) =>
+      Array.isArray(v)
+        ? v.filter((x): x is string => typeof x === 'string').slice(0, 8)
+        : undefined;
+    return runTest(windowGetter, {
+      devices: strings(req?.devices),
+      networks: (strings(req?.networks) ?? []).filter((n): n is NetworkPreset =>
+        NETWORK_PRESET_IDS.includes(n as NetworkPreset)
+      ),
+      cpus: Array.isArray(req?.cpus)
+        ? req.cpus.filter((c: unknown): c is number => typeof c === 'number').slice(0, 4)
+        : undefined,
+      schemes: Array.isArray(req?.schemes)
+        ? req.schemes
+            .filter((s: unknown) => s === 'light' || s === 'dark' || s === null)
+            .slice(0, 2)
+        : undefined,
+      startedBy: 'user',
+    });
   });
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.TEST_REPORTS_LIST);
   ipcMain.handle(IPC_MAIN_CHANNELS.TEST_REPORTS_LIST, () => listReports());

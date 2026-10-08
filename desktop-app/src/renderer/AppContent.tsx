@@ -20,6 +20,7 @@ import {AddonDock} from './components/Addons';
 import AnnouncementCard from './components/AnnouncementCard';
 import {AboutDialog} from './components/AboutDialog';
 import TestRunBar from './components/TestRunBar';
+import ProbePanel from './components/Probe';
 
 /** Present mode only applies while the canvas layout is active. */
 const usePresenting = (): boolean => {
@@ -42,6 +43,7 @@ const Browser = () => {
         <ToolBar sessionsRequest={sessionsRequest} onSessionsShown={sessionsShown} />
       )}
       {presenting ? null : <TestRunBar />}
+      {presenting ? null : <ProbePanel />}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
           <Previewer />
