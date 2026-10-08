@@ -36,6 +36,9 @@ const schema = {
         type: 'boolean',
         default: false,
       },
+      // Hardware frames around every preview, and a live browser bar on laptops.
+      deviceFrames: {type: 'boolean', default: false},
+      browserBar: {type: 'boolean', default: false},
       // Dark theme colours (App.css): graphite unless the user picks another.
       palette: {
         enum: ['graphite', 'stone', 'black', 'midnight'],

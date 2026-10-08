@@ -18,10 +18,11 @@ const RULER_GUTTER = 30;
 
 /** Hardware bezel geometry per form factor (Hybrid Studio canvas design). */
 const BEZELS: Record<string, {pad: string; radius: string; screenRadius: number}> = {
-  phone: {pad: '16px 7px', radius: '26px', screenRadius: 9},
-  tablet: {pad: '14px 12px', radius: '18px', screenRadius: 4},
-  notebook: {pad: '10px 10px', radius: '12px 12px 3px 3px', screenRadius: 4},
+  phone: {pad: '16px 7px', radius: '30px', screenRadius: 12},
+  tablet: {pad: '16px 12px', radius: '20px', screenRadius: 6},
+  notebook: {pad: '10px 10px 14px', radius: '14px 14px 3px 3px', screenRadius: 3},
 };
+const BUTTON = 'absolute bg-[#3a3d45]';
 
 interface Props {
   device: IDevice;
@@ -47,6 +48,8 @@ interface Props {
   /** Brief capture feedback overlay. */
   flashing: boolean;
   initialSrc: string;
+  /** A browser's chrome above the page (laptops): outside the viewport, so it takes no pixels. */
+  browserBar?: (width: number, radius: number) => ReactNode;
   /** Callback ref — never a ref object (see Device for why). */
   webviewRef: (element: Electron.WebviewTag | null) => void;
   toolbar: ReactNode;
@@ -88,6 +91,7 @@ const DeviceFrame = ({
   toolbar,
   browserBadge,
   onRemove,
+  browserBar,
   screenOverride,
 }: Props) => {
   const scaledHeight = height * zoomfactor;
@@ -98,8 +102,10 @@ const DeviceFrame = ({
 
   return (
     <div
+      // A frame around a narrow phone needs more than the 208px a bare one gets.
       className={cx('group relative h-fit', {
-        'w-52': isRestrictedMinimumDeviceSize,
+        'w-52': isRestrictedMinimumDeviceSize && bezel === null,
+        'min-w-52': isRestrictedMinimumDeviceSize && bezel !== null,
       })}
     >
       {/* The label row is also the canvas drag handle, so it stays in the
@@ -156,26 +162,75 @@ const DeviceFrame = ({
               : undefined
           }
         >
-          {bezel !== null && !isLaptop && !isRotated ? (
-            <div className="absolute left-1/2 top-[6px] h-1 w-[34px] -translate-x-1/2 rounded-full bg-[#4a4d55]" />
+          {bezel !== null && device.type === 'phone' && !isRotated ? (
+            <>
+              <i className={cx(BUTTON, '-left-[3px] top-[78px] h-[22px] w-[3px] rounded-l-sm')} />
+              <i className={cx(BUTTON, '-left-[3px] top-[116px] h-10 w-[3px] rounded-l-sm')} />
+              <i className={cx(BUTTON, '-left-[3px] top-[166px] h-10 w-[3px] rounded-l-sm')} />
+              <i className={cx(BUTTON, '-right-[3px] top-[130px] h-16 w-[3px] rounded-r-sm')} />
+              <div
+                data-testid="frame-notch"
+                className="absolute left-1/2 top-[16px] z-[3] h-3 -translate-x-1/2 rounded-b-[14px] bg-[#0a0a0c]"
+                style={{width: Math.max(40, Math.round(scaledWidth * 0.33))}}
+              />
+            </>
+          ) : null}
+          {bezel !== null && device.type === 'tablet' && !isRotated ? (
+            <>
+              <div className="absolute left-1/2 top-[6px] h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-[#1d1f24]" />
+              <i className={cx(BUTTON, '-top-[3px] right-[42px] h-[3px] w-[34px] rounded-t-sm')} />
+            </>
           ) : null}
           {bezel !== null && isLaptop ? (
-            <div
-              className="absolute -bottom-[9px] left-1/2 h-3 -translate-x-1/2 rounded-[2px_2px_12px_12px] shadow-[0_8px_16px_rgba(0,0,0,.3)]"
-              style={{
-                width: scaledWidth + 20 + 36,
-                background: 'linear-gradient(180deg,#4a4d55,#26282e)',
-              }}
-            />
+            <>
+              <div
+                data-testid="frame-camera"
+                className="absolute left-1/2 top-0 z-[3] h-[10px] w-14 -translate-x-1/2 rounded-b-[7px] bg-[#0a0a0c]"
+              />
+              <div
+                data-testid="frame-base"
+                className="absolute -bottom-[12px] left-1/2 h-3 -translate-x-1/2 rounded-b-[14px] rounded-t-[2px] shadow-[0_10px_18px_rgba(0,0,0,.35)]"
+                style={{
+                  width: scaledWidth + 20 + 60,
+                  background: 'linear-gradient(180deg,#5a5d66,#2a2c32)',
+                }}
+              >
+                <div className="absolute left-1/2 top-0 h-1 w-[72px] -translate-x-1/2 rounded-b-md bg-[#1c1d21]" />
+              </div>
+            </>
           ) : null}
+          {browserBar ? browserBar(scaledWidth + rulerOffset, bezel?.screenRadius ?? 0) : null}
           <ScaledFrame
             width={width}
             height={height}
             scale={zoomfactor}
             offset={rulerOffset}
             className="bg-white"
-            style={bezel !== null ? {borderRadius: bezel.screenRadius} : undefined}
+            style={
+              bezel !== null
+                ? {
+                    borderRadius: browserBar
+                      ? `0 0 ${bezel.screenRadius}px ${bezel.screenRadius}px`
+                      : bezel.screenRadius,
+                  }
+                : undefined
+            }
           >
+            {bezel !== null && device.type === 'phone' && !isRotated ? (
+              <>
+                <div
+                  data-testid="frame-status"
+                  className="pointer-events-none absolute inset-x-0 top-0 z-[3] flex h-4 items-center justify-between px-[14px] text-[8px] font-bold text-black mix-blend-difference"
+                >
+                  <span className="text-white">9:41</span>
+                  <span className="text-white">5G ▮▮▮</span>
+                </div>
+                <div
+                  className="pointer-events-none absolute bottom-[5px] left-1/2 z-[3] h-[3px] -translate-x-1/2 rounded-full bg-white mix-blend-difference"
+                  style={{width: Math.max(40, Math.round(scaledWidth * 0.27))}}
+                />
+              </>
+            ) : null}
             <GuideGrid
               scaledHeight={scaledHeight}
               scaledWidth={scaledWidth}

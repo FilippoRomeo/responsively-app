@@ -74,6 +74,10 @@ See:
 - Each device header has its own **rotate, screenshot, inspect, sound and light/dark**; **⋯** holds refresh, devtools, rulers, focus, full-page screenshot, design overlay and event mirroring; **×** takes the device out of the suite.
 - **⋮ › Manage Sessions…** (⌘⇧M) opens the Sessions manager.
 
+![An iPhone with a notch, side buttons, status bar and home bar; an iPad with its camera; a MacBook with its camera notch, base and a browser bar showing the page's title and address](docs/media/device-frames.png)
+
+**Appearance › Device frames** (off by default) draws hardware around every preview in any layout: a notch, buttons, status bar and home bar on phones, a camera and button on iPads, a camera and base on laptops. **Browser bar on laptops** adds a browser's chrome above the laptop preview, live: the page's title and address, with back, forward, reload and stop for that device. Both sit outside the page, so every preview keeps its exact device size, and screenshots, rulers and the design overlay are unchanged. Both settings are remembered.
+
 ## Add-ons
 
 Dev tools live in Responsively instead of in your project's packages. Paste a GitHub repo, an npm package, a web address (say, a ComfyUI panel) or a folder; it is used as it is, nothing to convert. Responsively shows what it found (page scripts, an app panel, an MCP server, rules written like Claude skills, premade prompts) and lets you run its build in a small terminal. Before it installs, it asks for exactly what the add-on may do. Every part has its own switch, and you can save a set of switches as a stack.
