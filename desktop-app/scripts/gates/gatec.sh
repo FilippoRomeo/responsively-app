@@ -20,27 +20,37 @@
 # earlier run built from the same commit, after checking that run's clone is at
 # that commit and its app.asar and bridge still hash as recorded when built.
 # Data and evidence are new; the earlier run is only read.
-# Quit the installed Responsively first. Run it in a normal Terminal window and
-# stay there: part-way through it asks you 3 yes/no questions.
+# --from-repo packages an already built repo (an install's own, see gatef.sh prepare
+# --auto) with this run's test bundle ID instead of cloning and building again.
+# --no-questions skips the 3 questions that need your eyes (recorded as skipped,
+# and tested.env says QUESTIONS=skipped); every measured check still runs.
+# Quit the installed Responsively first. Without --no-questions run it in a normal
+# Terminal window and stay there: part-way through it asks you 3 yes/no questions.
 set -euo pipefail
 
 EXPECTED_SHA="${1:-}"
 if ! printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-  echo "Usage: bash gatec.sh <full 40-character commit SHA> [run-name] [--reuse-build <earlier-run>]"
+  echo "Usage: bash gatec.sh <full 40-character commit SHA> [run-name] [--reuse-build <earlier-run>] [--from-repo <built-repo-dir>] [--no-questions]"
   exit 2
 fi
 RUN_NAME="${2:-c-${EXPECTED_SHA:0:7}-001}"
 REUSE_RUN=""
-if [ "${3:-}" = "--reuse-build" ]; then
-  REUSE_RUN="${4:-}"
-  [ -n "$REUSE_RUN" ] && [ "$REUSE_RUN" != "$RUN_NAME" ] || {
-    echo "--reuse-build needs the name of an earlier run, different from this one"
-    exit 2
-  }
-elif [ -n "${3:-}" ]; then
-  echo "Unknown option: $3"
-  exit 2
-fi
+FROM_REPO=""
+NO_QUESTIONS=""
+if [ $# -ge 3 ]; then shift 2; else shift $#; fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reuse-build | --from-repo)
+      [ -n "${2:-}" ] || { echo "$1 needs a value"; exit 2; }
+      if [ "$1" = --reuse-build ]; then REUSE_RUN="$2"; else FROM_REPO="$2"; fi
+      shift 2 ;;
+    --no-questions) NO_QUESTIONS=1; shift ;;
+    *) echo "Unknown option: $1"; exit 2 ;;
+  esac
+done
+[ "$REUSE_RUN" != "$RUN_NAME" ] || { echo "--reuse-build needs an earlier run, not this one"; exit 2; }
+[ -z "$FROM_REPO" ] || [ -d "$FROM_REPO/desktop-app/release/app/dist" ] || { echo "--from-repo needs a repo that is already built (desktop-app/release/app/dist)"; exit 2; }
+[ -z "$FROM_REPO" ] || [ -z "$REUSE_RUN" ] || { echo "--from-repo and --reuse-build cannot be combined"; exit 2; }
 REPO_URL="https://github.com/FilippoRomeo/responsively-app.git"
 APP_ID="app.responsively.validation-${RUN_NAME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,6 +61,8 @@ EV="$RUN/evidence"
 DATA="$RUN/data"
 REPO="$RUN/repo"
 CACHES="$RUN/caches"
+# A repo built elsewhere brings its download caches along.
+[ -z "$FROM_REPO" ] || CACHES="$(dirname "$FROM_REPO")/caches"
 BUILD_REL=".work/gatec-${RUN_NAME}/build"
 PACKAGE="$RUN/gatec-${RUN_NAME}-evidence.tgz"
 
@@ -232,6 +244,7 @@ finish() {
       echo "CLI_SHA=$(shasum -a 256 "$CLI" | awk '{print $1}')"
       echo "RESULT=$VERDICT"
       [ -z "$REUSE_RUN" ] || echo "BUILD_RUN=$REUSE_RUN"
+      [ -z "$NO_QUESTIONS" ] || echo "QUESTIONS=skipped"
     } | tee "$RUN/tested.env" > "$EV/tested.env"
     STEP="finish"
   fi
@@ -291,7 +304,7 @@ log "node $(node --version) at $(command -v node); $(git --version)"
 shasum -a 256 "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "$DRIVER" | tee "$EV/package-inputs.sha256"
 
 # Three checks need your answers; without a terminal they would fail after the whole build.
-if ! { : < /dev/tty; } 2>/dev/null; then
+if [ -z "$NO_QUESTIONS" ] && ! { : < /dev/tty; } 2>/dev/null; then
   log "FAIL: no terminal to ask you in. Run Gate C in a Terminal window (not through an agent or a ! command)."
   exit 1
 fi
@@ -337,24 +350,38 @@ if [ -n "$REUSE_RUN" ]; then
   APP_ID="app.responsively.validation-${REUSE_RUN}"
   log "app.asar and bridge unchanged since $REUSE_RUN built them"
 else
-  STEP="clone"
-  git clone "$REPO_URL" "$REPO" > "$EV/clone.log" 2>&1
-  git -C "$REPO" checkout --detach "$EXPECTED_SHA" >> "$EV/clone.log" 2>&1
-  HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
-  HEAD_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
-  log "HEAD=$HEAD_SHA tree=$HEAD_TREE"
-  [ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: expected commit $EXPECTED_SHA"; exit 1; }
+  if [ -n "$FROM_REPO" ]; then
+    STEP="from-repo"
+    REPO="$FROM_REPO"
+    HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
+    HEAD_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
+    log "packaging the built repo $REPO: HEAD=$HEAD_SHA tree=$HEAD_TREE"
+    [ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: that repo is at another commit"; exit 1; }
+    # electron-builder rewrites release/app/yarn.lock on every package; nothing else may differ.
+    CHANGED="$(git -C "$REPO" status --porcelain --untracked-files=no | grep -v ' desktop-app/release/app/yarn.lock$' || true)"
+    [ -z "$CHANGED" ] || { log "FAIL: that repo has local changes: $CHANGED"; exit 1; }
+    cd "$REPO/desktop-app"
+  else
+    STEP="clone"
+    git clone "$REPO_URL" "$REPO" > "$EV/clone.log" 2>&1
+    git -C "$REPO" checkout --detach "$EXPECTED_SHA" >> "$EV/clone.log" 2>&1
+    HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
+    HEAD_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
+    log "HEAD=$HEAD_SHA tree=$HEAD_TREE"
+    [ "$HEAD_SHA" = "$EXPECTED_SHA" ] || { log "FAIL: expected commit $EXPECTED_SHA"; exit 1; }
 
-  cd "$REPO/desktop-app"
+    cd "$REPO/desktop-app"
 
-  STEP="install"
-  log "yarn install (several minutes)"
-  npx -y yarn@1.22.22 install --frozen-lockfile > "$EV/install.log" 2>&1
+    STEP="install"
+    log "yarn install (several minutes)"
+    npx -y yarn@1.22.22 install --frozen-lockfile > "$EV/install.log" 2>&1
 
-  STEP="build"
-  log "yarn build"
-  rm -rf "$REPO/desktop-app/release/app/dist"
-  npx -y yarn@1.22.22 build > "$EV/build.log" 2>&1
+    STEP="build"
+    log "yarn build"
+    rm -rf "$REPO/desktop-app/release/app/dist"
+    npx -y yarn@1.22.22 build > "$EV/build.log" 2>&1
+
+  fi
 
   STEP="package"
   log "electron-builder --dir, appId $APP_ID"
@@ -373,6 +400,7 @@ else
   [ -n "$FOUND" ] || { log "FAIL: no ResponsivelyApp.app under $BUILD_REL"; exit 1; }
   case "$FOUND" in
     "$RUN"/*) APP="$FOUND" ;;
+    "$FROM_REPO"/*) [ -z "$FROM_REPO" ] && { log "FAIL: built app is outside the run folder: $FOUND"; exit 1; } || APP="$FOUND" ;;
     *) log "FAIL: built app is outside the run folder: $FOUND"; exit 1 ;;
   esac
 fi
@@ -395,7 +423,7 @@ set +e
 mkdir -p "$DATA/logs"
 node "$DRIVER" --cli "$CLI" --app "$APP" --root "$DATA/sessions-root" \
   --shell-data "$DATA/shell-data" --out "$EV" --stale-port "$STALE_PORT" \
-  --expected-exe "$APP/Contents/MacOS/ResponsivelyApp" --log-dir "$DATA/logs" 2> "$EV/driver.log"
+  --expected-exe "$APP/Contents/MacOS/ResponsivelyApp" --log-dir "$DATA/logs" ${NO_QUESTIONS:+--no-questions} 2> "$EV/driver.log"
 DRIVER_EXIT=$?
 set -e
 grep '^\[gatec\]' "$EV/driver.log" | tee -a "$EV/steps.log" || true

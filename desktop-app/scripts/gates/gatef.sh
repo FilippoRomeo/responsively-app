@@ -2,6 +2,14 @@
 # Gate F: install a commit that passed Gate C as ~/Applications/ResponsivelyMCP.app,
 # backup first. Three phases, each run separately and in order:
 #
+#   bash gatef.sh prepare --auto <full-commit-sha> <install-run>
+#       the whole check in one step, no Terminal and no questions: builds the
+#       commit once, packages it with the installed app's bundle ID, then packages
+#       the same build again with a test bundle ID and runs Gate C's automated
+#       checks on that copy (gatec.sh --from-repo --no-questions: isolation,
+#       Session routing, stop, force quit; the 3 questions that need your eyes are
+#       skipped). Needs Responsively quit, which backup needs anyway. Refuses unless
+#       those checks pass and both packages hold the same app.asar and bridge.
 #   bash gatef.sh prepare <gatec-run> <install-run>
 #       builds the commit that Gate C run tested, with the installed app's
 #       bundle ID, and verifies it (safe while the app runs). Refuses unless
@@ -20,12 +28,15 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: bash gatef.sh prepare <gatec-run> <install-run> | backup <install-run> | replace <install-run>"
+  echo "Usage: bash gatef.sh prepare --auto <sha> <install-run> | prepare <gatec-run> <install-run> | backup <install-run> | replace <install-run>"
   exit 2
 }
 PHASE="${1:-}"
 case "$PHASE" in
-  prepare) GATEC_RUN="${2:-}"; RUN_NAME="${3:-}"; [ -n "$GATEC_RUN" ] || usage ;;
+  prepare)
+    AUTO=""
+    if [ "${2:-}" = "--auto" ]; then AUTO=1; AUTO_SHA="${3:-}"; RUN_NAME="${4:-}"; GATEC_RUN="auto"
+    else GATEC_RUN="${2:-}"; RUN_NAME="${3:-}"; [ -n "$GATEC_RUN" ] || usage; fi ;;
   backup | replace) RUN_NAME="${2:-}" ;;
   *) usage ;;
 esac
@@ -44,7 +55,12 @@ CACHES="$RUN/caches"
 TARGET="$RUN/target.env"
 
 # The commit and hashes come from the Gate C run at prepare, then from target.env.
-if [ "$PHASE" = prepare ]; then
+if [ "$PHASE" = prepare ] && [ -n "$AUTO" ]; then
+  # The automated Gate C run happens inside prepare; its result is read then.
+  printf '%s' "$AUTO_SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "--auto needs the full 40-character commit SHA"; exit 2; }
+  TESTED=""
+  SOURCE=""
+elif [ "$PHASE" = prepare ]; then
   TESTED="$HOME/ResponsivelyGateC/$GATEC_RUN/tested.env"
   [ -f "$TESTED" ] || { echo "No Gate C result at $TESTED"; exit 2; }
   [ "$(val "$TESTED" RESULT)" = PASS ] || { echo "Gate C run $GATEC_RUN did not pass; refusing to install it"; exit 2; }
@@ -53,12 +69,17 @@ else
   [ -f "$TARGET" ] || { echo "Run prepare first."; exit 2; }
   SOURCE="$TARGET"
 fi
-EXPECTED_SHA="$(val "$SOURCE" COMMIT)"
-EXPECTED_TREE="$(val "$SOURCE" TREE)"
-TESTED_CLI_SHA="$(val "$SOURCE" CLI_SHA)"
-# Gate C builds with its own appId; app.asar is recorded, not enforced.
-GATEC_ASAR_SHA="$(val "$SOURCE" ASAR_SHA)"
-printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid COMMIT in $SOURCE"; exit 2; }
+if [ -n "${AUTO:-}" ] && [ "$PHASE" = prepare ]; then
+  EXPECTED_SHA="$AUTO_SHA"; EXPECTED_TREE=""; TESTED_CLI_SHA=""; GATEC_ASAR_SHA=""
+else
+  EXPECTED_SHA="$(val "$SOURCE" COMMIT)"
+  EXPECTED_TREE="$(val "$SOURCE" TREE)"
+  TESTED_CLI_SHA="$(val "$SOURCE" CLI_SHA)"
+  # Gate C builds with its own appId; app.asar is recorded, not enforced.
+  GATEC_ASAR_SHA="$(val "$SOURCE" ASAR_SHA)"
+fi
+printf '%s' "$EXPECTED_SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "Invalid COMMIT in ${SOURCE:-the arguments}"; exit 2; }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_REL=".work/install-main-${EXPECTED_SHA:0:7}/build"
 
 INSTALL="$HOME/Applications/ResponsivelyMCP.app"
@@ -148,19 +169,28 @@ case "$PHASE" in
   prepare)
     [ -e "$RUN" ] && { echo "Refusing to reuse $RUN. Pass a new install-run name."; exit 2; }
     mkdir -p "$EV" "$CACHES"
-    cp "$TESTED" "$EV/gatec-tested.env"
+    [ -z "$TESTED" ] || cp "$TESTED" "$EV/gatec-tested.env"
     trap pack EXIT
+    if [ -n "$AUTO" ] && pgrep -f "$(esc "$INSTALL/Contents/")" > /dev/null; then
+      fail "Responsively is running. Quit it from its menu-bar icon first: the automated checks need it quit (and the backup after them does too)."
+    fi
     export npm_config_cache="$CACHES/npm" YARN_CACHE_FOLDER="$CACHES/yarn"
     export electron_config_cache="$CACHES/electron" ELECTRON_BUILDER_CACHE="$CACHES/electron-builder"
     export npm_config_devdir="$CACHES/node-gyp"
     [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] || fail "macOS arm64 required"
     [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 24 ] || fail "Node >= 24 required"
-    log "node $(node --version); installing $EXPECTED_SHA, which Gate C run $GATEC_RUN passed"
+    if [ -n "$AUTO" ]; then log "node $(node --version); installing $EXPECTED_SHA after its own automated checks"
+    else log "node $(node --version); installing $EXPECTED_SHA, which Gate C run $GATEC_RUN passed"; fi
     shasum -a 256 "${BASH_SOURCE[0]}" | tee "$EV/script.sha256"
     git clone "$REPO_URL" "$REPO" > "$EV/clone.log" 2>&1
     git -C "$REPO" checkout --detach "$EXPECTED_SHA" >> "$EV/clone.log" 2>&1
-    [ "$(git -C "$REPO" rev-parse HEAD^{tree})" = "$EXPECTED_TREE" ] || fail "tree differs from the Gate C tested tree"
-    log "HEAD=$(git -C "$REPO" rev-parse HEAD) tree=$EXPECTED_TREE (same tree Gate C tested)"
+    if [ -n "$AUTO" ]; then
+      EXPECTED_TREE="$(git -C "$REPO" rev-parse HEAD^{tree})"
+      log "HEAD=$(git -C "$REPO" rev-parse HEAD) tree=$EXPECTED_TREE"
+    else
+      [ "$(git -C "$REPO" rev-parse HEAD^{tree})" = "$EXPECTED_TREE" ] || fail "tree differs from the Gate C tested tree"
+      log "HEAD=$(git -C "$REPO" rev-parse HEAD) tree=$EXPECTED_TREE (same tree Gate C tested)"
+    fi
     cd "$REPO/desktop-app"
     log "yarn install"
     npx -y yarn@1.22.22 install --frozen-lockfile > "$EV/install.log" 2>&1
@@ -185,11 +215,28 @@ case "$PHASE" in
     /usr/bin/codesign --verify --deep --strict "$NEW" > "$EV/codesign.log" 2>&1 || fail "codesign"
     /usr/bin/codesign -d --entitlements :- "$NEW" 2>&1 | grep -q disable-library-validation || fail "entitlements"
     [ -f "$NEW/Contents/Resources/mcp/manifest.json" ] || fail "MCP manifest missing"
+    if [ -n "$AUTO" ]; then
+      GC="c-auto-${RUN_NAME}"
+      log "automated checks on a test copy of this exact build (keep Responsively quit; about 2 minutes)"
+      bash "$SCRIPT_DIR/gatec.sh" "$EXPECTED_SHA" "$GC" --from-repo "$REPO" --no-questions > "$EV/gatec-auto.out" 2>&1 || true
+      TESTED="$HOME/ResponsivelyGateC/$GC/tested.env"
+      if [ ! -f "$TESTED" ] || [ "$(val "$TESTED" RESULT)" != PASS ]; then
+        sed -n '/\[gatec\] FAIL/p;/STOPPED EARLY/p;/FAIL:/p;/ISOLATION/p' "$HOME/ResponsivelyGateC/$GC/evidence/steps.log" 2>/dev/null | tail -8 | tee -a "$EV/steps.log"
+        fail "the automated checks did not pass: $HOME/ResponsivelyGateC/$GC/evidence"
+      fi
+      cp "$TESTED" "$EV/gatec-tested.env"
+      TESTED_CLI_SHA="$(val "$TESTED" CLI_SHA)"
+      GATEC_ASAR_SHA="$(val "$TESTED" ASAR_SHA)"
+      GATEC_RUN="$GC"
+      log "automated checks passed ($(grep -c '^\[gatec\] PASS' "$HOME/ResponsivelyGateC/$GC/evidence/steps.log") checks, isolation intact; the 3 questions skipped)"
+    fi
     CLI_SHA="$(sha "$NEW/Contents/Resources/mcp/cli.js")"
     [ "$CLI_SHA" = "$TESTED_CLI_SHA" ] || fail "cli.js $CLI_SHA is not the bridge Gate C tested"
     log "version $(/usr/bin/defaults read "$NEW/Contents/Info.plist" CFBundleShortVersionString); cli.js = Gate C tested bridge"
     if [ "$(sha "$NEW/Contents/Resources/app.asar")" = "$GATEC_ASAR_SHA" ]; then
       log "app.asar is byte-identical to Gate C run $GATEC_RUN"
+    elif [ -n "$AUTO" ]; then
+      fail "app.asar differs between the test copy and the install package of the same build"
     else
       log "note: app.asar differs from Gate C run $GATEC_RUN ($GATEC_ASAR_SHA); same commit, different appId build"
     fi
