@@ -5,7 +5,7 @@
 // with confirmation. No dependencies. Writes results.json and bridge-stderr.log.
 //
 // node gatec-m6-driver.mjs --cli <cli.js> --app <App.app> --root <sessions root>
-//   --shell-data <dir> --out <dir> --stale-port <port> --expected-exe <path>
+//   --shell-data <dir> --out <dir> --stale-port <port> --expected-exe <path> --log-dir <dir>
 import {execFileSync, spawn} from 'child_process';
 import fs from 'fs';
 import http from 'http';
@@ -71,6 +71,8 @@ Object.assign(env, {
   // T3 creates its test Sessions; agents' bridges never get this.
   RESPONSIVELY_MCP_ALLOW_CREATE_SESSION: '1',
   RESPONSIVELY_DISABLE_PROTOCOL_REGISTRATION: 'true',
+  // The test app's shell and controller log here, not into the installed app's log.
+  RESPONSIVELY_LOG_DIR: arg('log-dir'),
   CI: 'true',
 });
 const child = spawn(process.execPath, [CLI], {env, stdio: ['pipe', 'pipe', 'pipe']});

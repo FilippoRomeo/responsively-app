@@ -101,8 +101,71 @@ log_sizes() {
   done > "$EV/shared-log-sizes-$1.txt" 2>/dev/null || true
 }
 
-# pgrep/pkill take a regex; escape the test app path so it matches literally.
-test_app_pattern() { printf '%s' "$APP/Contents/" | sed 's/[][\.*^$()+?{}|]/\\&/g'; }
+# pgrep/pkill take a regex; escape a path so it matches literally.
+literal() { printf '%s' "$1" | sed 's/[][\.*^$()+?{}|]/\\&/g'; }
+test_app_pattern() { literal "$APP/Contents/"; }
+
+# Your installed app's processes (never the test copy, which lives in the run folder).
+real_app_pids() { pgrep -f "$(literal "$REAL_APP/Contents/")" | tr '\n' ' ' || true; }
+# Real Session runtimes whose process is alive.
+live_real_leases() {
+  for f in "$REAL_SESSIONS"/runtimes/*.json; do
+    [ -f "$f" ] || continue
+    pid="$(sed -n 's/.*"pid": *\([0-9][0-9]*\).*/\1/p' "$f" | head -n 1)"
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && printf '%s (pid %s) ' "$(basename "$f" .json)" "$pid"
+  done
+  return 0
+}
+# Who started a process: the process, then up to 3 ancestors (names the agent's app).
+describe_pids() {
+  for p in $1; do
+    ps -o pid=,lstart=,command= -p "$p" 2>/dev/null | cut -c1-200 | sed 's/^/  /'
+    pp="$p"
+    for _ in 1 2 3; do
+      pp="$(ps -o ppid= -p "$pp" 2>/dev/null | tr -d ' ')"
+      [ -n "$pp" ] && [ "$pp" != 1 ] || break
+      ps -o pid=,command= -p "$pp" 2>/dev/null | cut -c1-160 | sed 's/^/    from: /'
+    done
+  done
+}
+# Agents' bridges to Responsively: node running the npm bootstrap (responsively-mcp) or an app's mcp/cli.js.
+bridge_pids() {
+  ps -axo pid=,command= | awk '$2 ~ /(^|\/)node$/ && $3 ~ /responsively-mcp$|Resources\/mcp\/cli\.js$/ {print $1}' | tr '\n' ' '
+}
+# Ends this gate's own processes (never its parent's): descendants first, then the gate.
+stop_gate() {
+  local me="${BASHPID:-}" kids
+  kill_tree() { for c in $(pgrep -P "$1"); do kill_tree "$c"; done; [ "$1" = "$me" ] || kill -TERM "$1" 2>/dev/null; }
+  for c in $(pgrep -P $$); do [ "$c" = "$me" ] || kill_tree "$c"; done
+  kill -TERM $$ 2>/dev/null
+}
+# Names, last stop and last open of your Sessions: enough to explain a change, no URLs.
+registry_summary() {
+  node -e 'try{const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const s of r.sessions??r)console.log(JSON.stringify({id:s.id,name:s.name,lastStop:s.lastStop,lastOpenedAt:s.lastOpenedAt}))}catch(e){console.log("unreadable: "+e.message)}' "$REAL_SESSIONS/sessions-registry.json"
+}
+
+# Every 5 s: if your installed app starts, a real runtime appears or your registry
+# is written, stop the run now and record who did it, instead of failing 10 minutes later.
+watch_real() {
+  local reg_before leases_before reason pids
+  reg_before="$(stat -f %m "$REAL_SESSIONS/sessions-registry.json" 2>/dev/null || echo none)"
+  leases_before="$(ls -1 "$REAL_SESSIONS/runtimes" 2>/dev/null | sort | tr '\n' ' ')"
+  while sleep 5; do
+    reason=""
+    pids="$(real_app_pids)"
+    [ -z "${pids// /}" ] || reason="your installed Responsively started (PIDs $pids)"
+    [ -n "$reason" ] || [ "$(ls -1 "$REAL_SESSIONS/runtimes" 2>/dev/null | sort | tr '\n' ' ')" = "$leases_before" ] ||
+      reason="your Sessions' runtime list changed"
+    [ -n "$reason" ] || [ "$(stat -f %m "$REAL_SESSIONS/sessions-registry.json" 2>/dev/null || echo none)" = "$reg_before" ] ||
+      reason="your Sessions registry was written"
+    if [ -n "$reason" ]; then
+      { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $reason"; describe_pids "$pids"; } > "$EV/isolation-break.txt"
+      # The build or the driver; the test app runs detached and finish stops it.
+      stop_gate
+      return
+    fi
+  done
+}
 
 stop_test_processes() {
   [ -n "$APP" ] || return 0
@@ -122,17 +185,33 @@ finish() {
   set +e
   STEP="finish"
   log "exit code of last step: $code; driver exit: $DRIVER_EXIT"
+  [ -z "${WATCH_PID:-}" ] || kill "$WATCH_PID" 2>/dev/null
+  if [ -f "$EV/isolation-break.txt" ]; then
+    log "STOPPED EARLY, ISOLATION BROKEN: $(head -n 1 "$EV/isolation-break.txt")"
+    sed -n '2,$p' "$EV/isolation-break.txt" | tee -a "$EV/steps.log"
+  fi
   stop_test_processes
 
   snapshot_real after
   if [ ! -f "$EV/real-before.txt" ]; then
     log "ISOLATION CHECK: not run (stopped before the first snapshot)"
+  elif [ -f "$EV/isolation-break.txt" ] && cmp -s "$EV/real-before.txt" "$EV/real-after.txt"; then
+    log "ISOLATION CHECK: NOT PROVEN (your app was active during the run; your files ended unchanged)"
   elif cmp -s "$EV/real-before.txt" "$EV/real-after.txt"; then
     ISOLATION=PASS
     log "ISOLATION PASS: installed app, your Sessions registry and runtime leases unchanged"
   else
     log "ISOLATION CHECK: DIFFERS (compare real-before.txt and real-after.txt)"
+    # Say what changed, so the cause can be found without digging through logs.
+    registry_summary > "$EV/real-registry-after.txt"
+    {
+      diff "$EV/real-before.txt" "$EV/real-after.txt"
+      echo "Sessions changed (before → after):"
+      diff "$EV/real-registry-before.txt" "$EV/real-registry-after.txt"
+    } > "$EV/isolation-diff.txt" 2>&1
+    sed 's/^/  /' "$EV/isolation-diff.txt" | tee -a "$EV/steps.log"
   fi
+  [ -f "$EV/isolation-break.txt" ] && ISOLATION="broken"
 
   # The verdict comes after the isolation check: a run that changed your real
   # app, registry or leases fails even if every driver check passed.
@@ -159,6 +238,10 @@ finish() {
 
   # Lines the test controller/shell appended to the shared app-name log.
   log_sizes after
+  if [ -f "$EV/shared-log-sizes-before.txt" ]; then
+    added="$(paste "$EV/shared-log-sizes-before.txt" "$EV/shared-log-sizes-after.txt" | awk -F '\t' '{s+=$3-$1} END {print s+0}')"
+    log "installed app's shared log: $added bytes written during this run (the test copy logs to data/logs; 0 expected unless your app or an older build wrote)"
+  fi
   mkdir -p "$EV/shared-log-appended"
   if [ -f "$EV/shared-log-sizes-before.txt" ]; then
     while IFS="$(printf '\t')" read -r _ f; do
@@ -206,8 +289,32 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 log "node $(node --version) at $(command -v node); $(git --version)"
 [ "$NODE_MAJOR" -ge 24 ] || { log "FAIL: Node >= 24 required by desktop-app/package.json"; exit 1; }
 shasum -a 256 "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "$DRIVER" | tee "$EV/package-inputs.sha256"
+
+# Three checks need your answers; without a terminal they would fail after the whole build.
+if ! { : < /dev/tty; } 2>/dev/null; then
+  log "FAIL: no terminal to ask you in. Run Gate C in a Terminal window (not through an agent or a ! command)."
+  exit 1
+fi
+
+# Isolation can only be proven if your app stays untouched for the whole run.
+PIDS="$(real_app_pids)"
+if [ -n "${PIDS// /}" ]; then
+  log "FAIL: your installed Responsively is running. Quit it from its menu-bar icon, then run Gate C again:"
+  describe_pids "$PIDS" | tee -a "$EV/steps.log"
+  exit 1
+fi
+LIVE="$(live_real_leases)"
+[ -z "$LIVE" ] || { log "FAIL: a real Session runtime is still alive: $LIVE. Quit Responsively, then run Gate C again."; exit 1; }
+BRIDGES="$(bridge_pids)"
+if [ -n "${BRIDGES// /}" ]; then
+  log "note: agent bridges to Responsively are connected (idle is fine; one used meanwhile would start your app and stop this run):"
+  describe_pids "$BRIDGES" | tee -a "$EV/steps.log"
+fi
 snapshot_real before
+registry_summary > "$EV/real-registry-before.txt"
 log_sizes before
+watch_real &
+WATCH_PID=$!
 
 if [ -n "$REUSE_RUN" ]; then
   STEP="reuse"
@@ -285,9 +392,10 @@ STEP="driver"
 STALE_PORT="$(node -e 'const s=require("net").createServer().listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
 log "bridge configured with stale port $STALE_PORT (nothing listens there)"
 set +e
+mkdir -p "$DATA/logs"
 node "$DRIVER" --cli "$CLI" --app "$APP" --root "$DATA/sessions-root" \
   --shell-data "$DATA/shell-data" --out "$EV" --stale-port "$STALE_PORT" \
-  --expected-exe "$APP/Contents/MacOS/ResponsivelyApp" 2> "$EV/driver.log"
+  --expected-exe "$APP/Contents/MacOS/ResponsivelyApp" --log-dir "$DATA/logs" 2> "$EV/driver.log"
 DRIVER_EXIT=$?
 set -e
 grep '^\[gatec\]' "$EV/driver.log" | tee -a "$EV/steps.log" || true
