@@ -3,6 +3,8 @@ import cx from 'classnames';
 import {useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import Popover from 'renderer/components/Popover';
+import Toggle from 'renderer/components/Toggle';
+import {selectCanvasOptions, toggleCanvasOption} from 'renderer/store/features/renderer';
 import {
   previewsScheme,
   setPreviewsScheme,
@@ -75,6 +77,7 @@ const AppearanceMenu = () => {
   const dispatch = useDispatch();
   const darkMode = useSelector(selectDarkMode);
   const palette = useSelector(selectPalette);
+  const frames = useSelector(selectCanvasOptions);
   const [previews, setPreviews] = useState<PreviewScheme>(previewsScheme() ?? 'site');
   const setPreviewScheme = (value: PreviewScheme) => {
     setPreviews(value);
@@ -140,6 +143,33 @@ const AppearanceMenu = () => {
             );
           })}
         </div>
+        <Caption>Device frames</Caption>
+        {(
+          [
+            [
+              'showBezels',
+              'Hardware frames',
+              'Notch, buttons and a laptop base around every preview',
+            ],
+            [
+              'showBrowserBar',
+              'Browser bar on laptops',
+              'The page’s title and address, with back, forward and reload',
+            ],
+          ] as const
+        ).map(([key, label, note]) => (
+          <div key={key} className="flex items-center gap-3 px-[10px] py-[5px]">
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px]">{label}</span>
+              <span className="block text-[11px] text-muted">{note}</span>
+            </span>
+            <Toggle
+              isOn={frames[key]}
+              aria-label={label}
+              onChange={() => dispatch(toggleCanvasOption(key))}
+            />
+          </div>
+        ))}
         <Caption>Previews · all devices</Caption>
         <Segment
           label="Previews colour scheme"

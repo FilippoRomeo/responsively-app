@@ -26,6 +26,8 @@ export const canvasZoomSteps = [0.25, 0.33, 0.5, 0.55, 0.67, 0.75, 0.8, 0.9, 1, 
 export interface CanvasOptions {
   /** Draw hardware-style bezels around canvas frames. */
   showBezels: boolean;
+  /** A live browser bar above laptop previews (back, forward, reload, the page's address). */
+  showBrowserBar: boolean;
   showNames: boolean;
   showDims: boolean;
 }
@@ -42,7 +44,7 @@ const initialState: RendererState = {
   individualZoomFactor: zoomSteps[8],
   zoomFactor: zoomSteps[8],
   canvasZoom: DEFAULT_CANVAS_ZOOM,
-  canvasOptions: {showBezels: false, showNames: true, showDims: true},
+  canvasOptions: {showBezels: false, showBrowserBar: false, showNames: true, showDims: true},
   rotate: false,
   isInspecting: undefined,
   layout: PREVIEW_LAYOUTS.FLEX,

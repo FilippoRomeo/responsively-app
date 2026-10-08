@@ -117,6 +117,10 @@ test.describe('Device Color Scheme', () => {
     await app.navigateTo(`${testServerUrl}/color-scheme-test.html`);
     await app.page.waitForTimeout(2000);
 
+    // Light explicitly: the machine's own appearance (dark at night) must not decide this.
+    await setWebviewColorScheme(app.electronApp, 'light');
+    await app.page.waitForTimeout(1000);
+
     // Capture webview screenshot in light mode
     const lightPixel = await captureWebviewCenterPixel(app.electronApp);
 

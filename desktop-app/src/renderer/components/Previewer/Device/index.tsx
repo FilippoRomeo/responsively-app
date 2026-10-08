@@ -39,6 +39,8 @@ import useDeviceNavigation from './useDeviceNavigation';
 import useDevtoolsBridge from './useDevtoolsBridge';
 import useWebviewLifecycle from './useWebviewLifecycle';
 import {useDeviceScheme} from './scheme';
+import BrowserBar from './BrowserBar';
+import useWebviewLocation from './useWebviewLocation';
 
 interface Props {
   device: IDevice;
@@ -85,6 +87,9 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
   const {webviewReady} = useWebviewLifecycle(ref, {isMobileCapable: device.isMobileCapable});
   const navigation = useDeviceNavigation({ref, isPrimary, webviewReady, address});
   const scheme = useDeviceScheme(getWebview, webviewReady);
+  // A live browser bar on laptops only; the page is untouched.
+  const barOn = canvasOptions.showBrowserBar && device.type === 'notebook';
+  const location = useWebviewLocation(ref, webviewReady, barOn);
   const {openDevTools, inspectElement, inspectingHere, toggleInspectHere} = useDevtoolsBridge({
     ref,
     webviewReady,
@@ -247,7 +252,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
       designOverlay={designOverlay}
       resolution={resolution}
       isRestrictedMinimumDeviceSize={isRestrictedMinimumDeviceSize}
-      showBezel={isCanvasLayout && canvasOptions.showBezels}
+      showBezel={canvasOptions.showBezels}
       showName={!isCanvasLayout || canvasOptions.showNames}
       showDims={!isCanvasLayout || canvasOptions.showDims}
       isRotated={isDeviceRotationEnabled}
@@ -265,6 +270,22 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
                   devices: activeSuite.devices.filter((id) => id !== device.id),
                 })
               )
+      }
+      browserBar={
+        barOn
+          ? (barWidth, radius) => (
+              <BrowserBar
+                width={barWidth}
+                radius={radius}
+                dark={scheme.effective === 'dark'}
+                location={location}
+                onBack={() => ref.current?.goBack()}
+                onForward={() => ref.current?.goForward()}
+                onReload={() => ref.current?.reload()}
+                onStop={() => ref.current?.stop()}
+              />
+            )
+          : undefined
       }
       browserBadge={
         iosRuntime ? (

@@ -25,6 +25,7 @@ import {setDockPosition} from './features/devtools';
 import {
   setAddress,
   setLayout,
+  toggleCanvasOption,
   updateFileWatcher,
   zoomIn,
   zoomOut,
@@ -53,6 +54,15 @@ startListening({
   actionCreator: setDarkMode,
   effect: (action) => {
     window.electron.store.set('ui.darkMode', action.payload);
+  },
+});
+
+startListening({
+  actionCreator: toggleCanvasOption,
+  effect: (_action, api) => {
+    const {showBezels, showBrowserBar} = api.getState().renderer.canvasOptions;
+    window.electron.store.set('ui.deviceFrames', showBezels);
+    window.electron.store.set('ui.browserBar', showBrowserBar);
   },
 });
 

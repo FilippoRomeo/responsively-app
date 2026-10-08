@@ -47,6 +47,7 @@ const testOrder = [
   'address-bar-features.spec.ts',
   'device-toolbar.spec.ts',
   'device-tools.spec.ts',
+  'device-outlines.spec.ts',
   'zoom-controls.spec.ts',
   'ui-theme.spec.ts',
   'settings.spec.ts',
