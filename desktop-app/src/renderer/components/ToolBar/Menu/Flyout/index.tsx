@@ -6,7 +6,9 @@ import MenuRow from 'renderer/components/MenuRow';
 import Modal from 'renderer/components/Modal';
 import Toggle from 'renderer/components/Toggle';
 import {selectDockPosition, setDockPosition} from 'renderer/store/features/devtools';
-import {selectClassicToolbar} from 'renderer/store/features/ui';
+import {selectClassicToolbar, selectToolbarLayout} from 'renderer/store/features/ui';
+import {TOOL_INFO} from 'common/toolbar-layout';
+import ToolbarCustomizer from '../../ToolbarCustomizer';
 import {MANAGE_SESSIONS_EVENT} from 'renderer/components/Sessions';
 import ShortcutsModal from '../../Shortcuts/ShortcutsModal';
 import Bookmark from './Bookmark';
@@ -38,6 +40,10 @@ const MenuFlyout = ({closeFlyout}: Props) => {
   const dispatch = useDispatch();
   const dockPosition = useSelector(selectDockPosition);
   const classic = useSelector(selectClassicToolbar);
+  const layout = useSelector(selectToolbarLayout);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState<boolean>(false);
+  // Hidden buttons, in toolbar order, each opened through its real (invisible) button.
+  const hiddenTools = [...layout.group, ...layout.right].filter((id) => layout.hidden.includes(id));
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
 
@@ -56,6 +62,41 @@ const MenuFlyout = ({closeFlyout}: Props) => {
           />
         )}
         <Bookmark />
+        {classic ? null : (
+          <>
+            <div className="mx-1 my-[6px] border-t border-line-soft" />
+            <div className="px-[10px] pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+              More tools
+            </div>
+            {hiddenTools.length === 0 ? (
+              <div className="px-[10px] pb-2 text-[12px] text-muted">Nothing is hidden.</div>
+            ) : null}
+            {hiddenTools.map((id) => (
+              <MenuItem
+                key={id}
+                icon={TOOL_INFO[id].icon}
+                label={TOOL_INFO[id].name}
+                onClick={() => {
+                  closeFlyout();
+                  document
+                    .querySelector<HTMLElement>(
+                      `[data-tool="${id}"] button[title^="${TOOL_INFO[id].button}"]`
+                    )
+                    ?.click();
+                }}
+              />
+            ))}
+            <MenuItem
+              icon="lucide:sliders-horizontal"
+              iconClassName="text-accent"
+              label="Customize toolbar…"
+              onClick={() => {
+                closeFlyout();
+                setIsCustomizeOpen(true);
+              }}
+            />
+          </>
+        )}
         <div className="mx-1 my-[6px] border-t border-line-soft" />
         <div className="flex items-center justify-between px-[10px] py-2">
           <span className="text-[13.5px]">Dock devtools</span>
@@ -89,6 +130,7 @@ const MenuFlyout = ({closeFlyout}: Props) => {
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Settings">
         <SettingsContent onClose={() => setIsSettingsOpen(false)} />
       </Modal>
+      <ToolbarCustomizer isOpen={isCustomizeOpen} onClose={() => setIsCustomizeOpen(false)} />
       <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </>
   );

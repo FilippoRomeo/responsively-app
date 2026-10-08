@@ -36,6 +36,8 @@ const schema = {
         type: 'boolean',
         default: false,
       },
+      // Which toolbar buttons show and in what order (common/toolbar-layout.ts).
+      toolbarLayout: {type: 'object'},
       // Hardware frames around every preview, and a live browser bar on laptops.
       deviceFrames: {type: 'boolean', default: false},
       browserBar: {type: 'boolean', default: false},

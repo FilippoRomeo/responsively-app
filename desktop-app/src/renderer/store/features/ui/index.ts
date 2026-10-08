@@ -1,6 +1,11 @@
 import {createSlice} from '@reduxjs/toolkit';
 import type {PayloadAction} from '@reduxjs/toolkit';
 import type {RootState} from '../..';
+import {
+  DEFAULT_TOOLBAR_LAYOUT,
+  sanitizeToolbarLayout,
+  type ToolbarLayout,
+} from 'common/toolbar-layout';
 
 export const APP_VIEWS = {
   BROWSER: 'BROWSER',
@@ -31,6 +36,8 @@ export interface UIState {
   classicToolbar: boolean;
   /** Dark theme colours; light mode has one palette. */
   palette: Palette;
+  /** Which toolbar buttons show and in what order. */
+  toolbarLayout: ToolbarLayout;
   announcements: AnnouncementsState;
 }
 
@@ -43,6 +50,7 @@ const initialState: UIState = {
   isPresenting: false,
   classicToolbar: false,
   palette: 'graphite',
+  toolbarLayout: DEFAULT_TOOLBAR_LAYOUT,
   announcements: {seenVersion: null, supportShownAt: null, supportHidden: false},
 };
 
@@ -64,6 +72,9 @@ export const uiSlice = createSlice({
     },
     setClassicToolbar: (state, action: PayloadAction<boolean>) => {
       state.classicToolbar = action.payload;
+    },
+    setToolbarLayout: (state, action: PayloadAction<ToolbarLayout>) => {
+      state.toolbarLayout = sanitizeToolbarLayout(action.payload);
     },
     setPalette: (state, action: PayloadAction<Palette>) => {
       state.palette = action.payload;
@@ -88,6 +99,7 @@ export const {
   setPresenting,
   setClassicToolbar,
   setPalette,
+  setToolbarLayout,
   setWhatsNewSeen,
   setSupportShownAt,
   hideSupportForever,
@@ -96,6 +108,7 @@ export const {
 export const selectDarkMode = (state: RootState) => state.ui.darkMode;
 export const selectAppView = (state: RootState) => state.ui.appView;
 export const selectClassicToolbar = (state: RootState) => state.ui.classicToolbar;
+export const selectToolbarLayout = (state: RootState) => state.ui.toolbarLayout;
 export const selectPalette = (state: RootState) => state.ui.palette;
 export const selectMenuFlyout = (state: RootState) => state.ui.menuFlyout;
 export const selectIsPresenting = (state: RootState) => state.ui.isPresenting;

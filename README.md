@@ -73,6 +73,9 @@ See:
 - **Appearance** sets Responsively's own Dark/Light and colour, and Light/Dark for every preview's page (`prefers-color-scheme`).
 - Each device header has its own **rotate, screenshot, inspect, sound and light/dark**; **⋯** holds refresh, devtools, rulers, focus, full-page screenshot, design overlay and event mirroring; **×** takes the device out of the suite.
 - **⋮ › Manage Sessions…** (⌘⇧M) opens the Sessions manager.
+- **⋮ › Customize toolbar…** shows, hides and reorders the toolbar's buttons (drag a row, or use its arrows). A hidden button isn't gone: it's listed under **⋮ › More tools**, where one click runs it or opens its usual menu, and ⋮ shows how many are hidden. The layout is saved on this Mac for every Session window; **Reset to default** brings everything back.
+
+![The Customize toolbar dialog: each button with its drag handle, arrows and a switch; Capture and Add-ons are switched off, Sound has moved up, and the bar behind shows the change with a badge of 2 on ⋮](docs/media/toolbar-customize.png)
 
 ![An iPhone with a notch, side buttons, status bar and home bar; an iPad with its camera; a MacBook with its camera notch, base and a browser bar showing the page's title and address](docs/media/device-frames.png)
 
