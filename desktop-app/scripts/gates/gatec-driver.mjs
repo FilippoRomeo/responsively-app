@@ -44,6 +44,11 @@ const BROWSER_TOOLS = [
   'click',
   'type_text',
   'screenshot',
+  'set_conditions',
+  'clear_conditions',
+  'run_test',
+  'list_reports',
+  'get_report',
 ];
 const results = [];
 const started = Date.now();
@@ -408,7 +413,7 @@ try {
     .map((t) => t.name)
     .sort();
   record(
-    'T1 tools/list: session argument on all 14 browser tools',
+    'T1 tools/list: session argument on all 19 browser tools',
     JSON.stringify(withSession) === JSON.stringify([...BROWSER_TOOLS].sort()),
     {withSession, toolCount: tools.length}
   );

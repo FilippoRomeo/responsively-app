@@ -105,6 +105,16 @@ A Python project (a `requirements.txt`, `pyproject.toml` or `environment.yml`) g
 
 ![Settings › Storage: 9.5 GB in total, split into iOS versions, Simulators, add-ons, Python environments and Session profiles, each item with its size, last use and a Delete, Uninstall or Reset button](docs/media/storage.png)
 
+## Test under real conditions
+
+Ask an agent (or use the MCP tools) to measure a page the way people meet it: slow networks, a slower CPU, light or dark. `run_test` loads each page on each Chromium device under every combination (up to 60, one at a time, cache off) and writes a report: load time, LCP, layout shift, requests, bytes, failed requests, console errors, script time, memory, horizontal overflow and a screenshot per measurement. Networks: Wi-Fi, 5G, 4G, Fast 3G, Slow 3G, Offline; CPU 1× to 20× slower.
+
+![A test in progress: a "Test running" bar with the position in the run and a Stop button, and the iPhone preview's header showing the Slow 3G condition it is being measured under](docs/media/test-run.png)
+
+- While it runs, the previews reload and are throttled on purpose; **Stop** ends it. Afterwards every preview is put back exactly: no throttling, its own colour scheme, the page it showed.
+- `set_conditions` / `clear_conditions` apply the same conditions by hand; a chip on the device header shows them, and clicking it clears them.
+- Reports are kept per Session (the latest 20) and listed in **Settings › Storage › Test reports** with a Delete button. Agents read them with `list_reports` and `get_report`. Real iOS Safari previews are listed as not measured.
+
 ## Supported build
 
 The validated local build currently targets:
@@ -300,6 +310,7 @@ Browser tools include:
 - `set_device_browser` (a phone preview can show real iOS Safari from the iOS Simulator)
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
+- `run_test`, `set_conditions`, `clear_conditions`, `list_reports`, `get_report` (see [Test under real conditions](#test-under-real-conditions))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
 

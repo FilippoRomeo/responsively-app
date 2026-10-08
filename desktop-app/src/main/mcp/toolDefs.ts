@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {MAX_CPU_SLOWDOWN, MAX_TEST_CELLS, NETWORK_PRESET_IDS} from '../../common/test-conditions';
 
 /**
  * Pure tool metadata (descriptions + zod input shapes) shared by the live
@@ -80,6 +81,77 @@ export const toolDefs = {
         .string()
         .optional()
         .describe('Installed iOS version for ios-safari, e.g. "26.1"'),
+    },
+  },
+  set_conditions: {
+    description:
+      'Throttle one device preview (or all of them) to test how a page behaves: a network ' +
+      'preset (offline, 3g-slow, 3g-fast, 4g, 5g, wifi, none), a CPU slowdown (1 = normal, 4 = ' +
+      'four times slower) and/or a light or dark colour scheme. It stays on, and is shown on ' +
+      'the device, until clear_conditions. Only Chromium previews; real iOS Safari is not affected.',
+    inputSchema: {
+      device: z.string().optional().describe('Device id or exact name; omit for every device'),
+      network: z.enum(NETWORK_PRESET_IDS).optional(),
+      cpu: z.number().min(1).max(MAX_CPU_SLOWDOWN).optional(),
+      color_scheme: z.enum(['light', 'dark', 'default']).optional(),
+    },
+  },
+  clear_conditions: {
+    description: 'Remove set_conditions from one device preview, or from all of them.',
+    inputSchema: {
+      device: z.string().optional().describe('Device id or exact name; omit for every device'),
+    },
+  },
+  run_test: {
+    description:
+      'Measure a page under real-world conditions and get a report. It loads each page on each ' +
+      'device under each network preset, CPU slowdown and colour scheme (every combination, ' +
+      `at most ${MAX_TEST_CELLS}), one at a time with the cache off, and records load time, LCP, ` +
+      'layout shift, requests, bytes, failed requests, console errors, script time, memory, ' +
+      'horizontal overflow and a screenshot. The previews reload while it runs and are put back ' +
+      'afterwards; the user sees a "Test running" bar and can stop it. Returns a Markdown ' +
+      'summary and the report id; screenshots are files in the report folder. Real iOS Safari ' +
+      'previews are listed as not measured. Defaults: the current page, every Chromium device, ' +
+      'no throttling, normal CPU.',
+    inputSchema: {
+      pages: z
+        .array(z.string())
+        .max(10)
+        .optional()
+        .describe('URLs to test; default: the page now loaded'),
+      devices: z
+        .array(z.string())
+        .max(8)
+        .optional()
+        .describe('Device ids or exact names; default: all active'),
+      networks: z.array(z.enum(NETWORK_PRESET_IDS)).max(6).optional(),
+      cpu: z.array(z.number().min(1).max(MAX_CPU_SLOWDOWN)).max(4).optional(),
+      color_schemes: z
+        .array(z.enum(['light', 'dark']))
+        .max(2)
+        .optional(),
+      settle_ms: z
+        .number()
+        .min(0)
+        .max(5000)
+        .optional()
+        .describe('Wait after load before measuring; default 500'),
+      screenshots: z
+        .boolean()
+        .optional()
+        .describe('Take a screenshot per measurement; default true'),
+    },
+  },
+  list_reports: {
+    description: "List this Session's saved test reports, newest first (the latest 20 are kept).",
+  },
+  get_report: {
+    description:
+      'Read a saved test report by id: the Markdown summary (default) or the full JSON. The ' +
+      'folder holding its screenshots is included.',
+    inputSchema: {
+      id: z.string().min(1),
+      format: z.enum(['markdown', 'json']).optional(),
     },
   },
   evaluate: {

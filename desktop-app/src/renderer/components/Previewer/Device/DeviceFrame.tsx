@@ -55,6 +55,8 @@ interface Props {
   toolbar: ReactNode;
   /** Header badge naming a non-Chromium browser (Safari · iOS 26.1). */
   browserBadge?: ReactNode;
+  /** The test conditions on this preview, with a way to clear them. */
+  conditionsBadge?: ReactNode;
   /** Takes the device out of the suite (absent: it is the last one). */
   onRemove?: () => void;
   /** Replaces the preview with another browser's screen (real iOS Safari). */
@@ -90,6 +92,7 @@ const DeviceFrame = ({
   webviewRef,
   toolbar,
   browserBadge,
+  conditionsBadge,
   onRemove,
   browserBar,
   screenOverride,
@@ -129,6 +132,7 @@ const DeviceFrame = ({
           </span>
         ) : null}
         {browserBadge}
+        {conditionsBadge}
         <span className="flex-1" />
         {navigation.loading && !screenOverride ? <Spinner spinnerHeight={20} /> : null}
         {onRemove ? (
