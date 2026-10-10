@@ -105,6 +105,13 @@ A Python project (a `requirements.txt`, `pyproject.toml` or `environment.yml`) g
 
 ![Settings › Storage: 9.5 GB in total, split into iOS versions, Simulators, add-ons, Python environments and Session profiles, each item with its size, last use and a Delete, Uninstall or Reset button](docs/media/storage.png)
 
+## Network and iPad Safari
+
+![A Session with the iPhone in Chromium and the iPad Pro M4 running real Safari in an iPad Pro 11-inch Simulator, and the Network panel open with a SOCKS proxy address](docs/media/ipad-safari-proxy.png)
+
+- **Network** (the globe in the toolbar) sends this Session's previews through a proxy: `socks5://`, `http://` or `https://` with a port, no login yet. **Test and apply** first reaches an address-echo service through the proxy and shows the address pages now leave from; if it can't connect, nothing changes. Only this Session uses it: other Sessions don't, and neither does localhost. WebRTC is limited to the proxy so it doesn't leak this Mac's address. Real iOS Safari previews run in the Simulator, outside the app, so they follow this Mac's network.
+- **iPad Safari:** every built-in iPad can now run real Safari too, from the browser chip on its header, in the matching iPad Simulator (iPad Pro M4 → iPad Pro 11-inch (M4), iPad → iPad (A16), and so on) on an iOS version already installed: no extra download.
+
 ## Test under real conditions
 
 Ask an agent (or use the MCP tools) to measure a page the way people meet it: slow networks, a slower CPU, light or dark. `run_test` loads each page on each Chromium device under every combination (up to 60, one at a time, cache off) and writes a report: load time, LCP, layout shift, requests, bytes, failed requests, console errors, script time, memory, horizontal overflow and a screenshot per measurement. Networks: Wi-Fi, 5G, 4G, Fast 3G, Slow 3G, Offline; CPU 1× to 20× slower.
@@ -317,7 +324,7 @@ Browser tools include:
 - `read_page`
 - `click`
 - `type_text`
-- `set_device_browser` (a phone preview can show real iOS Safari from the iOS Simulator)
+- `set_device_browser` (a phone or iPad preview can show real Safari from the iOS Simulator)
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
 - `get_console`, `get_network`, `get_styles` (what DevTools shows: console messages since the preview opened, network requests, computed CSS; `get_network` starts capturing on its first call, so pass `reload: true`)

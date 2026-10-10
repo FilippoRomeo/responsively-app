@@ -60,10 +60,12 @@ const testOrder = [
   'device-manager.spec.ts',
   'app-launch.spec.ts',
   'ios-safari.spec.ts',
+  'ios-ipad.spec.ts',
   'addons.spec.ts',
   'addons-agents.spec.ts',
   'storage.spec.ts',
   'test-engine.spec.ts',
+  'session-proxy.spec.ts',
   'devtools-data.spec.ts',
   'probe.spec.ts',
   // Slow on purpose (18 s, 60 s and a bounded teardown): last, off the critical path.

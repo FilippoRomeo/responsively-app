@@ -23,7 +23,7 @@ describe('toolbar layout', () => {
       hidden: ['capture', 'capture', 'nope'],
     });
     expect(layout.group).toEqual(['sound', 'rotate', 'inspect', 'capture', 'simulate']);
-    expect(layout.right).toEqual(['appearance', 'addons', 'mcp', 'probe']);
+    expect(layout.right).toEqual(['appearance', 'addons', 'mcp', 'probe', 'network']);
     expect(layout.hidden).toEqual(['capture']);
   });
 
@@ -37,7 +37,7 @@ describe('toolbar layout', () => {
     const moved = moveTool(DEFAULT_TOOLBAR_LAYOUT, 'group', 0, 2);
     expect(moved.group).toEqual(['inspect', 'capture', 'rotate', 'simulate', 'sound']);
     expect(moved.right).toEqual(DEFAULT_TOOLBAR_LAYOUT.right);
-    expect(moveTool(DEFAULT_TOOLBAR_LAYOUT, 'right', 0, 4)).toBe(DEFAULT_TOOLBAR_LAYOUT);
+    expect(moveTool(DEFAULT_TOOLBAR_LAYOUT, 'right', 0, 5)).toBe(DEFAULT_TOOLBAR_LAYOUT);
     expect(moveTool(DEFAULT_TOOLBAR_LAYOUT, 'right', -1, 1)).toBe(DEFAULT_TOOLBAR_LAYOUT);
     // The default is never changed in place.
     expect(DEFAULT_TOOLBAR_LAYOUT.group[0]).toBe('rotate');

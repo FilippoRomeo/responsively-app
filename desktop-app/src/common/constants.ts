@@ -47,6 +47,8 @@ export const IPC_MAIN_CHANNELS = {
   TEST_CONDITIONS_CLEAR: 'test-conditions-clear',
   TEST_CONDITIONS_SET: 'test-conditions-set',
   TEST_RUN_START: 'test-run-start',
+  PROXY_GET: 'proxy-get',
+  PROXY_SET: 'proxy-set',
   TEST_REPORT_READ: 'test-report-read',
   TEST_REPORT_REVEAL: 'test-report-reveal',
   TEST_RESTORE_SCHEME: 'test-restore-scheme',

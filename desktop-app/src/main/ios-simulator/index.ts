@@ -6,6 +6,7 @@ import path from 'path';
 import {promisify} from 'util';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import type {IosSimRequest, IosSimState, IosSimStream} from '../../common/ios-simulator';
+import {simulatorModel} from '../../common/ios-simulator';
 
 const exec = promisify(execFile);
 const BIG = {maxBuffer: 64 * 1024 * 1024};
@@ -129,7 +130,8 @@ const list = async (): Promise<IosSimState> => {
   }
 };
 
-const ensureDevice = async (deviceName: string, runtime: string) => {
+const ensureDevice = async (appDeviceName: string, runtime: string) => {
+  const deviceName = simulatorModel(appDeviceName);
   const existing = (await ourDevices()).find(
     (d) => d.name === PREFIX + deviceName && d.runtime === runtime
   );
@@ -159,7 +161,8 @@ const start = async (deviceName: string, runtime: string): Promise<IosSimStream>
 };
 
 /** The Simulator's own pixels for a device showing iOS Safari; null until it has booted. */
-export const simulatorScreenshot = async (deviceName: string, runtime: string) => {
+export const simulatorScreenshot = async (appDeviceName: string, runtime: string) => {
+  const deviceName = simulatorModel(appDeviceName);
   const device = (await ourDevices()).find(
     (d) => d.name === PREFIX + deviceName && d.runtime === runtime && d.state === 'Booted'
   );
