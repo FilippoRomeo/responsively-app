@@ -1,3 +1,4 @@
+import {execFileSync} from 'child_process';
 import http from 'http';
 import type {AddressInfo} from 'net';
 import {expect, test} from '../fixtures/electron-app';
@@ -51,4 +52,58 @@ test('a Session can send its previews through a proxy, and turn it off again', a
     await page.keyboard.press('Escape');
     proxy.close();
   }
+});
+
+const KEY = 'MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=';
+const helperRunning = () => {
+  try {
+    return execFileSync('pgrep', ['-f', 'assets/bin/wireproxy']).toString().trim() !== '';
+  } catch {
+    return false; // pgrep exits 1 when nothing matches
+  }
+};
+
+test('a WireGuard config that cannot connect changes nothing and leaves no helper running', async ({
+  mainWindow: page,
+}) => {
+  test.setTimeout(90_000);
+  await page.waitForSelector('webview');
+  const panel = page.getByTestId('network-panel');
+  if (!(await panel.isVisible())) await page.getByTitle('Network for this Session').click();
+  await panel.getByLabel('Send this Session').check();
+  await expect(panel.getByLabel('Send this Session')).toBeChecked();
+  await panel
+    .getByRole('group', {name: 'Kind'})
+    .getByRole('button', {name: 'WireGuard config'})
+    .click();
+
+  // Nothing pasted: nothing to apply.
+  await expect(panel.getByRole('button', {name: 'Test and apply'})).toBeDisabled();
+
+  // Not a WireGuard config, or one with a section that could open a listener: refused with the reason.
+  await panel.getByLabel('WireGuard config').fill('hello');
+  await panel.getByRole('button', {name: 'Test and apply'}).click();
+  await expect(panel.getByRole('status')).toContainText('not a WireGuard config');
+  await panel
+    .getByLabel('WireGuard config')
+    .fill(
+      `[Interface]\nPrivateKey = ${KEY}\n[Peer]\nPublicKey = ${KEY}\nEndpoint = 127.0.0.1:9\n[Socks5]\nBindAddress = 0.0.0.0:1080\n`
+    );
+  await panel.getByRole('button', {name: 'Test and apply'}).click();
+  await expect(panel.getByRole('status')).toContainText('not allowed');
+
+  // A well-formed config whose server never answers: the helper starts, the test fails, all is undone.
+  await panel
+    .getByLabel('WireGuard config')
+    .fill(
+      `[Interface]\nPrivateKey = ${KEY}\nAddress = 10.2.0.2/32\n[Peer]\nPublicKey = ${KEY}\nAllowedIPs = 0.0.0.0/0\nEndpoint = 127.0.0.1:9\n`
+    );
+  await panel.getByRole('button', {name: 'Test and apply'}).click();
+  await expect(panel.getByRole('status')).toContainText('Could not connect through that config', {
+    timeout: 45_000,
+  });
+  await expect(page.getByTestId('network-button')).not.toContainText('vpn');
+  await expect(panel.getByText(/Saved config/)).toHaveCount(0);
+  await expect.poll(helperRunning, {timeout: 10_000}).toBe(false);
+  await panel.getByLabel('Send this Session').uncheck();
 });

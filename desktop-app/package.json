@@ -24,7 +24,7 @@
   "license": "MIT",
   "main": "./src/main/main.ts",
   "scripts": {
-    "build": "concurrently \"yarn run build:main\" \"yarn run build:renderer\" \"yarn run build:mcp\"",
+    "build": "node scripts/fetch-wireproxy.mjs && concurrently \"yarn run build:main\" \"yarn run build:renderer\" \"yarn run build:mcp\"",
     "build:main": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.main.prod.ts",
     "build:renderer": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.renderer.prod.ts",
     "build:mcp": "cross-env NODE_ENV=production TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.mcp-cli.ts && tsx ./.erb/scripts/generate-mcp-manifest.ts",

@@ -363,8 +363,9 @@ const schema = {
     properties: {
       enabled: {type: 'boolean'},
       address: {type: 'string'},
+      mode: {type: 'string'},
     },
-    default: {enabled: false, address: ''},
+    default: {enabled: false, address: '', mode: 'address'},
   },
   testProbe: {
     type: 'object',

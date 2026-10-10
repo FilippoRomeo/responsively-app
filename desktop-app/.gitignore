@@ -31,3 +31,6 @@ npm-debug.log.*
 # Playwright E2E
 playwright-report/
 test-results/
+
+# Fetched by scripts/fetch-wireproxy.mjs
+/assets/bin/
