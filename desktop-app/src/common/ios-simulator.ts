@@ -46,3 +46,17 @@ export interface IosSimStream {
   streamUrl: string;
   wsUrl: string;
 }
+
+/**
+ * The Simulator model behind a device preview. The built-in iPads carry their
+ * marketing names, the Simulator its own; an iPhone's name already matches.
+ */
+const SIMULATOR_MODELS: Record<string, string> = {
+  iPad: 'iPad (A16)',
+  'iPad Mini': 'iPad mini (A17 Pro)',
+  'iPad Air': 'iPad Air 11-inch (M3)',
+  'iPad Air M2': 'iPad Air 11-inch (M2)',
+  'iPad Pro': 'iPad Pro 13-inch (M5)',
+  'iPad Pro M4': 'iPad Pro 11-inch (M4)',
+};
+export const simulatorModel = (deviceName: string) => SIMULATOR_MODELS[deviceName] ?? deviceName;

@@ -1,6 +1,6 @@
 import {Device, getDevicesMap} from 'common/deviceList';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
-import {IosSimRequest, IosSimState, runtimeLabel} from 'common/ios-simulator';
+import {IosSimRequest, IosSimState, runtimeLabel, simulatorModel} from 'common/ios-simulator';
 import {
   McpActiveDevice,
   McpAppState,
@@ -252,7 +252,7 @@ const setBrowser = async (store: AppStore, payload: McpSetDeviceBrowserPayload) 
     {operation: 'list'}
   );
   if (!sim.available) throw new Error(`iOS Safari is not available: ${sim.reason}`);
-  const fits = sim.runtimes.filter((r) => r.deviceNames.includes(device.name));
+  const fits = sim.runtimes.filter((r) => r.deviceNames.includes(simulatorModel(device.name)));
   const runtime = payload.iosVersion
     ? fits.find((r) => r.name === `iOS ${payload.iosVersion}`)
     : fits[fits.length - 1];

@@ -63,4 +63,15 @@ describe('set-device-browser', () => {
       'No installed iOS version runs a "iPad" Simulator. Installed: iOS 18.6, iOS 26.1.'
     );
   });
+
+  it("runs the built-in iPad in the Simulator's iPad model", async () => {
+    vi.mocked(window.electron.ipcRenderer.invoke).mockResolvedValue({
+      available: true,
+      runtimes: [runtime('26.1', ['iPad (A16)'])],
+      devices: [],
+    });
+    const store = makeStore();
+    await executeMcpCommand(store, 'set-device-browser', {device: 'iPad', browser: 'ios-safari'});
+    expect(runtimeLabel(store.getState().deviceManager.deviceBrowsers['10013'])).toBe('iOS 26.1');
+  });
 });

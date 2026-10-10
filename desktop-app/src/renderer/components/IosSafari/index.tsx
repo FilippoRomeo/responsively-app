@@ -3,6 +3,7 @@ import cx from 'classnames';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {
   runtimeLabel,
+  simulatorModel,
   type IosSimRequest,
   type IosSimState,
   type IosSimStream,
@@ -35,7 +36,8 @@ export const BrowserPicker = ({deviceId, deviceName}: {deviceId: string; deviceN
   const dispatch = useDispatch();
   const runtime = useSelector(selectDeviceBrowser(deviceId));
   const [state, setState] = useState<IosSimState | null>(null);
-  const runtimes = state?.runtimes.filter((r) => r.deviceNames.includes(deviceName)) ?? [];
+  const model = simulatorModel(deviceName);
+  const runtimes = state?.runtimes.filter((r) => r.deviceNames.includes(model)) ?? [];
   const pick = (next?: string) => dispatch(setDeviceBrowser({id: deviceId, runtime: next}));
   return (
     <Popover
@@ -87,7 +89,7 @@ export const BrowserPicker = ({deviceId, deviceName}: {deviceId: string; deviceN
           ) : null}
           {state?.available && runtimes.length === 0 ? (
             <div className="px-[10px] py-[7px] text-[12px] text-muted">
-              No installed iOS version has a Simulator called “{deviceName}”
+              No installed iOS version has a Simulator called “{model}”
             </div>
           ) : null}
           {runtimes.map((r) => (

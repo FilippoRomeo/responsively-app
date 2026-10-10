@@ -358,6 +358,14 @@ const schema = {
     },
     default: [],
   },
+  sessionProxy: {
+    type: 'object',
+    properties: {
+      enabled: {type: 'boolean'},
+      address: {type: 'string'},
+    },
+    default: {enabled: false, address: ''},
+  },
   testProbe: {
     type: 'object',
     properties: {

@@ -4,6 +4,7 @@ import store from '../store';
 import log from './logging';
 import {decidePopupAction, PopupBehavior} from './popup-policy';
 import {captureConsole} from './devtools-data';
+import {webRtcPolicy} from './proxy';
 
 // Guest webContents ids tracked straight from did-attach-webview, so the set
 // cannot be spoofed through IPC. IPC handlers that take a webContentsId must
@@ -56,6 +57,7 @@ export const wireWebviewSecurity = (hostContents: WebContents, deps: WebviewSecu
     const {id} = guestContents;
     registeredWebviewIds.add(id);
     captureConsole(guestContents);
+    guestContents.setWebRTCIPHandlingPolicy(webRtcPolicy());
     guestContents.once('destroyed', () => {
       registeredWebviewIds.delete(id);
     });

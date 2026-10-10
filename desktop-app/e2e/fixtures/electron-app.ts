@@ -46,6 +46,8 @@ export const test = base.extend<{}, ElectronFixtures>({
         E2E_USER_DATA_DIR: userDataDir,
         RESPONSIVELY_SESSIONS_ROOT: path.join(userDataDir, 'session-test-root'),
         RESPONSIVELY_MCP_PORT: String(mcpPort),
+        // The proxy test asks this instead of the internet; the spec's own proxy answers it.
+        RESPONSIVELY_PROXY_ECHO: 'http://echo.test/ip',
       } as Record<string, string>;
       if (process.env.E2E_HEADLESS === 'true' || process.env.CI) {
         env.E2E_HEADLESS = 'true';

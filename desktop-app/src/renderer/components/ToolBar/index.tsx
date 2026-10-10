@@ -40,6 +40,7 @@ import useKeyboardShortcut, {
 } from '../KeyboardShortcutsManager/useKeyboardShortcut';
 import McpPanel from './McpPanel';
 import ProbeButton from '../Probe/ProbeButton';
+import NetworkButton from '../Network';
 import {AddonsButton} from '../Addons';
 import {SessionsButton, SessionsDialog, SessionsShowRequest} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
@@ -173,6 +174,7 @@ const ToolBar = ({
     addons: <AddonsButton />,
     mcp: <McpPanel />,
     probe: <ProbeButton />,
+    network: <NetworkButton />,
     appearance: <AppearanceMenu />,
   };
   const groupShown = layout.group.filter((id) => !layout.hidden.includes(id));
