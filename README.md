@@ -142,7 +142,7 @@ The panel's **Environment** view chooses where this Session's terminals run. **L
 - **Ports:** servers started inside appear under **Ports**. **Publish** forwards one to the same number on this Mac's localhost (or another free one if that is taken) and **Open in previews** loads it; or choose **Publish at once**. Nothing is published unless you do.
 - **Settings fixed at creation:** size (1, 2 or 4 CPUs and GiB), one optional Mac folder (files in a Mac folder are about 20× slower for many small files, so keep the project inside the sandbox), Docker and Compose inside (its own Docker, never your Mac's), and ssh-agent forwarding. **Stop when idle** (30 minutes) can change any time and gives the memory back.
 - **Memory:** a running 2 GiB sandbox holds about 1.5 GB on this Mac, and macOS does not take it back until it stops, hence the idle stop. A sandbox keeps running when you quit Responsively (that is how its terminals survive); **Settings › Storage** lists every sandbox with its size.
-- Agents cannot run commands in a sandbox yet; that is the next step.
+- **Agents** can work inside it (see below); they can never reach your Mac.
 
 ### What agents may do with them
 
@@ -153,7 +153,17 @@ Agents get five tools for a Session's environment, enforced in the app (not only
 - `env_status`, `list_ports`, `list_tunnels` are always allowed: they only look.
 - `start_tunnel` starts one of **your saved** tunnels by name and **asks you each time** in the Session window, naming the agent and the exact tunnel. Deny, or no answer in 60 seconds, is a refusal; an already-running tunnel needs no question.
 - `stop_tunnel` is always allowed: stopping only reduces exposure.
-- Agents cannot create or change tunnels, open a shell or type into one. Those arrive later, with the Sandbox.
+- Agents cannot create or change tunnels, open a shell on your Mac or type into one of your terminals. Inside a Sandbox they can run commands and use its files (below).
+
+#### Commands and files in a Sandbox
+
+![The question an agent triggers before running a command in the sandbox: the exact command, Deny, Allow once and Allow for this Session](docs/media/sandbox-agent-prompt.png)
+
+When a Session's environment is a **Sandbox** that is running, agents also get `run_command`, `read_file` and `write_file`. They work only inside the sandbox (never on your Mac) and the first use of each permission asks you, naming the agent and showing the exact command or path; **Allow for this Session** remembers the answer until the Session closes (it is never saved). A Local Session refuses all three, and so does a stopped sandbox: agents never start one.
+
+- `run_command` runs in the workspace (or a folder in it), in its own process group, with a time limit (60 s by default, at most 600 s) after which the whole group is killed; it returns the exit code and the end of the output.
+- `read_file` and `write_file` take paths relative to the workspace (up to 200 KB to read, 1 MB to write). The machine resolves each path again, symlinks included, and refuses anything that lands outside the workspace.
+- Each permission (tunnels, commands, files) can be switched off per agent in the MCP panel, and every call, allowed or refused, is logged as an `[env]` line.
 
 In the MCP panel, **Tunnels and ports** has a setting per agent (**Ask me each time** or **Off**) and the latest calls, each refused or allowed, as they happen. The same lines go to the log with an `[env]` prefix.
 
@@ -373,7 +383,7 @@ Browser tools include:
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
 - `get_console`, `get_network`, `get_styles` (what DevTools shows: console messages since the preview opened, network requests, computed CSS; `get_network` starts capturing on its first call, so pass `reload: true`)
-- `env_status`, `list_ports`, `list_tunnels`, `start_tunnel`, `stop_tunnel` (see [What agents may do with them](#what-agents-may-do-with-them))
+- `env_status`, `list_ports`, `list_tunnels`, `start_tunnel`, `stop_tunnel`, `run_command`, `read_file`, `write_file` (see [What agents may do with them](#what-agents-may-do-with-them))
 - `run_test`, `set_conditions`, `clear_conditions`, `list_reports`, `get_report` (see [Test under real conditions](#test-under-real-conditions))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:

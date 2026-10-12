@@ -17,6 +17,15 @@ import {
   type SandboxSettings,
   type SandboxState,
 } from '../../common/sandbox';
+import {
+  clampTimeout,
+  commandScript,
+  MAX_WRITE_BYTES,
+  readScript,
+  tailOutput,
+  workspacePath,
+  writeScript,
+} from '../../common/sandbox-exec';
 import log from '../logging';
 
 interface Run {
@@ -215,6 +224,42 @@ export class Sandbox {
   exec(command: string, timeoutMs = 30_000) {
     this.touch();
     return run('/usr/bin/ssh', this.sshArgs(command), timeoutMs);
+  }
+
+  /** An agent's command: in the workspace, with a hard time limit, no tty, no agent forwarded. */
+  async runCommand(command: string, cwd: string | undefined, timeoutSeconds: unknown) {
+    const seconds = clampTimeout(timeoutSeconds);
+    const r = await this.exec(commandScript(command, cwd, seconds), seconds * 1000 + 20_000);
+    const out = tailOutput(r.stdout);
+    const err = tailOutput(r.stderr);
+    return {
+      exitCode: r.code,
+      timedOut: r.code === 137,
+      stdout: out.text,
+      stderr: err.text,
+      truncated: out.truncated || err.truncated,
+    };
+  }
+
+  async readFile(path_: unknown): Promise<string> {
+    const r = await this.exec(readScript(workspacePath(path_)), 30_000);
+    if (r.code !== 0) throw new Error(r.stderr.trim() || 'Could not read that file.');
+    return r.stdout;
+  }
+
+  async writeFile(path_: unknown, content: unknown): Promise<number> {
+    if (typeof content !== 'string') throw new Error('The content must be text.');
+    if (Buffer.byteLength(content) > MAX_WRITE_BYTES)
+      throw new Error(`Files are limited to ${MAX_WRITE_BYTES} bytes here.`);
+    this.touch();
+    const r = await run(
+      '/usr/bin/ssh',
+      this.sshArgs(writeScript(workspacePath(path_))),
+      60_000,
+      content
+    );
+    if (r.code !== 0) throw new Error(r.stderr.trim() || 'Could not write that file.');
+    return Buffer.byteLength(content);
   }
 
   private async prove() {

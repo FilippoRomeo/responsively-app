@@ -1,11 +1,14 @@
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {expect, test} from '../fixtures/electron-app';
 
 // Boots a real colima machine (minutes, about 2 GB of memory): only when asked, with E2E_SANDBOX=1.
 test.skip(!process.env.E2E_SANDBOX, 'set E2E_SANDBOX=1 to create a real sandbox');
 
-test('a real sandbox: create it, work in a terminal that is tmux, publish a port, stop it, destroy it', async ({
+test('a real sandbox: create it, work in a terminal that is tmux, publish a port, let an agent work in it, stop it, destroy it', async ({
   mainWindow: page,
   app,
+  mcpPort,
 }) => {
   test.setTimeout(25 * 60_000);
   await page.waitForSelector('webview');
@@ -52,6 +55,46 @@ test('a real sandbox: create it, work in a terminal that is tmux, publish a port
   await ports.getByRole('button', {name: 'Open in previews'}).first().click();
   await expect(page.getByTestId('address-bar')).toHaveValue(/localhost:\d+/);
   await app.navigateTo('about:blank').catch(() => {});
+
+  // An agent works in it: asked the first time, then remembered for this Session.
+  const client = new Client({name: 'sbx-agent', version: '1'});
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${mcpPort}/mcp`), {
+      requestInit: {headers: {'x-responsively-agent': 'sbx-agent'}},
+    })
+  );
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const r = await client.callTool({name, arguments: args});
+    const t = (r.content as {type: string; text?: string}[]).find((c) => c.type === 'text');
+    return {isError: r.isError === true, text: t?.text ?? ''};
+  };
+  const prompt = page.getByTestId('agent-prompt');
+  const first = call('run_command', {command: 'echo from-the-sandbox; uname -s; pwd'});
+  await expect(prompt).toBeVisible();
+  await expect(prompt).toContainText('echo from-the-sandbox');
+  await prompt.getByRole('button', {name: 'Allow for this Session'}).click();
+  const ran = await first;
+  expect(ran.isError).toBe(false);
+  expect(ran.text).toContain('from-the-sandbox');
+  expect(ran.text).toContain('Linux');
+  expect(ran.text).toContain('workspace');
+  // No second question for the same permission; files are a separate permission.
+  expect((await call('run_command', {command: 'echo again'})).text).toContain('again');
+  await expect(prompt).toHaveCount(0);
+  const wrote = call('write_file', {path: 'notes/a.txt', content: 'hello from an agent\n'});
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole('button', {name: 'Allow once'}).click();
+  expect((await wrote).isError).toBe(false);
+  const readBack = call('read_file', {path: 'notes/a.txt'});
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole('button', {name: 'Deny'}).click();
+  expect((await readBack).text).toContain('did not allow');
+  // The workspace is the limit.
+  const escape = call('read_file', {path: '../../etc/passwd'});
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole('button', {name: 'Allow once'}).click();
+  expect((await escape).text).toContain('inside the sandbox workspace');
+  await client.close();
 
   // Stop, then destroy with the typed name.
   await panel.getByRole('button', {name: 'Environment'}).click();

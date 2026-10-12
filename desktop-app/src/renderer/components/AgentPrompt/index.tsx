@@ -36,7 +36,7 @@ const AgentPrompt = () => {
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!current) return null;
-  const answer = (allow: boolean) =>
+  const answer = (allow: 'deny' | 'once' | 'session') =>
     window.electron.ipcRenderer.invoke<unknown, unknown>(
       IPC_MAIN_CHANNELS.AGENT_PROMPT_ANSWER,
       current.id,
@@ -78,18 +78,31 @@ const AgentPrompt = () => {
           <button
             ref={deny}
             type="button"
-            onClick={() => answer(false)}
+            onClick={() => answer('deny')}
             className="h-[30px] rounded-lg border border-line px-[14px] text-[12.5px] hover:bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Deny
           </button>
           <button
             type="button"
-            onClick={() => answer(true)}
-            className="h-[30px] rounded-lg bg-accent px-[14px] text-[12.5px] font-bold text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-fg"
+            onClick={() => answer('once')}
+            className={`h-[30px] rounded-lg px-[14px] text-[12.5px] focus:outline-none focus-visible:ring-2 focus-visible:ring-fg ${
+              current.remember
+                ? 'border border-line hover:bg-hover'
+                : 'bg-accent font-bold text-black'
+            }`}
           >
             Allow once
           </button>
+          {current.remember ? (
+            <button
+              type="button"
+              onClick={() => answer('session')}
+              className="h-[30px] rounded-lg bg-accent px-[14px] text-[12.5px] font-bold text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-fg"
+            >
+              Allow for this Session
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
