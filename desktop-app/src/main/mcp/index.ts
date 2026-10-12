@@ -36,7 +36,7 @@ const handleMcpRequest = async (
     {name: MCP_SERVER_NAME, version: app.getVersion()},
     {instructions: MCP_AGENT_INSTRUCTIONS}
   );
-  registerTools(server, getMainWindow);
+  registerTools(server, getMainWindow, agentOf(req));
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

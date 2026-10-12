@@ -2,6 +2,7 @@ import {Icon} from '@iconify/react';
 import cx from 'classnames';
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import {useCallback, useEffect, useState} from 'react';
+import type {AgentGrants, AuditLine} from 'common/agent-env';
 import Popover from 'renderer/components/Popover';
 
 interface AgentToolState {
@@ -40,6 +41,8 @@ const McpPanel = () => {
   const [toolError, setToolError] = useState<string | null>(null);
   const [agents, setAgents] = useState<{name: string; allowed: boolean}[]>([]);
   const [resetting, setResetting] = useState(false);
+  const [grants, setGrants] = useState<AgentGrants[]>([]);
+  const [audit, setAudit] = useState<AuditLine[]>([]);
 
   const refresh = useCallback(async () => {
     const next = await window.electron.ipcRenderer.invoke<unknown, McpServerStatus>(
@@ -55,6 +58,16 @@ const McpPanel = () => {
         IPC_MAIN_CHANNELS.MCP_AGENTS
       )
     );
+    setGrants(
+      await window.electron.ipcRenderer.invoke<unknown, AgentGrants[]>(
+        IPC_MAIN_CHANNELS.ENV_GRANTS_LIST
+      )
+    );
+    setAudit(
+      await window.electron.ipcRenderer.invoke<unknown, AuditLine[]>(
+        IPC_MAIN_CHANNELS.ENV_AUDIT_LIST
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -67,6 +80,14 @@ const McpPanel = () => {
         IPC_MAIN_CHANNELS.MCP_STATUS_CHANGED,
         setStatus
       ),
+    []
+  );
+  // What agents did with the terminals and tunnels, as it happens.
+  useEffect(
+    () =>
+      window.electron.ipcRenderer.on<AuditLine>(IPC_MAIN_CHANNELS.ENV_AUDIT_EVENT, (line) => {
+        if (line) setAudit((list) => [line, ...list].slice(0, 12));
+      }),
     []
   );
   // A new agent app connected to this window.
@@ -88,6 +109,11 @@ const McpPanel = () => {
         {name: string; allowed: boolean}[]
       >(IPC_MAIN_CHANNELS.MCP_SET_AGENT, {name, allowed})
     );
+  };
+
+  const setTunnels = async (name: string, tunnels: 'ask' | 'off') => {
+    setGrants((list) => list.map((g) => (g.name === name ? {...g, tunnels} : g)));
+    await window.electron.ipcRenderer.invoke(IPC_MAIN_CHANNELS.ENV_GRANT_SET, name, tunnels);
   };
 
   const hardReset = async () => {
@@ -243,6 +269,41 @@ const McpPanel = () => {
               {agent.allowed ? null : <span className="text-[11px] text-muted">blocked</span>}
             </label>
           ))}
+        </div>
+
+        <div className="mx-1 mb-[6px] border-t border-line-soft" />
+
+        <div className="px-[10px] pb-1 pt-[2px] text-[10.5px] font-bold tracking-[0.08em] text-muted">
+          TUNNELS AND PORTS
+        </div>
+        <div data-testid="mcp-grants" className="px-[10px] pb-1 text-[11.5px] text-muted">
+          <p className="pb-1 leading-[1.5]">
+            Agents can always see ports and tunnels. Starting one of your saved tunnels asks you
+            each time (no answer in 60 s is a no). They cannot create or change tunnels.
+          </p>
+          {grants.map((g) => (
+            <div key={g.name} className="flex items-center gap-2 py-[3px] text-fg">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{g.name}</span>
+              <select
+                aria-label={`Tunnels for ${g.name}`}
+                value={g.tunnels}
+                onChange={(e) => void setTunnels(g.name, e.target.value as 'ask' | 'off')}
+                className="h-[24px] rounded-md border border-line bg-transparent px-1 text-[11.5px]"
+              >
+                <option value="ask">Ask me each time</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+          ))}
+          {audit.length > 0 ? (
+            <div data-testid="mcp-audit" className="mt-1 font-mono text-[10.5px] leading-[1.55]">
+              {audit.slice(0, 6).map((l) => (
+                <div key={l.at + l.text} className={l.outcome === 'refused' ? 'text-red-400' : ''}>
+                  {l.outcome}: {l.text}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="mx-1 mb-[6px] border-t border-line-soft" />

@@ -23,6 +23,7 @@ import TestRunBar from './components/TestRunBar';
 import ProbePanel from './components/Probe';
 import ReportViewer from './components/Probe/reportViewer';
 import TerminalDock from './components/Terminal';
+import AgentPrompt from './components/AgentPrompt';
 
 /** Present mode only applies while the canvas layout is active. */
 const usePresenting = (): boolean => {
@@ -47,6 +48,7 @@ const Browser = () => {
       {presenting ? null : <TestRunBar />}
       {presenting ? null : <ProbePanel />}
       <ReportViewer />
+      <AgentPrompt />
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
           <Previewer />

@@ -131,6 +131,19 @@ The terminal panel has two more views, next to **Terminal**:
 - **Ports** lists what the Session's terminals have started listening on (found by looking at the Mac every two seconds, then named by the process: node, python, postgres…), and **Open in previews** points every device at it. Another Session's terminals never show here.
 - **Tunnels** makes a service on one of your servers answer on this Mac, using your own `ssh`: pick a host from `~/.ssh/config` (or `user@host`), the service as the server sees it (`localhost:8188`) and a port here. Nothing is copied and no key is read. Status is proved, not assumed: **Connected** only once the local port answers while ssh is still alive; **Needs authentication** (with ssh's own words) when a password or unknown host would be asked; **Port in use**; **Reconnecting** with growing waits when a link drops. Tunnels can start with the Session. Like terminals, they keep running when the window closes and stop when you Stop the Session or quit; a tunnel left by a killed app is ended the next time.
 
+### What agents may do with them
+
+![The question an agent triggers: Claude Code wants to start a saved tunnel, with its name, server and where it reaches, a countdown to automatic refusal, and Deny / Allow once](docs/media/agent-prompt.png)
+
+Agents get five tools for a Session's environment, enforced in the app (not only hidden by the stdio bridge):
+
+- `env_status`, `list_ports`, `list_tunnels` are always allowed: they only look.
+- `start_tunnel` starts one of **your saved** tunnels by name and **asks you each time** in the Session window, naming the agent and the exact tunnel. Deny, or no answer in 60 seconds, is a refusal; an already-running tunnel needs no question.
+- `stop_tunnel` is always allowed: stopping only reduces exposure.
+- Agents cannot create or change tunnels, open a shell or type into one. Those arrive later, with the Sandbox.
+
+In the MCP panel, **Tunnels and ports** has a setting per agent (**Ask me each time** or **Off**) and the latest calls, each refused or allowed, as they happen. The same lines go to the log with an `[env]` prefix.
+
 ## Test under real conditions
 
 Ask an agent (or use the MCP tools) to measure a page the way people meet it: slow networks, a slower CPU, light or dark. `run_test` loads each page on each Chromium device under every combination (up to 60, one at a time, cache off) and writes a report: load time, LCP, layout shift, requests, bytes, failed requests, console errors, script time, memory, horizontal overflow and a screenshot per measurement. Networks: Wi-Fi, 5G, 4G, Fast 3G, Slow 3G, Offline; CPU 1× to 20× slower.
@@ -347,6 +360,7 @@ Browser tools include:
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
 - `get_console`, `get_network`, `get_styles` (what DevTools shows: console messages since the preview opened, network requests, computed CSS; `get_network` starts capturing on its first call, so pass `reload: true`)
+- `env_status`, `list_ports`, `list_tunnels`, `start_tunnel`, `stop_tunnel` (see [What agents may do with them](#what-agents-may-do-with-them))
 - `run_test`, `set_conditions`, `clear_conditions`, `list_reports`, `get_report` (see [Test under real conditions](#test-under-real-conditions))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:
