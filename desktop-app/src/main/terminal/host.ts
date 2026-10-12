@@ -1,15 +1,18 @@
 import {randomBytes, timingSafeEqual} from 'crypto';
+import {execFile} from 'child_process';
 import fs from 'fs';
 import net from 'net';
 import os from 'os';
 import path from 'path';
 import * as pty from 'node-pty';
+import {isOurTmux} from '../../common/sandbox';
 import {reapStaleTunnels, TunnelManager} from './tunnels';
 import {
   clampSize,
   HostMessage,
   HostRequest,
   LineReader,
+  SandboxTarget,
   MAX_TERMINALS_PER_SESSION,
   Scrollback,
   TerminalInfo,
@@ -29,7 +32,33 @@ interface Term {
   info: TerminalInfo;
   pty: pty.IPty;
   scrollback: Scrollback;
+  sandbox?: SandboxTarget;
 }
+
+const validTarget = (t: SandboxTarget | undefined): t is SandboxTarget =>
+  !!t &&
+  /^\/[^\0\n]*\/ssh\.config$/.test(t.config) &&
+  /^lima-colima-[a-z0-9-]{1,60}$/.test(t.host) &&
+  (t.tmux === undefined || isOurTmux(t.tmux));
+
+const killTmux = (t: SandboxTarget) => {
+  if (!t.tmux) return;
+  execFile(
+    '/usr/bin/ssh',
+    [
+      '-F',
+      t.config,
+      '-o',
+      'ConnectTimeout=5',
+      '-o',
+      'LogLevel=ERROR',
+      t.host,
+      `tmux kill-session -t ${t.tmux} 2>/dev/null || true`,
+    ],
+    {timeout: 15_000},
+    () => {}
+  );
+};
 
 /** node-pty's prebuilt helper loses its executable bit on some installs; it cannot spawn without it. */
 const ensureHelperExecutable = () => {
@@ -92,7 +121,13 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
   const broadcast = (id: string, m: HostMessage) =>
     conns.forEach((c) => c.attached.has(id) && send(c, m));
 
-  const create = (session: string, cwd: unknown, cols: unknown, rows: unknown): TerminalInfo => {
+  const create = (
+    session: string,
+    cwd: unknown,
+    cols: unknown,
+    rows: unknown,
+    target?: SandboxTarget
+  ): TerminalInfo => {
     const count = [...terms.values()].filter((t) => t.info.session === session).length;
     if (count >= MAX_TERMINALS_PER_SESSION)
       throw new Error(
@@ -106,23 +141,52 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
     const id = randomBytes(8).toString('hex');
     const n = (counters.get(session) ?? 0) + 1;
     counters.set(session, n);
-    const proc = pty.spawn(shell, ['-l'], {
-      name: 'xterm-256color',
-      cols: size.cols,
-      rows: size.rows,
-      cwd: dir,
-      env: shellEnv(),
-    });
+    if (target && !validTarget(target)) throw new Error('That is not a sandbox this app made.');
+    // A sandbox terminal is a tmux session in the machine, reached over ssh with no agent forwarded.
+    const tmux = target ? (target.tmux ?? `resp-${id}`) : undefined;
+    const proc = target
+      ? pty.spawn(
+          '/usr/bin/ssh',
+          [
+            '-F',
+            target.config,
+            '-tt',
+            '-o',
+            'LogLevel=ERROR',
+            target.host,
+            `tmux new-session -A -s ${tmux} -c "$HOME/workspace"`,
+          ],
+          {
+            name: 'xterm-256color',
+            cols: size.cols,
+            rows: size.rows,
+            cwd: os.homedir(),
+            env: shellEnv(),
+          }
+        )
+      : pty.spawn(shell, ['-l'], {
+          name: 'xterm-256color',
+          cols: size.cols,
+          rows: size.rows,
+          cwd: dir,
+          env: shellEnv(),
+        });
     const info: TerminalInfo = {
       id,
       session,
-      title: `${path.basename(shell)} ${n}`,
-      cwd: dir,
+      title: target ? `sandbox ${n}` : `${path.basename(shell)} ${n}`,
+      cwd: target ? '~/workspace' : dir,
+      ...(target ? {sandbox: true, tmux} : {}),
       state: 'running',
       cols: size.cols,
       rows: size.rows,
     };
-    const term: Term = {info, pty: proc, scrollback: new Scrollback()};
+    const term: Term = {
+      info,
+      pty: proc,
+      scrollback: new Scrollback(),
+      ...(target ? {sandbox: {...target, tmux}} : {}),
+    };
     terms.set(id, term);
     proc.onData((data) => {
       term.scrollback.push(data);
@@ -138,10 +202,12 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
     return info;
   };
 
-  const remove = (id: string) => {
+  const remove = (id: string, endTmux = true) => {
     const term = terms.get(id);
     if (!term) return;
     terms.delete(id);
+    // Closing the tab ends its tmux session; closing the Session only lets go of it.
+    if (endTmux && term.sandbox) killTmux(term.sandbox);
     if (term.info.state === 'running') {
       try {
         term.pty.kill();
@@ -180,7 +246,7 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
           });
           break;
         case 'create': {
-          const info = create(String(req.session), req.cwd, req.cols, req.rows);
+          const info = create(String(req.session), req.cwd, req.cols, req.rows, req.sandbox);
           reply({type: 'created', terminal: info});
           break;
         }
@@ -224,7 +290,7 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
         case 'kill-session':
           [...terms.values()]
             .filter((t) => t.info.session === req.session)
-            .forEach((t) => remove(t.info.id));
+            .forEach((t) => remove(t.info.id, false));
           tunnels.killSession(req.session);
           reply({type: 'ok'});
           break;
@@ -303,7 +369,7 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
     terminalCount: () => terms.size,
     activeCount: () => running(),
     stop: () => {
-      [...terms.keys()].forEach(remove);
+      [...terms.keys()].forEach((id) => remove(id, false));
       tunnels.stopAll();
       conns.forEach((c) => c.socket.destroy());
       server.close();

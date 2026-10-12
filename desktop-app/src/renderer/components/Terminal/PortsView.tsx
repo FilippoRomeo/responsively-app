@@ -51,18 +51,57 @@ const PortsView = () => {
         >
           <span className="w-[64px] font-mono text-[13px] font-bold">{p.port}</span>
           <span className="flex-1">
-            {p.tunnel ? `Tunnel: ${p.tunnel}` : p.process}
+            {p.source === 'sandbox'
+              ? 'In the sandbox'
+              : p.tunnel
+                ? `Tunnel: ${p.tunnel}`
+                : p.process}
             <span className="ml-2 text-muted">
-              {p.source === 'tunnel' ? 'ssh' : `pid ${p.pid}`}
+              {p.source === 'sandbox'
+                ? p.publishedAt
+                  ? `published at localhost:${p.publishedAt}`
+                  : 'not published'
+                : p.source === 'tunnel'
+                  ? 'ssh'
+                  : `pid ${p.pid}`}
             </span>
           </span>
-          <button
-            type="button"
-            onClick={() => dispatch(setAddress(`http://localhost:${p.port}`))}
-            className="h-7 rounded-[7px] border border-line px-3 hover:bg-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-          >
-            Open in previews
-          </button>
+          {p.source === 'sandbox' && !p.publishedAt ? (
+            <button
+              type="button"
+              aria-label={`Publish port ${p.port}`}
+              onClick={() =>
+                window.electron.ipcRenderer
+                  .invoke<unknown, unknown>(IPC_MAIN_CHANNELS.PORT_PUBLISH, p.port)
+                  .catch((e: Error) => setError(e.message))
+              }
+              className="h-7 rounded-[7px] bg-accent px-3 font-bold text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-fg"
+            >
+              Publish
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => dispatch(setAddress(`http://localhost:${p.publishedAt ?? p.port}`))}
+              className="h-7 rounded-[7px] border border-line px-3 hover:bg-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            >
+              Open in previews
+            </button>
+          )}
+          {p.source === 'sandbox' && p.publishedAt ? (
+            <button
+              type="button"
+              aria-label={`Unpublish port ${p.port}`}
+              onClick={() =>
+                window.electron.ipcRenderer
+                  .invoke<unknown, unknown>(IPC_MAIN_CHANNELS.PORT_UNPUBLISH, p.port)
+                  .catch((e: Error) => setError(e.message))
+              }
+              className="h-7 rounded-[7px] px-2 text-muted hover:bg-hover"
+            >
+              Unpublish
+            </button>
+          ) : null}
         </div>
       ))}
     </div>

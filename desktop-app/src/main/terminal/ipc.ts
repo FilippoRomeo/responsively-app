@@ -16,6 +16,8 @@ import {sessionRequest} from '../sessions/service';
 import type {GetMainWindow} from '../mcp/bridge';
 import {HostConnection, type HostEndpoint} from './client';
 import {setEnvApi} from './env-api';
+import {getSandbox, sandboxMode} from '../sandbox';
+import {isOurTmux} from '../../common/sandbox';
 import {terminalEndpoint} from './supervisor';
 
 /**
@@ -70,9 +72,35 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     ipcMain.handle(channel, async (_e, ...args) => fn(await connection(), ...(args as A)));
   };
 
+  /** The sandbox must be running to open a terminal in it: nothing is started behind your back. */
+  const sandboxTarget = () => {
+    const sandbox = getSandbox();
+    if (!sandbox.isRunning())
+      throw new Error('The sandbox is not running. Start it in the Environment view.');
+    return sandbox.target();
+  };
+
   handle(IPC_MAIN_CHANNELS.TERMINAL_LIST, async (c) => {
     const m = await c.request({op: 'list', session: session()});
-    return m.type === 'list' ? m.terminals : ([] as TerminalInfo[]);
+    const all = m.type === 'list' ? m.terminals : ([] as TerminalInfo[]);
+    if (sandboxMode() !== 'sandbox') return all.filter((t) => !t.sandbox);
+    const sandbox = getSandbox();
+    if (!sandbox.isRunning()) return [];
+    // After the app was quit, the sandbox's tmux sessions are still there: attach tabs to them again.
+    const mine = all.filter((t) => t.sandbox);
+    for (const name of await sandbox.tmuxSessions()) {
+      if (mine.some((t) => t.tmux === name) || !isOurTmux(name)) continue;
+
+      const made = await c.request({
+        op: 'create',
+        session: session(),
+        cols: 100,
+        rows: 16,
+        sandbox: {...sandbox.target(), tmux: name},
+      });
+      if (made.type === 'created') mine.push(made.terminal);
+    }
+    return mine;
   });
   handle(
     IPC_MAIN_CHANNELS.TERMINAL_CREATE,
@@ -83,6 +111,7 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
         session: session(),
         cwd: typeof size?.cwd === 'string' ? size.cwd : undefined,
         ...s,
+        ...(sandboxMode() === 'sandbox' ? {sandbox: sandboxTarget()} : {}),
       });
       if (m.type !== 'created') throw new Error('Could not start a terminal.');
       return m.terminal;
@@ -107,8 +136,11 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
   ipcMain.removeAllListeners(IPC_MAIN_CHANNELS.TERMINAL_INPUT);
   ipcMain.on(IPC_MAIN_CHANNELS.TERMINAL_INPUT, (_e, args: unknown[]) => {
     const [id, data] = Array.isArray(args) ? args : [];
-    if (conn && !conn.closed && typeof id === 'string' && typeof data === 'string')
+    if (conn && !conn.closed && typeof id === 'string' && typeof data === 'string') {
       conn.post({op: 'input', id, data});
+      // Typing in a sandbox terminal counts as using the sandbox.
+      if (sandboxMode() === 'sandbox') getSandbox().touch();
+    }
   });
   ipcMain.removeAllListeners(IPC_MAIN_CHANNELS.TERMINAL_RESIZE);
   ipcMain.on(IPC_MAIN_CHANNELS.TERMINAL_RESIZE, (_e, args: unknown[]) => {
@@ -198,9 +230,61 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     }
   });
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORTS_LIST);
+  const SBX_PORT = 'sbx-port-';
+  const sandboxPortDef = (port: number): TunnelDef => {
+    const t = getSandbox().target();
+    return {
+      id: `${SBX_PORT}${port}`,
+      name: `Sandbox port ${port}`,
+      host: t.host,
+      sshConfig: t.config,
+      remote: `127.0.0.1:${port}`,
+      localPort: port,
+      anyPort: true,
+      autoStart: false,
+    };
+  };
+  const publishPort = async (port: number) => {
+    if (!Number.isInteger(port) || port < 1024 || port > 65535)
+      throw new Error('Not a usable port.');
+    const m = await (
+      await connection()
+    ).request({op: 'tunnel-start', session: session(), def: sandboxPortDef(port)}, 15_000);
+    return m.type === 'tunnels' ? m.tunnels[0] : undefined;
+  };
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORT_PUBLISH);
+  ipcMain.handle(IPC_MAIN_CHANNELS.PORT_PUBLISH, (_e, port: number) => publishPort(Number(port)));
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORT_UNPUBLISH);
+  ipcMain.handle(IPC_MAIN_CHANNELS.PORT_UNPUBLISH, async (_e, port: number) => {
+    (await connection()).post({op: 'tunnel-stop', id: `${SBX_PORT}${Number(port)}`});
+    return true;
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORTS_LIST);
   ipcMain.handle(IPC_MAIN_CHANNELS.PORTS_LIST, async (): Promise<PortInfo[]> => {
-    const m = await (await connection()).request({op: 'ports', session: session()});
-    return m.type === 'ports' ? m.ports : [];
+    const c = await connection();
+    if (sandboxMode() !== 'sandbox') {
+      const m = await c.request({op: 'ports', session: session()});
+      return m.type === 'ports' ? m.ports : [];
+    }
+    const sandbox = getSandbox();
+    if (!sandbox.isRunning()) return [];
+    const guest = await sandbox.listeningPorts();
+    const published = new Map<number, number>();
+    (await live()).forEach((t) => {
+      if (t.def.id.startsWith(SBX_PORT) && t.state === 'connected')
+        published.set(Number(t.def.id.slice(SBX_PORT.length)), t.localPort);
+    });
+    // "Publish at once": a new port is forwarded to this Mac as soon as it is seen.
+    if (sandbox.state().settings.publish === 'auto')
+      for (const p of guest)
+        if (!published.has(p) && p >= 1024) await publishPort(p).catch(() => {});
+    return guest.map((port) => ({
+      port,
+      pid: 0,
+      process: 'sandbox',
+      source: 'sandbox' as const,
+      ...(published.has(port) ? {publishedAt: published.get(port) as number} : {}),
+    }));
   });
 
   // What agents may ask of this environment (the MCP tools check permission first).

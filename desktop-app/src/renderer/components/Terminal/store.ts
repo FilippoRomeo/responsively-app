@@ -16,7 +16,7 @@ export const useTerminalOpen = () =>
     () => open
   );
 
-export type DockView = 'terminal' | 'ports' | 'tunnels';
+export type DockView = 'terminal' | 'ports' | 'tunnels' | 'environment';
 let view: DockView = 'terminal';
 const viewListeners = new Set<() => void>();
 export const setDockView = (value: DockView) => {

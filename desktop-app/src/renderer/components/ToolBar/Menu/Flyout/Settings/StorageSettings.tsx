@@ -44,9 +44,10 @@ interface Data {
   sessions: SessionInfo[];
   profiles: Record<string, number>;
   reports: {id: string; createdAt: string; status: string; measurements: number; bytes: number}[];
+  sandboxes: {name: string; running: boolean; bytes: number}[];
 }
 
-const groupsFor = ({ios, lib, sizes, sessions, profiles, reports}: Data) => [
+const groupsFor = ({ios, lib, sizes, sessions, profiles, reports, sandboxes}: Data) => [
   {
     title: 'iOS versions',
     color: 'bg-chart-1',
@@ -130,6 +131,22 @@ const groupsFor = ({ios, lib, sizes, sessions, profiles, reports}: Data) => [
     }),
   },
   {
+    title: 'Sandboxes',
+    color: 'bg-accent',
+    empty: 'None: a Session gets a sandbox when you create one in its Environment view.',
+    rows: sandboxes.map((b): StorageRow => ({
+      key: b.name,
+      name: `Sandbox ${b.name}`,
+      detail: b.running
+        ? 'Running now: stop it in its Session, then destroy it there'
+        : 'Stopped. Destroy it from its Session (Environment), where you type the Session name',
+      bytes: b.bytes,
+      action: 'Delete',
+      blocked: 'Destroy it in its Session',
+      run: async () => undefined,
+    })),
+  },
+  {
     title: 'Test reports',
     color: 'bg-accent',
     empty: "None yet: an agent's run_test, or a test you start, saves one here.",
@@ -206,8 +223,15 @@ export const StorageSettings = () => {
           ),
         []
       ),
+      read(
+        () =>
+          window.electron.ipcRenderer.invoke<undefined, Data['sandboxes']>(
+            IPC_MAIN_CHANNELS.SANDBOX_LIST
+          ),
+        []
+      ),
     ])
-      .then(([ios, lib, sizes, sessions, profiles, reports]) =>
+      .then(([ios, lib, sizes, sessions, profiles, reports, sandboxes]) =>
         setData({
           ios,
           lib,
@@ -215,6 +239,7 @@ export const StorageSettings = () => {
           sessions: Array.isArray(sessions) ? sessions : [],
           profiles,
           reports: Array.isArray(reports) ? reports : [],
+          sandboxes: Array.isArray(sandboxes) ? sandboxes : [],
         })
       )
       .catch((e) => setError(String(e)));

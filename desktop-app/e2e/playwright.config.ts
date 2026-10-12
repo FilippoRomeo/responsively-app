@@ -69,6 +69,8 @@ const testOrder = [
   'terminal-sessions.spec.ts',
   'tunnels-ports.spec.ts',
   'agent-env.spec.ts',
+  'sandbox.spec.ts',
+  'sandbox-real.spec.ts',
   'session-proxy.spec.ts',
   'devtools-data.spec.ts',
   'probe.spec.ts',
