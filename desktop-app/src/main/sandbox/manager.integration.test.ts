@@ -46,6 +46,24 @@ describe.skipIf(!process.env.E2E_SANDBOX)('a real sandbox', () => {
         expect(mac.stdout).toMatch(/No such file|cannot access/);
         expect(mac.stdout).toContain('agent=none');
 
+        // An agent's commands and files: exit codes, a hard time limit, and a workspace it cannot leave.
+        const ran = await sandbox.runCommand('echo hi; echo oops >&2; exit 3', undefined, 30);
+        expect(ran).toMatchObject({exitCode: 3, stdout: 'hi\n', timedOut: false});
+        expect(ran.stderr).toContain('oops');
+        const slow = await sandbox.runCommand('sleep 30', undefined, 1);
+        expect(slow.timedOut).toBe(true);
+        expect(await sandbox.writeFile('deep/dir/a.txt', 'héllo\n')).toBeGreaterThan(5);
+        expect(await sandbox.readFile('deep/dir/a.txt')).toBe('héllo\n');
+        expect((await sandbox.runCommand('pwd', 'deep', 10)).stdout.trim()).toMatch(
+          /workspace\/deep$/
+        );
+        await expect(sandbox.readFile('../etc/passwd')).rejects.toThrow(/inside/);
+        await expect(sandbox.readFile('/etc/passwd')).rejects.toThrow(/relative/);
+        await sandbox.exec('ln -s /etc "$HOME/workspace/escape"');
+        await expect(sandbox.readFile('escape/hostname')).rejects.toThrow(/Outside the workspace/);
+        await expect(sandbox.writeFile('escape/x', 'no')).rejects.toThrow(/Outside the workspace/);
+        await expect(sandbox.readFile('missing.txt')).rejects.toThrow(/No such file/);
+
         // A terminal-style tmux session survives, is found again, and is ended on request.
         const name = tmuxNameFor('0123456789abcdef');
         await sandbox.exec(`tmux new-session -d -s ${name} "sleep 600"`);

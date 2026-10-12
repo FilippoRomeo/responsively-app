@@ -215,6 +215,38 @@ export const toolDefs = {
     description: 'Stop a running tunnel by name. Stopping is always safe, so it needs no question.',
     inputSchema: {tunnel: z.string().min(1).max(100).describe("The saved tunnel's name")},
   },
+  run_command: {
+    description:
+      "Run a shell command inside this Session's Sandbox (a Linux machine; never the user's Mac), " +
+      'in its workspace, and get its exit code and output. The user is asked the first time and can ' +
+      'allow it for the rest of the Session. There is a time limit (default 60 s, at most 600 s). ' +
+      'Refused if the Session runs Local or the sandbox is not running.',
+    inputSchema: {
+      command: z.string().min(1).max(8000).describe('A shell command, run with bash'),
+      cwd: z
+        .string()
+        .max(500)
+        .optional()
+        .describe('A folder inside the workspace, default the workspace'),
+      timeout_s: z.number().int().min(1).max(600).optional(),
+    },
+  },
+  read_file: {
+    description:
+      "Read a text file from the Sandbox's workspace (path relative to it, up to 200 KB). " +
+      'The user is asked the first time. Refused if the Session runs Local.',
+    inputSchema: {path: z.string().min(1).max(500).describe('For example src/app.ts')},
+  },
+  write_file: {
+    description:
+      "Write a text file in the Sandbox's workspace (path relative to it, up to 1 MB), creating " +
+      'folders as needed and replacing the file. The user is asked the first time. Refused if the ' +
+      'Session runs Local.',
+    inputSchema: {
+      path: z.string().min(1).max(500).describe('For example src/app.ts'),
+      content: z.string().max(1_000_000),
+    },
+  },
   evaluate: {
     description:
       'Run a JavaScript expression in a Chromium device preview and return its result as JSON ' +

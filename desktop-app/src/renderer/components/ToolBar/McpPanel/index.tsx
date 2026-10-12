@@ -111,9 +111,18 @@ const McpPanel = () => {
     );
   };
 
-  const setTunnels = async (name: string, tunnels: 'ask' | 'off') => {
-    setGrants((list) => list.map((g) => (g.name === name ? {...g, tunnels} : g)));
-    await window.electron.ipcRenderer.invoke(IPC_MAIN_CHANNELS.ENV_GRANT_SET, name, tunnels);
+  const setGrant = async (
+    name: string,
+    capability: 'tunnels' | 'commands' | 'files',
+    value: 'ask' | 'off'
+  ) => {
+    setGrants((list) => list.map((g) => (g.name === name ? {...g, [capability]: value} : g)));
+    await window.electron.ipcRenderer.invoke(
+      IPC_MAIN_CHANNELS.ENV_GRANT_SET,
+      name,
+      capability,
+      value
+    );
   };
 
   const hardReset = async () => {
@@ -279,20 +288,37 @@ const McpPanel = () => {
         <div data-testid="mcp-grants" className="px-[10px] pb-1 text-[11.5px] text-muted">
           <p className="pb-1 leading-[1.5]">
             Agents can always see ports and tunnels. Starting one of your saved tunnels asks you
-            each time (no answer in 60 s is a no). They cannot create or change tunnels.
+            each time (no answer in 60 s is a no). In a Sandbox, running commands and using its
+            workspace files ask you the first time, and you can allow them for the rest of the
+            Session. Nothing here reaches your Mac, and agents cannot create or change tunnels.
           </p>
           {grants.map((g) => (
-            <div key={g.name} className="flex items-center gap-2 py-[3px] text-fg">
-              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{g.name}</span>
-              <select
-                aria-label={`Tunnels for ${g.name}`}
-                value={g.tunnels}
-                onChange={(e) => void setTunnels(g.name, e.target.value as 'ask' | 'off')}
-                className="h-[24px] rounded-md border border-line bg-transparent px-1 text-[11.5px]"
-              >
-                <option value="ask">Ask me each time</option>
-                <option value="off">Off</option>
-              </select>
+            <div key={g.name} className="py-[3px] text-fg">
+              <div className="truncate font-mono text-[12px]">{g.name}</div>
+              {(
+                [
+                  ['tunnels', 'Start tunnels'],
+                  ['commands', 'Run commands in the sandbox'],
+                  ['files', 'Files in the sandbox workspace'],
+                ] as const
+              ).map(([capability, label]) => (
+                <label key={capability} className="flex items-center gap-2 py-[2px] pl-2">
+                  <span className="flex-1 text-[11.5px] text-muted">{label}</span>
+                  <select
+                    aria-label={`${label} for ${g.name}`}
+                    value={g[capability]}
+                    onChange={(e) =>
+                      void setGrant(g.name, capability, e.target.value as 'ask' | 'off')
+                    }
+                    className="h-[24px] rounded-md border border-line bg-transparent px-1 text-[11.5px] text-fg"
+                  >
+                    <option value="ask">
+                      {capability === 'tunnels' ? 'Ask me each time' : 'Ask me'}
+                    </option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+              ))}
             </div>
           ))}
           {audit.length > 0 ? (

@@ -1,5 +1,14 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import {tunnelGrant, askUser, audit} from '../terminal/agent-access';
+import {sandboxMode, getSandbox} from '../sandbox';
+import {
+  askUser,
+  audit,
+  grantFor,
+  isRemembered,
+  remember,
+  tunnelGrant,
+} from '../terminal/agent-access';
+import type {Capability} from '../../common/agent-env';
 import {getEnvApi} from '../terminal/env-api';
 import {toolDefs} from './toolDefs';
 
@@ -16,6 +25,56 @@ const fail = (error: unknown) => ({
  * starting a tunnel asks you each time unless you switched tunnels off for this
  * agent. Nothing here can create or edit a tunnel, open a shell, or type into one.
  */
+/** The permission for an agent to use the sandbox: off, remembered for this Session, or asked now. */
+const permit = async (
+  agent: string,
+  capability: Capability,
+  what: string,
+  rows: [string, string][]
+) => {
+  if (sandboxMode() !== 'sandbox') {
+    audit(agent, `${what} (this Session runs Local)`, 'refused');
+    throw new Error(
+      "Agents can only work inside a Session's Sandbox, and this Session runs Local (the user's Mac). Ask the user to choose Sandbox in the Environment view."
+    );
+  }
+  if (!getSandbox().isRunning()) {
+    audit(agent, `${what} (the sandbox is not running)`, 'refused');
+    throw new Error(
+      'The sandbox is not running. Ask the user to start it in the Environment view.'
+    );
+  }
+  if (grantFor(agent, capability) === 'off') {
+    audit(agent, `${what} (${capability} are off for this agent)`, 'refused');
+    throw new Error(`The user has switched ${capability} off for you in the MCP panel.`);
+  }
+  if (!isRemembered(agent, capability)) {
+    const answer = await askUser({
+      agent,
+      title: `${agent} wants to ${capability === 'commands' ? 'run commands' : 'use files'} in the sandbox`,
+      rows,
+      note: 'Inside the sandbox only: it cannot see your Mac. Allowing for this Session means you will not be asked again until the Session closes.',
+      remember: true,
+    });
+    if (answer === 'deny') {
+      audit(agent, `${what} (no, or no answer in 60 s)`, 'refused');
+      throw new Error('The user did not allow this (denied, or no answer within 60 seconds).');
+    }
+    if (answer === 'session') remember(agent, capability);
+    audit(
+      agent,
+      `${what} (${answer === 'session' ? 'allowed for this Session' : 'allowed once'})`,
+      'allowed'
+    );
+  } else audit(agent, what, 'allowed');
+  getSandbox().touch();
+};
+
+const oneLine = (text: string, max = 100) => {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+};
+
 export const registerEnvTools = (server: McpServer, agent: string) => {
   const summarize = (t: Awaited<ReturnType<ReturnType<typeof getEnvApi>['tunnels']>>[number]) => ({
     name: t.def.name,
@@ -75,7 +134,7 @@ export const registerEnvTools = (server: McpServer, agent: string) => {
           'The user has switched tunnels off for you in the MCP panel, so this was refused.'
         );
       }
-      const allowed = await askUser({
+      const answer = await askUser({
         agent,
         title: `${agent} wants to start a tunnel`,
         rows: [
@@ -85,7 +144,7 @@ export const registerEnvTools = (server: McpServer, agent: string) => {
         ],
         note: 'It runs your own ssh with your keys. The agent cannot change this tunnel, only start it.',
       });
-      if (!allowed) {
+      if (answer === 'deny') {
         audit(agent, `start_tunnel "${def.name}" (no, or no answer in 60 s)`, 'refused');
         throw new Error('The user did not allow this (denied, or no answer within 60 seconds).');
       }
@@ -108,6 +167,43 @@ export const registerEnvTools = (server: McpServer, agent: string) => {
       await env.stopTunnel(def.id);
       audit(agent, `stop_tunnel "${def.name}"`, 'allowed');
       return text({name: def.name, state: 'stopped'});
+    } catch (e) {
+      return fail(e);
+    }
+  });
+
+  server.registerTool(
+    'run_command',
+    toolDefs.run_command,
+    async ({command, cwd, timeout_s: timeout}) => {
+      try {
+        await permit(agent, 'commands', `run_command "${oneLine(command)}"`, [
+          ['command', oneLine(command, 300)],
+          ['in', cwd ? `workspace/${cwd}` : 'the sandbox workspace'],
+        ]);
+        return text(await getSandbox().runCommand(command, cwd, timeout));
+      } catch (e) {
+        return fail(e);
+      }
+    }
+  );
+
+  server.registerTool('read_file', toolDefs.read_file, async ({path: file}) => {
+    try {
+      await permit(agent, 'files', `read_file ${oneLine(file)}`, [['read', `workspace/${file}`]]);
+      return {content: [{type: 'text' as const, text: await getSandbox().readFile(file)}]};
+    } catch (e) {
+      return fail(e);
+    }
+  });
+
+  server.registerTool('write_file', toolDefs.write_file, async ({path: file, content}) => {
+    try {
+      await permit(agent, 'files', `write_file ${oneLine(file)} (${content.length} chars)`, [
+        ['write', `workspace/${file}`],
+        ['size', `${content.length} characters`],
+      ]);
+      return text({path: file, bytes: await getSandbox().writeFile(file, content)});
     } catch (e) {
       return fail(e);
     }

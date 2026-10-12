@@ -1,10 +1,13 @@
 import {ipcMain} from 'electron';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import {
+  CAPABILITIES,
   DEFAULT_TUNNEL_GRANT,
   type AgentGrants,
   type AgentPrompt,
+  type Answer,
   type AuditLine,
+  type Capability,
   type TunnelGrant,
 } from '../../common/agent-env';
 import store from '../../store';
@@ -21,11 +24,26 @@ let prompter: Prompter | null = null;
 let notify: (line: AuditLine) => void = () => {};
 const lines: AuditLine[] = [];
 
-export const grantsOf = (): Record<string, TunnelGrant> =>
-  (store.get('envGrants') as Record<string, TunnelGrant> | undefined) ?? {};
+type Stored = Record<string, Partial<Record<Capability, TunnelGrant>> | TunnelGrant>;
 
-export const tunnelGrant = (agent: string): TunnelGrant =>
-  grantsOf()[agent] === 'off' ? 'off' : DEFAULT_TUNNEL_GRANT;
+/** What is saved per agent. An older version saved just the tunnels setting, as a word. */
+export const grantsOf = (): Record<string, Partial<Record<Capability, TunnelGrant>>> => {
+  const raw = (store.get('envGrants') as Stored | undefined) ?? {};
+  return Object.fromEntries(
+    Object.entries(raw).map(([name, v]) => [name, typeof v === 'string' ? {tunnels: v} : v])
+  );
+};
+
+export const grantFor = (agent: string, capability: Capability): TunnelGrant =>
+  grantsOf()[agent]?.[capability] === 'off' ? 'off' : DEFAULT_TUNNEL_GRANT;
+export const tunnelGrant = (agent: string): TunnelGrant => grantFor(agent, 'tunnels');
+
+/** "Allow for this Session": remembered while this window's Session runs, never saved. */
+const remembered = new Set<string>();
+export const isRemembered = (agent: string, capability: Capability) =>
+  remembered.has(`${agent}\0${capability}`);
+export const remember = (agent: string, capability: Capability) =>
+  remembered.add(`${agent}\0${capability}`);
 
 export const audit = (agent: string, text: string, outcome: AuditLine['outcome']) => {
   const line: AuditLine = {at: new Date().toISOString(), text: `${text} by ${agent}`, outcome};
@@ -35,8 +53,9 @@ export const audit = (agent: string, text: string, outcome: AuditLine['outcome']
   notify(line);
 };
 
-export const askUser = (input: Pick<AgentPrompt, 'agent' | 'title' | 'rows' | 'note'>) =>
-  prompter ? prompter.ask(input) : Promise.resolve(false);
+export const askUser = (
+  input: Pick<AgentPrompt, 'agent' | 'title' | 'rows' | 'note' | 'remember'>
+): Promise<Answer> => (prompter ? prompter.ask(input) : Promise.resolve('deny'));
 
 export const initAgentAccess = (getMainWindow: GetMainWindow, knownAgents: () => string[]) => {
   const win = () => {
@@ -64,18 +83,27 @@ export const initAgentAccess = (getMainWindow: GetMainWindow, knownAgents: () =>
   ipcMain.handle(IPC_MAIN_CHANNELS.ENV_GRANTS_LIST, (): AgentGrants[] =>
     [...new Set([...knownAgents(), ...Object.keys(grantsOf())])].map((name) => ({
       name,
-      tunnels: tunnelGrant(name),
+      tunnels: grantFor(name, 'tunnels'),
+      commands: grantFor(name, 'commands'),
+      files: grantFor(name, 'files'),
     }))
   );
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.ENV_GRANT_SET);
-  ipcMain.handle(IPC_MAIN_CHANNELS.ENV_GRANT_SET, (_e, name: unknown, tunnels: unknown) => {
-    if (typeof name !== 'string' || name.length === 0 || name.length > 80)
-      throw new Error('Unknown agent');
-    if (tunnels !== 'ask' && tunnels !== 'off') throw new Error('Choose ask or off');
-    store.set('envGrants', {...grantsOf(), [name]: tunnels});
-    audit('you', `tunnels for ${name} set to ${tunnels}`, 'allowed');
-    return true;
-  });
+  ipcMain.handle(
+    IPC_MAIN_CHANNELS.ENV_GRANT_SET,
+    (_e, name: unknown, capability: unknown, value: unknown) => {
+      if (typeof name !== 'string' || name.length === 0 || name.length > 80)
+        throw new Error('Unknown agent');
+      if (!CAPABILITIES.includes(capability as Capability)) throw new Error('Unknown permission');
+      if (value !== 'ask' && value !== 'off') throw new Error('Choose ask or off');
+      const all = grantsOf();
+      store.set('envGrants', {...all, [name]: {...all[name], [capability as Capability]: value}});
+      // Changing a permission ends any "for this Session" you gave for it.
+      remembered.delete(`${name}\0${capability}`);
+      audit('you', `${capability} for ${name} set to ${value}`, 'allowed');
+      return true;
+    }
+  );
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.ENV_AUDIT_LIST);
   ipcMain.handle(IPC_MAIN_CHANNELS.ENV_AUDIT_LIST, (): AuditLine[] => lines.slice(0, 12));
   win()?.once('closed', () => prompter?.refuseAll());

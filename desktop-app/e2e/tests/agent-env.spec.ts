@@ -79,10 +79,22 @@ test('agents see ports and tunnels freely, and starting a tunnel asks you each t
     );
 
     // Off: refused at once, no question shown.
-    await ipc('env-grant-set', AGENT, 'off');
+    await ipc('env-grant-set', AGENT, 'tunnels', 'off');
     const off = await call('start_tunnel', {tunnel: 'ComfyUI on gpu-box'});
     expect(off.isError).toBe(true);
     expect(off.text).toContain('switched tunnels off');
+    await expect(prompt).toHaveCount(0);
+
+    // Commands and files exist only in a Sandbox: a Local Session is refused, with no question.
+    for (const [name, args] of [
+      ['run_command', {command: 'echo hi'}],
+      ['read_file', {path: 'a.txt'}],
+      ['write_file', {path: 'a.txt', content: 'x'}],
+    ] as const) {
+      const local = await call(name, args as unknown as Record<string, unknown>);
+      expect(local.isError).toBe(true);
+      expect(local.text).toContain('runs Local');
+    }
     await expect(prompt).toHaveCount(0);
 
     // Every call left an audit line.
@@ -97,7 +109,7 @@ test('agents see ports and tunnels freely, and starting a tunnel asks you each t
       true
     );
   } finally {
-    await ipc('env-grant-set', AGENT, 'ask').catch(() => {});
+    await ipc('env-grant-set', AGENT, 'tunnels', 'ask').catch(() => {});
     const saved = await ipc<{def: {id: string}}[]>('tunnels-list').catch(() => []);
     for (const t of saved) await ipc('tunnel-delete', t.def.id).catch(() => {});
     await client.close();

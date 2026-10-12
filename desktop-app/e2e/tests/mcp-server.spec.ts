@@ -91,7 +91,9 @@ test.describe('MCP server', () => {
       'list_tunnels',
       'navigate',
       'open_session',
+      'read_file',
       'read_page',
+      'run_command',
       'run_test',
       'screenshot',
       'set_active_devices',
@@ -101,6 +103,7 @@ test.describe('MCP server', () => {
       'stop_session',
       'stop_tunnel',
       'type_text',
+      'write_file',
     ]);
   });
 
