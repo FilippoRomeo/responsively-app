@@ -1,8 +1,11 @@
 /** iOS Safari previews: real Safari in an iOS Simulator, streamed by serve-sim. */
 
 /** com.apple.CoreSimulator.SimRuntime.iOS-26-1 → iOS 26.1 */
-export const runtimeLabel = (id: string) =>
-  (id.split('.').pop() ?? id).replace(/^(\w+)-(\d+)-(\d+)$/, '$1 $2.$3');
+export const runtimeLabel = (id: string, deviceName = '') =>
+  (id.split('.').pop() ?? id)
+    .replace(/^(\w+)-(\d+)-(\d+)$/, '$1 $2.$3')
+    // The same runtime serves iPads, which Apple calls iPadOS.
+    .replace(/^iOS/, /^iPad/i.test(deviceName) ? 'iPadOS' : 'iOS');
 export type IosSimRequest =
   | {operation: 'list'}
   | {operation: 'start'; deviceName: string; runtime: string}
