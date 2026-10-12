@@ -24,6 +24,7 @@ test('a Session can send its previews through a proxy, and turn it off again', a
   const port = (proxy.address() as AddressInfo).port;
   try {
     await page.waitForSelector('webview');
+    await app.dismissModals();
     await page.getByTitle('Network for this Session').click();
     const panel = page.getByTestId('network-panel');
     await panel.getByLabel('Send this Session').check();
@@ -65,9 +66,11 @@ const helperRunning = () => {
 
 test('a WireGuard config that cannot connect changes nothing and leaves no helper running', async ({
   mainWindow: page,
+  app,
 }) => {
   test.setTimeout(90_000);
   await page.waitForSelector('webview');
+  await app.dismissModals();
   const panel = page.getByTestId('network-panel');
   if (!(await panel.isVisible())) await page.getByTitle('Network for this Session').click();
   await panel.getByLabel('Send this Session').check();

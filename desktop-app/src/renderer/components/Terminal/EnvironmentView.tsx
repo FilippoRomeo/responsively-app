@@ -326,6 +326,14 @@ const EnvironmentView = () => {
                 onChange={() => set({idleStop: !s.idleStop})}
               />
             </Row>
+            <Row title="Stop when I quit">
+              <Switch
+                label="Stop it when the Session stops or Responsively quits"
+                hint="(closing the window leaves it running; its terminals end with it)"
+                on={s.stopOnQuit}
+                onChange={() => set({stopOnQuit: !s.stopOnQuit})}
+              />
+            </Row>
             <Row title="New ports">
               <span
                 role="group"

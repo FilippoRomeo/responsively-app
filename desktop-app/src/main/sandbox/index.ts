@@ -2,6 +2,7 @@ import path from 'path';
 import {app, dialog, ipcMain, type BrowserWindow} from 'electron';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import {
+  profileFor,
   sanitizeSandbox,
   validFolder,
   type SandboxSettings,
@@ -10,6 +11,7 @@ import {
 import store from '../../store';
 import type {GetMainWindow} from '../mcp/bridge';
 import {listSandboxProfiles, Sandbox} from './manager';
+import {stopSandboxIfNoted, writeQuitNote} from './quit';
 
 /** This window's Sandbox, and the IPC the Environment view uses to drive it. */
 let current: Sandbox | null = null;
@@ -31,6 +33,11 @@ export const initSandbox = (getMainWindow: GetMainWindow) => {
     root: path.join(app.getPath('userData'), 'sandbox'),
     load: () => store.get('sandbox'),
     save: (settings: SandboxSettings) => store.set('sandbox', settings),
+    remember: (settings: SandboxSettings) =>
+      writeQuitNote(path.join(app.getPath('userData'), 'sandbox'), {
+        profile: profileFor(sessionId),
+        stop: settings.mode === 'sandbox' && settings.stopOnQuit,
+      }),
     emit,
   });
   const sandbox = current;
@@ -77,7 +84,17 @@ export const initSandbox = (getMainWindow: GetMainWindow) => {
     if (!validFolder(folder)) throw new Error('That folder cannot be shown inside a sandbox.');
     return folder;
   });
-  app.on('will-quit', () => sandbox.dispose());
+  app.on('will-quit', () => {
+    sandbox.dispose();
+    // Outside Sessions there is no controller to stop it when the window quits.
+    if (!process.env.RESPONSIVELY_SESSION_ID && sandbox.state().settings.stopOnQuit)
+      stopSandboxIfNoted(path.join(app.getPath('userData'), 'sandbox'));
+  });
+  // Write the note now, so it is right even if nothing is changed this run.
+  writeQuitNote(path.join(app.getPath('userData'), 'sandbox'), {
+    profile: profileFor(sessionId),
+    stop: sandbox.state().settings.mode === 'sandbox' && sandbox.state().settings.stopOnQuit,
+  });
   // Know its state from the start, so the toolbar and the terminal are right.
   void sandbox.refresh();
 };

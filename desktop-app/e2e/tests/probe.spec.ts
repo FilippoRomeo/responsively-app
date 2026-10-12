@@ -3,8 +3,12 @@ import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/st
 import {expect, test} from '../fixtures/electron-app';
 
 test.describe('test probe', () => {
-  test('plugs into a device, applies conditions live, and unplugs', async ({mainWindow: page}) => {
+  test('plugs into a device, applies conditions live, and unplugs', async ({
+    mainWindow: page,
+    app,
+  }) => {
     await page.waitForSelector('webview');
+    await app.dismissModals();
     const name = (await page
       .locator('[data-device-label]')
       .first()
@@ -37,8 +41,9 @@ test.describe('test probe', () => {
     await expect(panel).toHaveCount(0);
   });
 
-  test('clearing the chip on the device unplugs the probe', async ({mainWindow: page}) => {
+  test('clearing the chip on the device unplugs the probe', async ({mainWindow: page, app}) => {
     await page.waitForSelector('webview');
+    await app.dismissModals();
     const name = (await page
       .locator('[data-device-label]')
       .first()
@@ -57,9 +62,11 @@ test.describe('test probe', () => {
 
   test('runs every combination on the plugged device and shows the report', async ({
     mainWindow: page,
+    app,
   }) => {
     test.setTimeout(120_000);
     await page.waitForSelector('webview');
+    await app.dismissModals();
     const name = (await page
       .locator('[data-device-label]')
       .first()
@@ -85,10 +92,12 @@ test.describe('test probe', () => {
 
   test('a saved list of pages multiplies the run, and the report opens in a viewer', async ({
     mainWindow: page,
+    app,
     testServerUrl,
   }) => {
     test.setTimeout(120_000);
     await page.waitForSelector('webview');
+    await app.dismissModals();
     const name = (await page
       .locator('[data-device-label]')
       .first()
@@ -124,10 +133,12 @@ test.describe('test probe', () => {
 
   test('"ask me first" holds an agent test until you allow it', async ({
     mainWindow: page,
+    app,
     electronApp,
     mcpPort,
   }) => {
     await page.waitForSelector('webview');
+    await app.dismissModals();
     await page.getByTitle('Test probe').click();
     const panel = page.getByTestId('probe-panel');
     await panel.getByLabel('Ask me before an agent runs a test or sets conditions').check();

@@ -10,6 +10,7 @@ import {provesRuntime, readProcess} from './process-proof';
 import log from '../logging';
 import {z} from 'zod';
 import {killSessionTerminals, terminalEndpoint, terminalsRunning} from '../terminal/supervisor';
+import {stopSandboxIfNoted} from '../sandbox/quit';
 import {
   controllerClient,
   controllerRoot,
@@ -488,7 +489,11 @@ export class SessionManager {
           this.pending.delete(id);
           this.registry.update(id, {lastStop: {by: source, at: new Date().toISOString()}});
           // Closing the window leaves terminals running; stopping or quitting ends them.
-          if (source !== 'window') await killSessionTerminals(id);
+          if (source !== 'window') {
+            await killSessionTerminals(id);
+            // A sandbox that asked to end with its Session ends now (never waited for).
+            stopSandboxIfNoted(path.join(sessionsRoot(), 'profiles', id, 'sandbox'));
+          }
           return this.inspect(id);
         }
         if (!quitting && lease) quitting = await portClosed(lease);

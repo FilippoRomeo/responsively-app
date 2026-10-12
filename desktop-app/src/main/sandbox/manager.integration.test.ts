@@ -76,6 +76,17 @@ describe.skipIf(!process.env.E2E_SANDBOX)('a real sandbox', () => {
         await sandbox.killTmux(name);
         expect(await sandbox.tmuxSessions()).not.toContain(name);
 
+        // The controller's stop-on-quit: a note in the Session's folder ends the machine, detached.
+        const {writeQuitNote, stopSandboxIfNoted} = await import('./quit');
+        writeQuitNote(root, {profile: sandbox.profile, stop: true});
+        expect(stopSandboxIfNoted(root)).toBe(true);
+        for (let i = 0; i < 40 && (await sandbox.refresh()).phase === 'running'; i += 1)
+          await new Promise((resolve) => {
+            setTimeout(resolve, 3000);
+          });
+        expect((await sandbox.refresh()).phase).toBe('stopped');
+        expect((await sandbox.start()).phase).toBe('running');
+
         // Stop keeps the disk; start proves it again; destroy needs the typed name and a stopped machine.
         expect((await sandbox.stop()).phase).toBe('stopped');
         expect(() => sandbox.destroy('wrong')).toThrow(/exactly/);

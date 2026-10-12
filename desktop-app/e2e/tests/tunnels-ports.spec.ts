@@ -2,9 +2,11 @@ import {expect, test} from '../fixtures/electron-app';
 
 test('saved tunnels show proven status; Ports lists what a terminal opened', async ({
   mainWindow: page,
+  app,
 }) => {
   test.setTimeout(120_000);
   await page.waitForSelector('webview');
+  await app.dismissModals();
   await page.getByTitle('Terminal', {exact: true}).click();
   const dock = page.getByTestId('terminal-dock');
   await expect(dock.getByRole('tab')).toHaveCount(1, {timeout: 30_000});

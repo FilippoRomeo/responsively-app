@@ -40,14 +40,14 @@ interface Run {
 const COLIMA_PATHS = ['/opt/homebrew/bin/colima', '/usr/local/bin/colima'];
 export const colimaHome = () => process.env.COLIMA_HOME || path.join(os.homedir(), '.colima');
 
-const findColima = (): string | null => {
+export const findColima = (): string | null => {
   const wanted = process.env.RESPONSIVELY_COLIMA;
   if (wanted !== undefined) return fs.existsSync(wanted) ? wanted : null;
   return COLIMA_PATHS.find((p) => fs.existsSync(p)) ?? null;
 };
 
 /** A GUI app's PATH lacks Homebrew; colima needs limactl and qemu tools from it. */
-const toolEnv = (): NodeJS.ProcessEnv => {
+export const toolEnv = (): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(process.env))
     if (!/^(RESPONSIVELY_|ELECTRON_|NODE_OPTIONS$)/.test(k)) env[k] = v;
@@ -111,6 +111,8 @@ export interface SandboxOptions {
   root: string;
   load: () => unknown;
   save: (settings: SandboxSettings) => void;
+  /** Tells whoever stops Sessions (a different process) what to do with this sandbox. */
+  remember?: (settings: SandboxSettings) => void;
   emit: (state: SandboxState) => void;
 }
 
@@ -207,6 +209,7 @@ export class Sandbox {
     }
     this.settings = next;
     this.o.save(next);
+    this.o.remember?.(next);
     this.armIdle();
     this.publish();
     return this.state();
