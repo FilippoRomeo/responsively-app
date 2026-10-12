@@ -1,3 +1,5 @@
+import type {PortInfo, TunnelDef, TunnelInfo} from './tunnel';
+
 /**
  * Local terminals: a real PTY per tab, owned by a host process so a tab outlives
  * its panel and its window. The host speaks newline-delimited JSON over loopback TCP.
@@ -29,6 +31,10 @@ export type HostRequest = (
   | {op: 'resize'; id: string; cols: number; rows: number}
   | {op: 'close'; id: string}
   | {op: 'kill-session'; session: string}
+  | {op: 'tunnel-start'; session: string; def: TunnelDef}
+  | {op: 'tunnel-stop'; id: string}
+  | {op: 'tunnel-list'; session: string}
+  | {op: 'ports'; session: string}
 ) & {reqId?: number};
 
 /** Host → client. `reqId` echoes a request that asked for an answer. */
@@ -42,6 +48,10 @@ export type HostMessage = (
   | {type: 'data'; id: string; data: string}
   | {type: 'exit'; id: string; exitCode: number}
   | {type: 'closed'; id: string}
+  | {type: 'tunnels'; tunnels: TunnelInfo[]}
+  /** A tunnel's state changed (pushed to every connection). */
+  | {type: 'tunnel'; session: string; tunnel: TunnelInfo}
+  | {type: 'ports'; ports: PortInfo[]}
 ) & {reqId?: number};
 
 /** The last `limit` characters of everything written to it. */

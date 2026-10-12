@@ -67,6 +67,7 @@ const testOrder = [
   'test-engine.spec.ts',
   'terminal.spec.ts',
   'terminal-sessions.spec.ts',
+  'tunnels-ports.spec.ts',
   'session-proxy.spec.ts',
   'devtools-data.spec.ts',
   'probe.spec.ts',

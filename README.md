@@ -122,6 +122,15 @@ The terminal button in the toolbar opens a real terminal (your login shell, in a
 - **Nothing else can type into it.** The host listens on loopback only, behind a token, and agents have no access to terminals yet.
 - **Start commands stop cleanly.** An add-on's start command now runs in its own process group, so stopping it also stops the dev server it launched.
 
+### Ports and tunnels
+
+![The dock's Tunnels view: a connected tunnel with Open in previews and Stop, and one that needs authentication, with the reason ssh gave](docs/media/tunnels.png)
+
+The terminal panel has two more views, next to **Terminal**:
+
+- **Ports** lists what the Session's terminals have started listening on (found by looking at the Mac every two seconds, then named by the process: node, python, postgres…), and **Open in previews** points every device at it. Another Session's terminals never show here.
+- **Tunnels** makes a service on one of your servers answer on this Mac, using your own `ssh`: pick a host from `~/.ssh/config` (or `user@host`), the service as the server sees it (`localhost:8188`) and a port here. Nothing is copied and no key is read. Status is proved, not assumed: **Connected** only once the local port answers while ssh is still alive; **Needs authentication** (with ssh's own words) when a password or unknown host would be asked; **Port in use**; **Reconnecting** with growing waits when a link drops. Tunnels can start with the Session. Like terminals, they keep running when the window closes and stop when you Stop the Session or quit; a tunnel left by a killed app is ended the next time.
+
 ## Test under real conditions
 
 Ask an agent (or use the MCP tools) to measure a page the way people meet it: slow networks, a slower CPU, light or dark. `run_test` loads each page on each Chromium device under every combination (up to 60, one at a time, cache off) and writes a report: load time, LCP, layout shift, requests, bytes, failed requests, console errors, script time, memory, horizontal overflow and a screenshot per measurement. Networks: Wi-Fi, 5G, 4G, Fast 3G, Slow 3G, Offline; CPU 1× to 20× slower.
