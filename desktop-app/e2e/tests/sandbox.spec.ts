@@ -5,8 +5,10 @@ test.skip(!!process.env.E2E_SANDBOX, 'this runs where colima is deliberately abs
 
 test('Environment: Local by default, and a Sandbox says plainly when colima is missing', async ({
   mainWindow: page,
+  app,
 }) => {
   await page.waitForSelector('webview');
+  await app.dismissModals();
   await page.getByTitle('Terminal', {exact: true}).click();
   const dock = page.getByTestId('terminal-dock');
   await expect(dock.getByTestId('environment-chip')).toContainText('Local · your Mac');

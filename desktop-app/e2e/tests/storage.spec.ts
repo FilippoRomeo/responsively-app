@@ -52,6 +52,8 @@ test('a Python add-on runs in its own environment; Storage lists and removes it'
   expect(env.startsWith(dir)).toBe(false);
   expect(fs.readdirSync(dir).sort()).toEqual(['requirements.txt', 'started.txt']);
 
+  // An earlier spec can leave its dropdown open over the menu.
+  await app.page.keyboard.press('Escape');
   await app.openSettings();
   const storage = app.page.getByTestId('settings-storage');
   await expect(storage.getByRole('region', {name: 'Add-ons'})).toContainText(name);

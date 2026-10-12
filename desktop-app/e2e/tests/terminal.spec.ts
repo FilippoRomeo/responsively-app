@@ -2,9 +2,11 @@ import {expect, test} from '../fixtures/electron-app';
 
 test('a terminal tab runs a real shell and keeps running while the panel is closed', async ({
   mainWindow: page,
+  app,
 }) => {
   test.setTimeout(90_000);
   await page.waitForSelector('webview');
+  await app.dismissModals();
   await page.getByTitle('Terminal', {exact: true}).click();
   const dock = page.getByTestId('terminal-dock');
   await expect(dock).toBeVisible();

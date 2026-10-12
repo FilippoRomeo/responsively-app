@@ -20,6 +20,8 @@ export interface SandboxSettings {
   folder?: string;
   /** Stop after 30 minutes without use. */
   idleStop: boolean;
+  /** Stop when the Session is stopped or Responsively quits (closing the window does not). */
+  stopOnQuit: boolean;
   /** New ports: ask, or publish at once. */
   publish: 'ask' | 'auto';
 }
@@ -30,6 +32,7 @@ export const DEFAULT_SANDBOX: SandboxSettings = {
   docker: false,
   sshAgent: false,
   idleStop: true,
+  stopOnQuit: true,
   publish: 'ask',
 };
 
@@ -88,6 +91,7 @@ export const sanitizeSandbox = (raw: unknown): SandboxSettings => {
     sshAgent: v.sshAgent === true,
     ...(validFolder(v.folder) ? {folder: v.folder} : {}),
     idleStop: v.idleStop !== false,
+    stopOnQuit: v.stopOnQuit !== false,
     publish: v.publish === 'auto' ? 'auto' : 'ask',
   };
 };
