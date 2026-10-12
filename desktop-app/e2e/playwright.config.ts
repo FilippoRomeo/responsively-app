@@ -71,6 +71,7 @@ const testOrder = [
   'agent-env.spec.ts',
   'sandbox.spec.ts',
   'sandbox-real.spec.ts',
+  'sandbox-docker.spec.ts',
   'session-proxy.spec.ts',
   'devtools-data.spec.ts',
   'probe.spec.ts',

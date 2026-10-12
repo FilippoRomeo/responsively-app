@@ -50,6 +50,8 @@ export interface PortInfo {
   source: 'terminal' | 'tunnel' | 'sandbox';
   /** A sandbox port reachable on this Mac at this port, once published. */
   publishedAt?: number;
+  /** The Docker container behind a sandbox port, as "name · image". */
+  container?: string;
 }
 
 const HOST = /^[A-Za-z0-9_][A-Za-z0-9._@-]{0,127}$/;

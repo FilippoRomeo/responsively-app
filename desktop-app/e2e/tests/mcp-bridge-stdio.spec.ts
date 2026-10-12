@@ -21,6 +21,7 @@ const EXPECTED_TOOLS = [
   'get_session',
   'get_styles',
   'list_addon_tools',
+  'list_containers',
   'list_devices',
   'list_ports',
   'list_reports',

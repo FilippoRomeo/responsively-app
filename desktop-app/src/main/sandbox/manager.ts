@@ -4,9 +4,12 @@ import os from 'os';
 import path from 'path';
 import {
   createArgs,
+  DOCKER_PS_FORMAT,
+  type DockerContainer,
   IDLE_STOP_MS,
   isOurTmux,
   parseColimaList,
+  parseDockerPs,
   parseSs,
   phaseFromColima,
   profileFor,
@@ -285,6 +288,13 @@ export class Sandbox {
   async listeningPorts(): Promise<number[]> {
     const r = await this.exec('ss -ltnH', 10_000);
     return r.code === 0 ? parseSs(r.stdout) : [];
+  }
+
+  /** The containers of the sandbox's own Docker, when it has one and is running. */
+  async dockerContainers(): Promise<DockerContainer[]> {
+    if (!this.settings.docker || this.phase !== 'running') return [];
+    const r = await this.exec(`docker ps --format '${DOCKER_PS_FORMAT}' 2>/dev/null`, 15_000);
+    return r.code === 0 ? parseDockerPs(r.stdout) : [];
   }
 
   isRunning() {

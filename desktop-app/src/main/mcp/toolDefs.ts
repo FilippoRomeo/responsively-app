@@ -204,6 +204,12 @@ export const toolDefs = {
       'The SSH tunnels you saved for this Session and their live state (connected, needs ' +
       'authentication, port in use…). Always allowed.',
   },
+  list_containers: {
+    description:
+      "The Docker containers running inside this Session's Sandbox (name, image, state, the " +
+      'ports they publish). Empty when the Session runs Local, the sandbox is stopped, or it has ' +
+      'no Docker. Always allowed: it only looks.',
+  },
   start_tunnel: {
     description:
       'Start one of the SSH tunnels the user saved for this Session, by its name. The user is ' +

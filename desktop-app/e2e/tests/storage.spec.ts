@@ -16,7 +16,11 @@ test('a Python add-on runs in its own environment; Storage lists and removes it'
   const started = path.join(dir, 'started.txt');
 
   await app.dismissModals();
-  await app.page.getByTestId('addons-button').click();
+  // The first click can land while the toolbar is still settling: try again until the dialog is up.
+  await expect(async () => {
+    await app.page.getByTestId('addons-button').click();
+    await expect(app.page.getByTestId('addon-source')).toBeVisible({timeout: 3000});
+  }).toPass({timeout: 30_000});
   await app.page.getByTestId('addon-source').fill(dir);
   await app.page.getByRole('button', {name: 'Look inside'}).click();
 

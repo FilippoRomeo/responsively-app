@@ -62,6 +62,7 @@ export const IPC_MAIN_CHANNELS = {
   SANDBOX_PICK_FOLDER: 'sandbox-pick-folder',
   SANDBOX_EVENT: 'sandbox-event',
   SANDBOX_LIST: 'sandbox-list',
+  SANDBOX_DOCKER: 'sandbox-docker',
   PORT_PUBLISH: 'port-publish',
   PORT_UNPUBLISH: 'port-unpublish',
   AGENT_PROMPT: 'agent-prompt',
