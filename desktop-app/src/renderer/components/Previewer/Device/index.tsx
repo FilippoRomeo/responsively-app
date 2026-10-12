@@ -314,7 +314,7 @@ const Device = ({isPrimary, device, setIndividualDevice}: Props) => {
             data-testid="browser-badge"
             className="whitespace-nowrap rounded-full bg-accent-soft px-2 py-[2px] text-[10.5px] text-accent"
           >
-            Safari · {runtimeLabel(iosRuntime)}
+            Safari · {runtimeLabel(iosRuntime, device.name)}
           </span>
         ) : null
       }
