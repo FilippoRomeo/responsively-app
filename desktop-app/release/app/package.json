@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "browser-sync": "^2.27.12",
+    "node-pty": "1.1.0",
     "serve-sim": "0.1.47"
   }
 }

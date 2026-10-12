@@ -65,6 +65,8 @@ const testOrder = [
   'addons-agents.spec.ts',
   'storage.spec.ts',
   'test-engine.spec.ts',
+  'terminal.spec.ts',
+  'terminal-sessions.spec.ts',
   'session-proxy.spec.ts',
   'devtools-data.spec.ts',
   'probe.spec.ts',

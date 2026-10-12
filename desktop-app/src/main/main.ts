@@ -28,6 +28,7 @@ import {initDevtoolsHandlers} from './devtools';
 import {initAudioMute} from './audio-mute';
 import {initTestEngine} from './testing/engine';
 import {initSessionProxy} from './proxy';
+import {initTerminals} from './terminal/ipc';
 import {initWebviewStorageManagerHandlers} from './webview-storage-manager';
 import {initIosSimulatorHandlers} from './ios-simulator';
 import {initAddonsHandlers} from './addons';
@@ -505,6 +506,7 @@ app
     initAudioMute(getMainWindow);
     initTestEngine(getMainWindow);
     initSessionProxy();
+    initTerminals(getMainWindow);
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
       await startShellOwner(
         (message) => showSessions(false, message, true),

@@ -49,7 +49,9 @@ export type SessionOperation =
   | 'attention'
   | 'force-stop'
   | 'mute'
-  | 'agents';
+  | 'agents'
+  /** Where this Session's terminals live (the controller starts the terminal host). */
+  | 'terminal-host';
 export interface SessionRequest {
   operation: SessionOperation;
   id?: string;

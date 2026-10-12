@@ -9,6 +9,7 @@ import {normalizeUrl} from '../mcp/utils';
 import {provesRuntime, readProcess} from './process-proof';
 import log from '../logging';
 import {z} from 'zod';
+import {killSessionTerminals, terminalEndpoint, terminalsRunning} from '../terminal/supervisor';
 import {
   controllerClient,
   controllerRoot,
@@ -486,6 +487,8 @@ export class SessionManager {
           this.errors.delete(id);
           this.pending.delete(id);
           this.registry.update(id, {lastStop: {by: source, at: new Date().toISOString()}});
+          // Closing the window leaves terminals running; stopping or quitting ends them.
+          if (source !== 'window') await killSessionTerminals(id);
           return this.inspect(id);
         }
         if (!quitting && lease) quitting = await portClosed(lease);
@@ -667,6 +670,8 @@ export const startController = async () => {
   let lastRequest = Date.now();
   let requests = 0;
   const {server, endpoint} = await serve(secret(), async (body) => {
+    // Terminals live here, not in a Session window, so closing a window leaves them running.
+    if ((body as {operation?: unknown})?.operation === 'terminal-host') return terminalEndpoint();
     requests += 1;
     lastRequest = Date.now();
     try {
@@ -682,6 +687,7 @@ export const startController = async () => {
       void ensureShellOwner().catch(() => {});
     if (
       requests === 0 &&
+      !terminalsRunning() &&
       Date.now() - lastRequest > 15_000 &&
       (!fs.existsSync(dir) || fs.readdirSync(dir).length === 0)
     )

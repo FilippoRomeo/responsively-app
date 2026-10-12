@@ -22,6 +22,7 @@ import {AboutDialog} from './components/AboutDialog';
 import TestRunBar from './components/TestRunBar';
 import ProbePanel from './components/Probe';
 import ReportViewer from './components/Probe/reportViewer';
+import TerminalDock from './components/Terminal';
 
 /** Present mode only applies while the canvas layout is active. */
 const usePresenting = (): boolean => {
@@ -52,6 +53,7 @@ const Browser = () => {
         </div>
         {presenting ? null : <AddonDock />}
       </div>
+      {presenting ? null : <TerminalDock />}
       {presenting ? null : <StatusBar />}
     </div>
   );
