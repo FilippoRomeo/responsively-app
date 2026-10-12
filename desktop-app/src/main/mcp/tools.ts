@@ -17,6 +17,7 @@ import {clickElement, evaluateInPage, readPage, typeText} from './interactions';
 import {callAddonTool, getPrompts, getRules, listAddonTools} from '../addons';
 import {clearConditions, runTest, setConditions} from '../testing/engine';
 import {askBeforeAgent} from '../testing/approval';
+import {registerEnvTools} from './env-tools';
 import {readConsole, readNetwork, startNetwork} from '../devtools-data';
 import {listReports, readReport, reportsDir} from '../testing/reports';
 import {renderReportMarkdown} from '../../common/test-report';
@@ -102,7 +103,12 @@ const captureTarget = async (
   };
 };
 
-export const registerTools = (server: McpServer, getMainWindow: GetMainWindow) => {
+export const registerTools = (
+  server: McpServer,
+  getMainWindow: GetMainWindow,
+  agent = 'unidentified client'
+) => {
+  registerEnvTools(server, agent);
   const manage = async (request: SessionRequest) => {
     try {
       if (request.operation === 'stop' && request.id === process.env.RESPONSIVELY_SESSION_ID)

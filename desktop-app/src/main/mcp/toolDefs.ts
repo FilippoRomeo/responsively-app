@@ -189,6 +189,32 @@ export const toolDefs = {
       device: z.string().optional().describe('Optional device id or exact name'),
     },
   },
+  env_status: {
+    description:
+      "A summary of this Session's environment: how many terminals run, each saved tunnel's " +
+      'state, and how many ports its terminals have open. Always allowed.',
+  },
+  list_ports: {
+    description:
+      "Ports this Session's terminals are listening on (port, process, pid) and its tunnels' " +
+      'local ports. Always allowed.',
+  },
+  list_tunnels: {
+    description:
+      'The SSH tunnels you saved for this Session and their live state (connected, needs ' +
+      'authentication, port in use…). Always allowed.',
+  },
+  start_tunnel: {
+    description:
+      'Start one of the SSH tunnels the user saved for this Session, by its name. The user is ' +
+      'asked each time (no answer in 60 s means no) unless they switched tunnels off for you. ' +
+      'You cannot create or change tunnels. Returns the tunnel once it is connected, or why not.',
+    inputSchema: {tunnel: z.string().min(1).max(100).describe("The saved tunnel's name")},
+  },
+  stop_tunnel: {
+    description: 'Stop a running tunnel by name. Stopping is always safe, so it needs no question.',
+    inputSchema: {tunnel: z.string().min(1).max(100).describe("The saved tunnel's name")},
+  },
   evaluate: {
     description:
       'Run a JavaScript expression in a Chromium device preview and return its result as JSON ' +

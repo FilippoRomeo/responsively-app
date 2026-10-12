@@ -52,6 +52,11 @@ const BROWSER_TOOLS = [
   'get_console',
   'get_network',
   'get_styles',
+  'env_status',
+  'list_ports',
+  'list_tunnels',
+  'start_tunnel',
+  'stop_tunnel',
 ];
 const results = [];
 const started = Date.now();
@@ -416,7 +421,7 @@ try {
     .map((t) => t.name)
     .sort();
   record(
-    'T1 tools/list: session argument on all 22 browser tools',
+    'T1 tools/list: session argument on all 27 browser tools',
     JSON.stringify(withSession) === JSON.stringify([...BROWSER_TOOLS].sort()),
     {withSession, toolCount: tools.length}
   );

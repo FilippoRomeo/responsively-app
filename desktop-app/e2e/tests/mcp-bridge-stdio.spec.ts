@@ -9,6 +9,7 @@ const EXPECTED_TOOLS = [
   'call_addon_tool',
   'clear_conditions',
   'click',
+  'env_status',
   'evaluate',
   'focus_session',
   'get_app_state',
@@ -21,8 +22,10 @@ const EXPECTED_TOOLS = [
   'get_styles',
   'list_addon_tools',
   'list_devices',
+  'list_ports',
   'list_reports',
   'list_sessions',
+  'list_tunnels',
   'navigate',
   'open_session',
   'read_page',
@@ -31,7 +34,9 @@ const EXPECTED_TOOLS = [
   'set_active_devices',
   'set_conditions',
   'set_device_browser',
+  'start_tunnel',
   'stop_session',
+  'stop_tunnel',
   'type_text',
 ];
 

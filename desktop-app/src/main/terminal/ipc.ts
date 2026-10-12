@@ -15,6 +15,7 @@ import store from '../../store';
 import {sessionRequest} from '../sessions/service';
 import type {GetMainWindow} from '../mcp/bridge';
 import {HostConnection, type HostEndpoint} from './client';
+import {setEnvApi} from './env-api';
 import {terminalEndpoint} from './supervisor';
 
 /**
@@ -200,6 +201,40 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
   ipcMain.handle(IPC_MAIN_CHANNELS.PORTS_LIST, async (): Promise<PortInfo[]> => {
     const m = await (await connection()).request({op: 'ports', session: session()});
     return m.type === 'ports' ? m.ports : [];
+  });
+
+  // What agents may ask of this environment (the MCP tools check permission first).
+  const settled = ['connected', 'auth-required', 'port-conflict', 'failed', 'stopped'];
+  setEnvApi({
+    terminalCount: async () => {
+      const m = await (await connection()).request({op: 'list', session: session()});
+      return m.type === 'list' ? m.terminals.length : 0;
+    },
+    ports: async () => {
+      const m = await (await connection()).request({op: 'ports', session: session()});
+      return m.type === 'ports' ? m.ports : [];
+    },
+    tunnels: async () => {
+      const running = await live();
+      return saved().map((d) => running.get(d.id) ?? stopped(d));
+    },
+    savedTunnel: (nameOrId) =>
+      saved().find((d) => d.id === nameOrId || d.name.toLowerCase() === nameOrId.toLowerCase()),
+    savedNames: () => saved().map((d) => d.name),
+    startTunnel: async (def) => {
+      let info = await startTunnel(def);
+      for (let i = 0; i < 50 && !settled.includes(info.state); i += 1) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 400);
+        });
+
+        info = (await live()).get(def.id) ?? info;
+      }
+      return info;
+    },
+    stopTunnel: async (id) => {
+      (await connection()).post({op: 'tunnel-stop', id});
+    },
   });
 
   // Tunnels marked "start with the Session" come up when its window does.

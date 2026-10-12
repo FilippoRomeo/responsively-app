@@ -29,6 +29,7 @@ import {initAudioMute} from './audio-mute';
 import {initTestEngine} from './testing/engine';
 import {initSessionProxy} from './proxy';
 import {initTerminals} from './terminal/ipc';
+import {initAgentAccess} from './terminal/agent-access';
 import {initWebviewStorageManagerHandlers} from './webview-storage-manager';
 import {initIosSimulatorHandlers} from './ios-simulator';
 import {initAddonsHandlers} from './addons';
@@ -507,6 +508,7 @@ app
     initTestEngine(getMainWindow);
     initSessionProxy();
     initTerminals(getMainWindow);
+    initAgentAccess(getMainWindow, () => listMcpAgents().map((a) => a.name));
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)
       await startShellOwner(
         (message) => showSessions(false, message, true),

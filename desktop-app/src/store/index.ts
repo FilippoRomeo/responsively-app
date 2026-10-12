@@ -367,6 +367,11 @@ const schema = {
     },
     default: {enabled: false, address: '', mode: 'address'},
   },
+  /** What each agent may do with this Session's tunnels: {agent: 'ask' | 'off'}. */
+  envGrants: {
+    type: 'object',
+    default: {},
+  },
   sessionTunnels: {
     type: 'array',
     items: {

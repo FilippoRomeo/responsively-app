@@ -72,6 +72,7 @@ test.describe('MCP server', () => {
       'clear_conditions',
       'click',
       'create_session',
+      'env_status',
       'evaluate',
       'focus_session',
       'get_app_state',
@@ -84,8 +85,10 @@ test.describe('MCP server', () => {
       'get_styles',
       'list_addon_tools',
       'list_devices',
+      'list_ports',
       'list_reports',
       'list_sessions',
+      'list_tunnels',
       'navigate',
       'open_session',
       'read_page',
@@ -94,7 +97,9 @@ test.describe('MCP server', () => {
       'set_active_devices',
       'set_conditions',
       'set_device_browser',
+      'start_tunnel',
       'stop_session',
+      'stop_tunnel',
       'type_text',
     ]);
   });
