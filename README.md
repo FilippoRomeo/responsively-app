@@ -140,6 +140,7 @@ The panel's **Environment** view chooses where this Session's terminals run. **L
 - **Lifecycle, proved:** Create, Start, Stop, Restart, Destroy. "Running" is shown only once a command inside has answered; Destroy needs the Session stopped and its name typed. The first Create downloads a base system (a minute or two); later Starts take about ten seconds.
 - **Terminals are tmux:** each tab is a tmux session in the machine, reached over ssh, so tabs survive closing the window and quitting Responsively and reappear next time. Closing a tab ends its session.
 - **Ports:** servers started inside appear under **Ports**. **Publish** forwards one to the same number on this Mac's localhost (or another free one if that is taken) and **Open in previews** loads it; or choose **Publish at once**. Nothing is published unless you do.
+- **Docker and Compose inside:** switch it on when creating and the sandbox has its **own** Docker engine and `docker compose` (never your Mac's, and your Mac's Docker context is untouched). Run a stack in a terminal or let an agent do it; the Environment view lists its containers, and **Ports** names each published port by its container (`stack-web-1 · nginx:alpine`), so **Publish** and **Open in previews** work for a Compose app like for any server. It costs about 1 GB more memory while running.
 - **Settings fixed at creation:** size (1, 2 or 4 CPUs and GiB), one optional Mac folder (files in a Mac folder are about 20× slower for many small files, so keep the project inside the sandbox), Docker and Compose inside (its own Docker, never your Mac's), and ssh-agent forwarding. **Stop when idle** (30 minutes) can change any time and gives the memory back.
 - **Memory:** a running 2 GiB sandbox holds about 1.5 GB on this Mac, and macOS does not take it back until it stops, hence the idle stop. A sandbox keeps running when you quit Responsively (that is how its terminals survive); **Settings › Storage** lists every sandbox with its size.
 - **Agents** can work inside it (see below); they can never reach your Mac.
@@ -150,7 +151,7 @@ The panel's **Environment** view chooses where this Session's terminals run. **L
 
 Agents get five tools for a Session's environment, enforced in the app (not only hidden by the stdio bridge):
 
-- `env_status`, `list_ports`, `list_tunnels` are always allowed: they only look.
+- `env_status`, `list_ports`, `list_tunnels`, `list_containers` are always allowed: they only look (the last lists the sandbox's Docker containers).
 - `start_tunnel` starts one of **your saved** tunnels by name and **asks you each time** in the Session window, naming the agent and the exact tunnel. Deny, or no answer in 60 seconds, is a refusal; an already-running tunnel needs no question.
 - `stop_tunnel` is always allowed: stopping only reduces exposure.
 - Agents cannot create or change tunnels, open a shell on your Mac or type into one of your terminals. Inside a Sandbox they can run commands and use its files (below).
@@ -383,7 +384,7 @@ Browser tools include:
 - `evaluate` (run JavaScript in a preview and get the result)
 - `list_addon_tools`, `call_addon_tool`, `get_rules`, `get_prompts` (see [Add-ons](#add-ons))
 - `get_console`, `get_network`, `get_styles` (what DevTools shows: console messages since the preview opened, network requests, computed CSS; `get_network` starts capturing on its first call, so pass `reload: true`)
-- `env_status`, `list_ports`, `list_tunnels`, `start_tunnel`, `stop_tunnel`, `run_command`, `read_file`, `write_file` (see [What agents may do with them](#what-agents-may-do-with-them))
+- `env_status`, `list_ports`, `list_tunnels`, `start_tunnel`, `stop_tunnel`, `run_command`, `read_file`, `write_file`, `list_containers` (see [What agents may do with them](#what-agents-may-do-with-them))
 - `run_test`, `set_conditions`, `clear_conditions`, `list_reports`, `get_report` (see [Test under real conditions](#test-under-real-conditions))
 
 Each browser tool takes an optional `session` argument, a Session UUID from `list_sessions`. The bridge looks up that Session's current MCP port on every call, so the same UUID keeps working after the Session restarts on a new port:

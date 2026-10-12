@@ -115,6 +115,21 @@ export const registerEnvTools = (server: McpServer, agent: string) => {
     }
   });
 
+  server.registerTool('list_containers', toolDefs.list_containers, async () => {
+    try {
+      if (sandboxMode() !== 'sandbox')
+        return text({containers: [], note: 'This Session runs Local.'});
+      const sandbox = getSandbox();
+      const s = sandbox.state();
+      if (!sandbox.isRunning()) return text({containers: [], note: 'The sandbox is not running.'});
+      if (!s.settings.docker)
+        return text({containers: [], note: 'This sandbox was made without Docker.'});
+      return text({containers: await sandbox.dockerContainers()});
+    } catch (e) {
+      return fail(e);
+    }
+  });
+
   server.registerTool('start_tunnel', toolDefs.start_tunnel, async ({tunnel}) => {
     try {
       const env = getEnvApi();

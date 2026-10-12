@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {
   createArgs,
+  parseDockerPs,
   DEFAULT_SANDBOX,
   isOurTmux,
   parseColimaList,
@@ -96,5 +97,22 @@ describe('tmux and ports', () => {
       'LISTEN 0      511    [::]:3000       [::]:*',
     ].join('\n');
     expect(parseSs(ss)).toEqual([3000, 8099]);
+  });
+});
+
+describe('parseDockerPs', () => {
+  it('reads containers and the ports they publish on the machine', () => {
+    const out = [
+      'stack-web-1|nginx:alpine|running|0.0.0.0:8088->80/tcp, [::]:8088->80/tcp',
+      'stack-cache-1|redis:7-alpine|running|6379/tcp',
+      'multi|app:1|running|0.0.0.0:9000-9002->9000-9002/tcp',
+      '',
+      'broken line',
+    ].join('\n');
+    const list = parseDockerPs(out);
+    expect(list.map((c) => c.name)).toEqual(['stack-web-1', 'stack-cache-1', 'multi']);
+    expect(list[0]).toMatchObject({image: 'nginx:alpine', state: 'running', ports: [8088]});
+    expect(list[1].ports).toEqual([]);
+    expect(list[2].ports).toEqual([9000, 9001, 9002]);
   });
 });

@@ -52,7 +52,7 @@ const PortsView = () => {
           <span className="w-[64px] font-mono text-[13px] font-bold">{p.port}</span>
           <span className="flex-1">
             {p.source === 'sandbox'
-              ? 'In the sandbox'
+              ? (p.container ?? 'In the sandbox')
               : p.tunnel
                 ? `Tunnel: ${p.tunnel}`
                 : p.process}

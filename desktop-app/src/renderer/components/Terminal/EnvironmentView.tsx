@@ -1,6 +1,12 @@
 import cx from 'classnames';
-import {SANDBOX_SIZES, type SandboxPhase, type SandboxSettings} from 'common/sandbox';
-import {useState} from 'react';
+import {IPC_MAIN_CHANNELS} from 'common/constants';
+import {
+  SANDBOX_SIZES,
+  type DockerContainer,
+  type SandboxPhase,
+  type SandboxSettings,
+} from 'common/sandbox';
+import {useEffect, useState} from 'react';
 import {useSandbox} from './useSandbox';
 
 const PHASE: Record<SandboxPhase, {label: string; dot: string}> = {
@@ -79,6 +85,30 @@ const Row = ({
 /** Environment: Local (your Mac) or this Session's Sandbox, with its lifecycle and settings. */
 const EnvironmentView = () => {
   const {state, error, act, set, pickFolder} = useSandbox();
+  const [containers, setContainers] = useState<DockerContainer[]>([]);
+  const dockerUp = !!state && state.phase === 'running' && state.settings.docker;
+  // What the sandbox's own Docker is running, looked at every few seconds while this is open.
+  useEffect(() => {
+    if (!dockerUp) {
+      setContainers([]);
+      return undefined;
+    }
+    let alive = true;
+    const look = () =>
+      window.electron.ipcRenderer
+        .invoke<unknown, DockerContainer[]>(IPC_MAIN_CHANNELS.SANDBOX_DOCKER)
+        .then((list) => {
+          if (alive) setContainers(list);
+          return list;
+        })
+        .catch(() => {});
+    look();
+    const timer = setInterval(look, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [dockerUp]);
   const [typed, setTyped] = useState('');
   const [confirming, setConfirming] = useState(false);
   if (!state)
@@ -256,6 +286,29 @@ const EnvironmentView = () => {
                 onChange={() => set({docker: !s.docker})}
               />
             </Row>
+            {dockerUp ? (
+              <Row title="Containers" hint="in the sandbox's Docker">
+                {containers.length === 0 ? (
+                  <span className="text-muted">
+                    None running. Try docker compose up in a terminal.
+                  </span>
+                ) : (
+                  <span
+                    data-testid="containers"
+                    className="block font-mono text-[11.5px] leading-[1.6]"
+                  >
+                    {containers.map((c) => (
+                      <span key={c.name} className="block">
+                        {c.name} <span className="text-muted">{c.image}</span>
+                        {c.ports.length ? (
+                          <span className="text-accent"> · port {c.ports.join(', ')}</span>
+                        ) : null}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </Row>
+            ) : null}
             <Row title="Use my ssh keys inside" hint="for git push and ssh">
               <Switch
                 label="Forward my ssh-agent"

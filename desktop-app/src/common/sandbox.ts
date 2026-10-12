@@ -170,3 +170,33 @@ export const parseSs = (text: string): number[] => {
   }
   return [...ports].sort((a, b) => a - b);
 };
+
+export interface DockerContainer {
+  name: string;
+  image: string;
+  state: string;
+  /** Ports published to the machine itself (the host side of 0.0.0.0:8088->80/tcp). */
+  ports: number[];
+}
+
+/** The format `docker ps` is asked for: easy to split, nothing locale-dependent. */
+export const DOCKER_PS_FORMAT = '{{.Names}}|{{.Image}}|{{.State}}|{{.Ports}}';
+
+export const parseDockerPs = (text: string): DockerContainer[] =>
+  text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const [name, image, state, ...rest] = line.split('|');
+      if (!name || !image) return [];
+      const ports = new Set<number>();
+      for (const m of rest
+        .join('|')
+        .matchAll(/(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-f:]*\]):(\d+)(?:-(\d+))?->/gi)) {
+        const from = Number(m[1]);
+        const to = m[2] ? Number(m[2]) : from;
+        for (let p = from; p <= Math.min(to, from + 200); p += 1) ports.add(p);
+      }
+      return [{name, image, state: state ?? '', ports: [...ports].sort((a, b) => a - b)}];
+    });

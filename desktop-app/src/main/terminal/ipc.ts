@@ -259,8 +259,8 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     (await connection()).post({op: 'tunnel-stop', id: `${SBX_PORT}${Number(port)}`});
     return true;
   });
-  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORTS_LIST);
-  ipcMain.handle(IPC_MAIN_CHANNELS.PORTS_LIST, async (): Promise<PortInfo[]> => {
+  /** Ports now: the Mac's, for this Session's terminals (Local), or the sandbox's, named by container. */
+  const portsNow = async (): Promise<PortInfo[]> => {
     const c = await connection();
     if (sandboxMode() !== 'sandbox') {
       const m = await c.request({op: 'ports', session: session()});
@@ -268,7 +268,10 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     }
     const sandbox = getSandbox();
     if (!sandbox.isRunning()) return [];
-    const guest = await sandbox.listeningPorts();
+    const [guest, containers] = await Promise.all([
+      sandbox.listeningPorts(),
+      sandbox.dockerContainers(),
+    ]);
     const published = new Map<number, number>();
     (await live()).forEach((t) => {
       if (t.def.id.startsWith(SBX_PORT) && t.state === 'connected')
@@ -278,14 +281,20 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     if (sandbox.state().settings.publish === 'auto')
       for (const p of guest)
         if (!published.has(p) && p >= 1024) await publishPort(p).catch(() => {});
-    return guest.map((port) => ({
-      port,
-      pid: 0,
-      process: 'sandbox',
-      source: 'sandbox' as const,
-      ...(published.has(port) ? {publishedAt: published.get(port) as number} : {}),
-    }));
-  });
+    return guest.map((port) => {
+      const owner = containers.find((k) => k.ports.includes(port));
+      return {
+        port,
+        pid: 0,
+        process: 'sandbox',
+        source: 'sandbox' as const,
+        ...(owner ? {container: `${owner.name} · ${owner.image}`} : {}),
+        ...(published.has(port) ? {publishedAt: published.get(port) as number} : {}),
+      };
+    });
+  };
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORTS_LIST);
+  ipcMain.handle(IPC_MAIN_CHANNELS.PORTS_LIST, portsNow);
 
   // What agents may ask of this environment (the MCP tools check permission first).
   const settled = ['connected', 'auth-required', 'port-conflict', 'failed', 'stopped'];
@@ -294,10 +303,7 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
       const m = await (await connection()).request({op: 'list', session: session()});
       return m.type === 'list' ? m.terminals.length : 0;
     },
-    ports: async () => {
-      const m = await (await connection()).request({op: 'ports', session: session()});
-      return m.type === 'ports' ? m.ports : [];
-    },
+    ports: portsNow,
     tunnels: async () => {
       const running = await live();
       return saved().map((d) => running.get(d.id) ?? stopped(d));

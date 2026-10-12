@@ -59,6 +59,8 @@ export const initSandbox = (getMainWindow: GetMainWindow) => {
         throw new Error('Unknown sandbox action');
     }
   });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.SANDBOX_DOCKER);
+  ipcMain.handle(IPC_MAIN_CHANNELS.SANDBOX_DOCKER, () => sandbox.dockerContainers());
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.SANDBOX_LIST);
   ipcMain.handle(IPC_MAIN_CHANNELS.SANDBOX_LIST, () => listSandboxProfiles());
   ipcMain.removeHandler(IPC_MAIN_CHANNELS.SANDBOX_PICK_FOLDER);

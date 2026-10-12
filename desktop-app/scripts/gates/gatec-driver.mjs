@@ -60,6 +60,7 @@ const BROWSER_TOOLS = [
   'run_command',
   'read_file',
   'write_file',
+  'list_containers',
 ];
 const results = [];
 const started = Date.now();
@@ -424,7 +425,7 @@ try {
     .map((t) => t.name)
     .sort();
   record(
-    'T1 tools/list: session argument on all 30 browser tools',
+    'T1 tools/list: session argument on all 31 browser tools',
     JSON.stringify(withSession) === JSON.stringify([...BROWSER_TOOLS].sort()),
     {withSession, toolCount: tools.length}
   );
