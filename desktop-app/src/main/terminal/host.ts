@@ -4,6 +4,7 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import * as pty from 'node-pty';
+import {reapStaleTunnels, TunnelManager} from './tunnels';
 import {
   clampSize,
   HostMessage,
@@ -69,12 +70,21 @@ const validCwd = (cwd: unknown): string => {
 
 export const startTerminalHost = async (opts: {onCount?: (running: number) => void} = {}) => {
   ensureHelperExecutable();
+  await reapStaleTunnels();
   const token = randomBytes(32).toString('hex');
   const terms = new Map<string, Term>();
   const conns = new Set<Conn>();
   const counters = new Map<string, number>();
-  const running = () => [...terms.values()].filter((t) => t.info.state === 'running').length;
-  const reportCount = () => opts.onCount?.(running());
+  const tunnels = new TunnelManager((session, tunnel) => {
+    conns.forEach((c) => c.authed && send(c, {type: 'tunnel', session, tunnel}));
+    reportCount();
+  });
+  // Anything that must keep the controller alive: running shells and live tunnels.
+  const running = () =>
+    [...terms.values()].filter((t) => t.info.state === 'running').length + tunnels.active();
+  function reportCount() {
+    opts.onCount?.(running());
+  }
 
   const send = (c: Conn, m: HostMessage) => {
     if (!c.socket.destroyed) c.socket.write(`${JSON.stringify(m)}\n`);
@@ -215,7 +225,36 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
           [...terms.values()]
             .filter((t) => t.info.session === req.session)
             .forEach((t) => remove(t.info.id));
+          tunnels.killSession(req.session);
           reply({type: 'ok'});
+          break;
+        case 'tunnel-start':
+          tunnels
+            .start(String(req.session), req.def)
+            .then((tunnel) => reply({type: 'tunnels', tunnels: [tunnel]}))
+            .catch((e) =>
+              reply({type: 'error', message: e instanceof Error ? e.message : String(e)})
+            );
+          break;
+        case 'tunnel-stop':
+          tunnels.stop(String(req.id));
+          reply({type: 'ok'});
+          break;
+        case 'tunnel-list':
+          reply({type: 'tunnels', tunnels: tunnels.list(String(req.session))});
+          break;
+        case 'ports':
+          tunnels
+            .ports(
+              String(req.session),
+              [...terms.values()]
+                .filter((t) => t.info.session === req.session && t.info.state === 'running')
+                .map((t) => t.pty.pid)
+            )
+            .then((ports) => reply({type: 'ports', ports}))
+            .catch((e) =>
+              reply({type: 'error', message: e instanceof Error ? e.message : String(e)})
+            );
           break;
         default:
           throw new Error('Unknown request');
@@ -262,8 +301,10 @@ export const startTerminalHost = async (opts: {onCount?: (running: number) => vo
     port,
     token,
     terminalCount: () => terms.size,
+    activeCount: () => running(),
     stop: () => {
       [...terms.keys()].forEach(remove);
+      tunnels.stopAll();
       conns.forEach((c) => c.socket.destroy());
       server.close();
     },

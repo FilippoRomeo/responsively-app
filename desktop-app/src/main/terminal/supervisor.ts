@@ -19,7 +19,11 @@ const start = () =>
       stdio: 'ignore',
     });
     child = proc;
-    app.once('will-quit', () => proc.kill());
+    // Ask it to end its shells and tunnels first, then make sure it is gone.
+    app.once('will-quit', () => {
+      proc.postMessage({type: 'shutdown'});
+      setTimeout(() => proc.kill(), 800);
+    });
     const timer = setTimeout(
       () => reject(new Error('The terminal service did not start.')),
       15_000

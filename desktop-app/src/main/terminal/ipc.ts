@@ -1,6 +1,17 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import {ipcMain} from 'electron';
 import {IPC_MAIN_CHANNELS} from '../../common/constants';
 import {clampSize, HostMessage, TerminalInfo} from '../../common/terminal';
+import {
+  parseSshHosts,
+  validateTunnel,
+  type PortInfo,
+  type TunnelDef,
+  type TunnelInfo,
+} from '../../common/tunnel';
+import store from '../../store';
 import {sessionRequest} from '../sessions/service';
 import type {GetMainWindow} from '../mcp/bridge';
 import {HostConnection, type HostEndpoint} from './client';
@@ -27,7 +38,11 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
 
   const emit = (m: HostMessage) => {
     const win = getMainWindow();
-    if (win && !win.isDestroyed()) win.webContents.send(IPC_MAIN_CHANNELS.TERMINAL_EVENT, m);
+    if (!win || win.isDestroyed()) return;
+    // Tunnel changes go to their own channel, and only for this Session's tunnels.
+    if (m.type === 'tunnel') {
+      if (m.session === session()) win.webContents.send(IPC_MAIN_CHANNELS.TUNNEL_EVENT, m.tunnel);
+    } else win.webContents.send(IPC_MAIN_CHANNELS.TERMINAL_EVENT, m);
   };
 
   const connection = (): Promise<HostConnection> => {
@@ -100,4 +115,97 @@ export const initTerminals = (getMainWindow: GetMainWindow) => {
     if (conn && !conn.closed && typeof id === 'string')
       conn.post({op: 'resize', id, ...clampSize(cols, rows)});
   });
+
+  // ---- Tunnels: definitions live in this Session's own store; the host runs them. ----
+  const saved = () => (store.get('sessionTunnels') as TunnelDef[] | undefined) ?? [];
+  const stopped = (def: TunnelDef): TunnelInfo => ({
+    def,
+    state: 'stopped',
+    localPort: def.localPort,
+    attempts: 0,
+  });
+  const live = async (): Promise<Map<string, TunnelInfo>> => {
+    try {
+      const c = await connection();
+      const m = await c.request({op: 'tunnel-list', session: session()});
+      return new Map(
+        (m.type === 'tunnels' ? m.tunnels : []).map((t) => [t.def.id, t] as [string, TunnelInfo])
+      );
+    } catch {
+      return new Map();
+    }
+  };
+  const startTunnel = async (def: TunnelDef) => {
+    const c = await connection();
+    const m = await c.request({op: 'tunnel-start', session: session(), def}, 15_000);
+    return m.type === 'tunnels' ? m.tunnels[0] : stopped(def);
+  };
+
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TUNNELS_LIST);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TUNNELS_LIST, async (): Promise<TunnelInfo[]> => {
+    const defs = saved();
+    if (defs.length === 0) return [];
+    const running = await live();
+    return defs.map((d) => running.get(d.id) ?? stopped(d));
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TUNNEL_SAVE);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TUNNEL_SAVE, (_e, input: Partial<TunnelDef>) => {
+    const def: TunnelDef = {
+      id: typeof input?.id === 'string' && input.id ? input.id : `t-${Date.now().toString(36)}`,
+      name: String(input?.name ?? '').trim(),
+      host: String(input?.host ?? '').trim(),
+      remote: String(input?.remote ?? '').trim(),
+      localPort: Number(input?.localPort),
+      anyPort: input?.anyPort !== false,
+      autoStart: input?.autoStart === true,
+    };
+    const problem = validateTunnel(def);
+    if (problem) throw new Error(problem);
+    store.set('sessionTunnels', [...saved().filter((d) => d.id !== def.id), def]);
+    return def;
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TUNNEL_DELETE);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TUNNEL_DELETE, async (_e, id: string) => {
+    try {
+      (await connection()).post({op: 'tunnel-stop', id: String(id)});
+    } catch {
+      /* the host is not running: nothing to stop */
+    }
+    store.set(
+      'sessionTunnels',
+      saved().filter((d) => d.id !== id)
+    );
+    return true;
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TUNNEL_START);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TUNNEL_START, async (_e, id: string) => {
+    const def = saved().find((d) => d.id === id);
+    if (!def) throw new Error('That tunnel is gone.');
+    return startTunnel(def);
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.TUNNEL_STOP);
+  ipcMain.handle(IPC_MAIN_CHANNELS.TUNNEL_STOP, async (_e, id: string) => {
+    (await connection()).post({op: 'tunnel-stop', id: String(id)});
+    return true;
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.SSH_HOSTS);
+  ipcMain.handle(IPC_MAIN_CHANNELS.SSH_HOSTS, (): string[] => {
+    try {
+      return parseSshHosts(fs.readFileSync(path.join(os.homedir(), '.ssh', 'config'), 'utf8'));
+    } catch {
+      return [];
+    }
+  });
+  ipcMain.removeHandler(IPC_MAIN_CHANNELS.PORTS_LIST);
+  ipcMain.handle(IPC_MAIN_CHANNELS.PORTS_LIST, async (): Promise<PortInfo[]> => {
+    const m = await (await connection()).request({op: 'ports', session: session()});
+    return m.type === 'ports' ? m.ports : [];
+  });
+
+  // Tunnels marked "start with the Session" come up when its window does.
+  const auto = saved().filter((d) => d.autoStart);
+  if (auto.length > 0)
+    setTimeout(() => {
+      auto.forEach((d) => startTunnel(d).catch(() => {}));
+    }, 1500);
 };

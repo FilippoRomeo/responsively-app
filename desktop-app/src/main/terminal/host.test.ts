@@ -1,5 +1,7 @@
 // @vitest-environment node
 import net from 'net';
+import path from 'path';
+import type {TunnelDef} from '../../common/tunnel';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {HostMessage, HostRequest, LineReader} from '../../common/terminal';
 import {startTerminalHost} from './host';
@@ -51,6 +53,7 @@ describe('terminal host', () => {
   let host: Awaited<ReturnType<typeof startTerminalHost>>;
   const counts: number[] = [];
   beforeAll(async () => {
+    process.env.RESPONSIVELY_SSH = path.join(__dirname, 'fixtures', 'fake-ssh.js');
     host = await startTerminalHost({onCount: (n) => counts.push(n)});
   });
   afterAll(() => host.stop());
@@ -147,5 +150,149 @@ describe('terminal host', () => {
     await a.until((m) => m.type === 'ok' && m.reqId === 100);
     expect(host.terminalCount()).toBe(0);
     a.socket.destroy();
+  });
+
+  describe('tunnels and ports', () => {
+    const freePort = () =>
+      new Promise<number>((resolve) => {
+        const server = net.createServer();
+        server.listen(0, '127.0.0.1', () => {
+          const {port} = server.address() as net.AddressInfo;
+          server.close(() => resolve(port));
+        });
+      });
+    const def = (over: Partial<TunnelDef>): TunnelDef => ({
+      id: `t-${Math.random().toString(36).slice(2, 8)}`,
+      name: 'test',
+      host: 'good-host',
+      remote: 'localhost:8188',
+      localPort: 40000,
+      anyPort: false,
+      autoStart: false,
+      ...over,
+    });
+    const open = async () => {
+      const c = await connect(host.port);
+      c.send({op: 'auth', token: host.token});
+      await c.until((m) => m.type === 'ok');
+      return c;
+    };
+    const stateOf = (m: HostMessage) => (m.type === 'tunnel' ? m.tunnel : undefined);
+    const waitState = (
+      c: Awaited<ReturnType<typeof open>>,
+      id: string,
+      state: string,
+      ms = 15_000
+    ) =>
+      c.until((m) => stateOf(m)?.def.id === id && stateOf(m)?.state === state, ms) as Promise<
+        Extract<HostMessage, {type: 'tunnel'}>
+      >;
+
+    it('is Connected only once the local port answers, and Stopped when stopped', async () => {
+      const c = await open();
+      const port = await freePort();
+      const d = def({localPort: port});
+      c.send({op: 'tunnel-start', session: 'tun', def: d});
+      const up = await waitState(c, d.id, 'connected');
+      expect(up.tunnel.localPort).toBe(port);
+      const reply = await new Promise<string>((resolve) => {
+        const s = net.connect(port, '127.0.0.1');
+        s.setEncoding('utf8');
+        s.on('data', (x) => resolve(String(x)));
+      });
+      expect(reply).toContain('tunnel ok');
+      expect(host.activeCount()).toBeGreaterThanOrEqual(1);
+      c.send({op: 'tunnel-stop', id: d.id});
+      await waitState(c, d.id, 'stopped');
+      c.socket.destroy();
+    });
+
+    it('says Authentication required, and does not retry', async () => {
+      const c = await open();
+      const d = def({host: 'auth-host', localPort: await freePort()});
+      c.send({op: 'tunnel-start', session: 'tun', def: d});
+      const m = await waitState(c, d.id, 'auth-required');
+      expect(m.tunnel.detail).toMatch(/Permission denied/);
+      c.send({op: 'tunnel-list', session: 'tun', reqId: 77});
+      const list = (await c.until((x) => x.type === 'tunnels' && x.reqId === 77)) as Extract<
+        HostMessage,
+        {type: 'tunnels'}
+      >;
+      expect(list.tunnels.find((t) => t.def.id === d.id)?.state).toBe('auth-required');
+      c.socket.destroy();
+    });
+
+    it('reports a taken port, or moves to a free one when allowed', async () => {
+      const taken = net.createServer();
+      await new Promise<void>((resolve) => taken.listen(0, '127.0.0.1', () => resolve()));
+      const busy = (taken.address() as net.AddressInfo).port;
+      const c = await open();
+      const strict = def({localPort: busy});
+      c.send({op: 'tunnel-start', session: 'tun', def: strict});
+      await waitState(c, strict.id, 'port-conflict');
+      const flexible = def({localPort: busy, anyPort: true});
+      c.send({op: 'tunnel-start', session: 'tun', def: flexible});
+      const up = await waitState(c, flexible.id, 'connected');
+      expect(up.tunnel.localPort).not.toBe(busy);
+      c.send({op: 'kill-session', session: 'tun', reqId: 5});
+      await c.until((m) => m.type === 'ok' && m.reqId === 5);
+      taken.close();
+      c.socket.destroy();
+    });
+
+    it('reconnects after a connection that dropped', async () => {
+      const c = await open();
+      const d = def({host: 'drop-host', localPort: await freePort()});
+      c.send({op: 'tunnel-start', session: 'tun', def: d});
+      await waitState(c, d.id, 'connected');
+      const again = await waitState(c, d.id, 'reconnecting');
+      expect(again.tunnel.attempts).toBeGreaterThanOrEqual(1);
+      c.send({op: 'kill-session', session: 'tun', reqId: 6});
+      await c.until((m) => m.type === 'ok' && m.reqId === 6);
+      c.socket.destroy();
+    });
+
+    it(
+      'lists the ports a terminal started, by process, and its tunnels',
+      {timeout: 30_000},
+      async () => {
+        const c = await open();
+        const port = await freePort();
+        c.send({op: 'create', session: 'ports', cols: 80, rows: 24, reqId: 1});
+        const created = (await c.until((m) => m.type === 'created')) as Extract<
+          HostMessage,
+          {type: 'created'}
+        >;
+        c.send({op: 'attach', id: created.terminal.id});
+        c.send({
+          op: 'input',
+          id: created.terminal.id,
+          data: `/usr/bin/python3 -m http.server ${port} --bind 127.0.0.1 >/dev/null 2>&1 &\r`,
+        });
+        let found: Extract<HostMessage, {type: 'ports'}> | undefined;
+        for (let i = 0; i < 20 && !found; i += 1) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 500);
+          });
+          c.send({op: 'ports', session: 'ports', reqId: 100 + i});
+          const m = (await c.until((x) => x.type === 'ports' && x.reqId === 100 + i)) as Extract<
+            HostMessage,
+            {type: 'ports'}
+          >;
+          if (m.ports.some((p) => p.port === port)) found = m;
+        }
+        expect(found?.ports.find((p) => p.port === port)).toMatchObject({source: 'terminal'});
+        // Another Session sees none of it.
+        c.send({op: 'ports', session: 'elsewhere', reqId: 300});
+        const other = (await c.until((x) => x.type === 'ports' && x.reqId === 300)) as Extract<
+          HostMessage,
+          {type: 'ports'}
+        >;
+        expect(other.ports.some((p) => p.port === port)).toBe(false);
+        c.send({op: 'kill-session', session: 'ports', reqId: 301});
+        await c.until((m) => m.type === 'ok' && m.reqId === 301);
+        c.socket.destroy();
+      }
+    );
   });
 });

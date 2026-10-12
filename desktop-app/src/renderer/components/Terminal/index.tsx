@@ -1,15 +1,29 @@
 import {IPC_MAIN_CHANNELS} from 'common/constants';
 import type {HostMessage, TerminalInfo} from 'common/terminal';
 import {useCallback, useEffect, useState} from 'react';
-import {setTerminalOpen, useTerminalOpen} from './store';
+import PortsView from './PortsView';
+import {setDockView, setTerminalOpen, useDockView, useTerminalOpen, type DockView} from './store';
 import TerminalView from './TerminalView';
+import TunnelsView from './TunnelsView';
 
 const invoke = <R,>(channel: string, ...args: unknown[]) =>
   window.electron.ipcRenderer.invoke<unknown, R>(channel, ...args);
+const clean = (e: Error) =>
+  e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
-/** The bottom panel: this Session's terminals as tabs. Closing it detaches; the shells keep running. */
+const VIEWS: {id: DockView; label: string}[] = [
+  {id: 'terminal', label: 'Terminal'},
+  {id: 'ports', label: 'Ports'},
+  {id: 'tunnels', label: 'Tunnels'},
+];
+
+/**
+ * The bottom panel: this Session's terminals as tabs, the ports they opened, and
+ * its SSH tunnels. Closing it detaches; the shells and tunnels keep running.
+ */
 const TerminalDock = () => {
   const open = useTerminalOpen();
+  const view = useDockView();
   const [tabs, setTabs] = useState<TerminalInfo[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -24,12 +38,7 @@ const TerminalDock = () => {
       setTabs((t) => [...t, info]);
       setActive(info.id);
     } catch (e) {
-      setError(
-        String((e as Error).message).replace(
-          /^Error invoking remote method '[^']+': (Error: )?/,
-          ''
-        )
-      );
+      setError(clean(e as Error));
     }
   }, []);
 
@@ -41,12 +50,12 @@ const TerminalDock = () => {
       .then((list) => {
         setTabs(list);
         if (list.length > 0) setActive((a) => (a && list.some((t) => t.id === a) ? a : list[0].id));
-        else add();
+        else if (view === 'terminal') add();
         return list;
       })
-      .catch((e: Error) =>
-        setError(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
-      );
+      .catch((e: Error) => setError(clean(e)));
+    // Only when the panel opens: switching views must not start shells.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, add]);
 
   // A tab closed elsewhere disappears here too.
@@ -73,46 +82,66 @@ const TerminalDock = () => {
       data-testid="terminal-dock"
       className="flex h-[300px] flex-shrink-0 flex-col border-t border-line bg-[#111113]"
     >
-      <div
-        role="tablist"
-        className="flex h-9 flex-shrink-0 items-center gap-1 border-b border-line px-2 text-[12px]"
-      >
-        {tabs.map((t) => (
-          <span
-            key={t.id}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 ${
-              t.id === active ? 'bg-accent-soft text-accent' : 'text-fg hover:bg-hover'
-            }`}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={t.id === active}
-              onClick={() => setActive(t.id)}
-              className="focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-            >
-              {t.title}
-              {t.state === 'exited' ? ' (ended)' : ''}
-            </button>
-            <button
-              type="button"
-              aria-label={`Close ${t.title}`}
-              onClick={() => invoke(IPC_MAIN_CHANNELS.TERMINAL_CLOSE, t.id).catch(() => {})}
-              className="text-muted hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-            >
-              ✕
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          aria-label="New terminal"
-          onClick={add}
-          className="h-6 w-6 rounded-md text-muted hover:bg-hover hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      <div className="flex h-9 flex-shrink-0 items-center gap-1 border-b border-line px-2 text-[12px]">
+        <div
+          role="group"
+          aria-label="Panel"
+          className="mr-2 flex gap-[2px] rounded-lg border border-line p-[2px]"
         >
-          +
-        </button>
-        {error ? (
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={view === v.id}
+              onClick={() => setDockView(v.id)}
+              className={`h-[22px] rounded-md px-[9px] focus:outline-none focus-visible:ring-1 focus-visible:ring-accent ${
+                view === v.id ? 'bg-accent-soft text-accent' : 'text-fg hover:bg-hover'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        {view === 'terminal' ? (
+          <div role="tablist" className="flex items-center gap-1">
+            {tabs.map((t) => (
+              <span
+                key={t.id}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 ${
+                  t.id === active ? 'bg-accent-soft text-accent' : 'text-fg hover:bg-hover'
+                }`}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={t.id === active}
+                  onClick={() => setActive(t.id)}
+                  className="focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                >
+                  {t.title}
+                  {t.state === 'exited' ? ' (ended)' : ''}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Close ${t.title}`}
+                  onClick={() => invoke(IPC_MAIN_CHANNELS.TERMINAL_CLOSE, t.id).catch(() => {})}
+                  className="text-muted hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              aria-label="New terminal"
+              onClick={add}
+              className="h-6 w-6 rounded-md text-muted hover:bg-hover hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            >
+              +
+            </button>
+          </div>
+        ) : null}
+        {error && view === 'terminal' ? (
           <span role="alert" className="ml-2 text-red-400">
             {error}
           </span>
@@ -129,9 +158,13 @@ const TerminalDock = () => {
         </button>
       </div>
       <div className="min-h-0 flex-1">
-        {tabs.map((t) => (
-          <TerminalView key={t.id} id={t.id} active={t.id === active} />
-        ))}
+        {view === 'ports' ? <PortsView /> : null}
+        {view === 'tunnels' ? <TunnelsView /> : null}
+        <div className="h-full" style={{display: view === 'terminal' ? 'block' : 'none'}}>
+          {tabs.map((t) => (
+            <TerminalView key={t.id} id={t.id} active={t.id === active && view === 'terminal'} />
+          ))}
+        </div>
       </div>
     </section>
   );

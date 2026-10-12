@@ -367,6 +367,22 @@ const schema = {
     },
     default: {enabled: false, address: '', mode: 'address'},
   },
+  sessionTunnels: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: {type: 'string'},
+        name: {type: 'string'},
+        host: {type: 'string'},
+        remote: {type: 'string'},
+        localPort: {type: 'number'},
+        anyPort: {type: 'boolean'},
+        autoStart: {type: 'boolean'},
+      },
+    },
+    default: [],
+  },
   testProbe: {
     type: 'object',
     properties: {

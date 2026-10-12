@@ -15,3 +15,19 @@ export const useTerminalOpen = () =>
     },
     () => open
   );
+
+export type DockView = 'terminal' | 'ports' | 'tunnels';
+let view: DockView = 'terminal';
+const viewListeners = new Set<() => void>();
+export const setDockView = (value: DockView) => {
+  view = value;
+  viewListeners.forEach((l) => l());
+};
+export const useDockView = () =>
+  useSyncExternalStore(
+    (cb) => {
+      viewListeners.add(cb);
+      return () => viewListeners.delete(cb);
+    },
+    () => view
+  );
