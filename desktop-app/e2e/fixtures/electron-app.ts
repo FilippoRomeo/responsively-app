@@ -49,8 +49,17 @@ export const test = base.extend<{}, ElectronFixtures>({
         // The proxy test asks this instead of the internet; the spec's own proxy answers it.
         RESPONSIVELY_PROXY_ECHO: 'http://echo.test/ip',
         RESPONSIVELY_TERMINAL_SHELL: '/bin/sh',
+        // Sandboxes need colima and a real VM: only a run that asks for them (E2E_SANDBOX=1) may use it.
+        ...(process.env.E2E_SANDBOX ? {} : {RESPONSIVELY_COLIMA: '/nonexistent/colima'}),
         // Tunnels run this stand-in for ssh, which behaves by the server's name.
-        RESPONSIVELY_SSH: path.join(__dirname, '../../src/main/terminal/fixtures/fake-ssh.js'),
+        ...(process.env.E2E_SANDBOX
+          ? {}
+          : {
+              RESPONSIVELY_SSH: path.join(
+                __dirname,
+                '../../src/main/terminal/fixtures/fake-ssh.js'
+              ),
+            }),
       } as Record<string, string>;
       if (process.env.E2E_HEADLESS === 'true' || process.env.CI) {
         env.E2E_HEADLESS = 'true';

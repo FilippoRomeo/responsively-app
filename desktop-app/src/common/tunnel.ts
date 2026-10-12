@@ -16,6 +16,8 @@ export interface TunnelDef {
   anyPort: boolean;
   /** Start when the Session opens. */
   autoStart: boolean;
+  /** A Lima ssh config to use (a sandbox's own), instead of ~/.ssh/config. */
+  sshConfig?: string;
 }
 
 export type TunnelState =
@@ -45,7 +47,9 @@ export interface PortInfo {
   process: string;
   /** The tunnel that owns it, when it is one. */
   tunnel?: string;
-  source: 'terminal' | 'tunnel';
+  source: 'terminal' | 'tunnel' | 'sandbox';
+  /** A sandbox port reachable on this Mac at this port, once published. */
+  publishedAt?: number;
 }
 
 const HOST = /^[A-Za-z0-9_][A-Za-z0-9._@-]{0,127}$/;
@@ -59,6 +63,8 @@ export const validateTunnel = (def: Partial<TunnelDef>): string | null => {
   const m = typeof def.remote === 'string' ? REMOTE.exec(def.remote) : null;
   if (!m || Number(m[2]) < 1 || Number(m[2]) > 65535)
     return 'The remote service looks like localhost:8188 (as the server sees it).';
+  if (def.sshConfig !== undefined && !/^\/[^\0\n]*\/ssh\.config$/.test(def.sshConfig))
+    return 'That ssh config is not valid.';
   if (!Number.isInteger(def.localPort) || def.localPort! < 1024 || def.localPort! > 65535)
     return 'The local port must be between 1024 and 65535.';
   return null;
@@ -66,6 +72,11 @@ export const validateTunnel = (def: Partial<TunnelDef>): string | null => {
 
 /** The exact ssh arguments: foreground, key-less prompts fail fast, dead links are noticed. */
 export const sshArgs = (def: TunnelDef, localPort: number): string[] => [
+  // A Lima config shares one master connection, and then `ssh -N -L` hands the forward to it and
+  // exits at once, leaving the port open after the tunnel is "stopped": give each tunnel its own.
+  ...(def.sshConfig
+    ? ['-F', def.sshConfig, '-o', 'ControlMaster=no', '-o', 'ControlPath=none']
+    : []),
   '-N',
   '-o',
   'ExitOnForwardFailure=yes',

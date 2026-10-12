@@ -18,13 +18,31 @@ export interface TerminalInfo {
   exitCode?: number;
   cols: number;
   rows: number;
+  /** Runs inside the Session's Sandbox, as a tmux session that outlives the app. */
+  sandbox?: boolean;
+  /** The tmux session behind a sandbox terminal. */
+  tmux?: string;
+}
+
+/** Where a sandbox terminal runs: the Lima ssh config and host alias, and its tmux name. */
+export interface SandboxTarget {
+  config: string;
+  host: string;
+  tmux?: string;
 }
 
 /** Client → host. The first message of a connection must be {op: 'auth'}. */
 export type HostRequest = (
   | {op: 'auth'; token: string}
   | {op: 'list'; session: string}
-  | {op: 'create'; session: string; cwd?: string; cols: number; rows: number}
+  | {
+      op: 'create';
+      session: string;
+      cwd?: string;
+      cols: number;
+      rows: number;
+      sandbox?: SandboxTarget;
+    }
   | {op: 'attach'; id: string}
   | {op: 'detach'; id: string}
   | {op: 'input'; id: string; data: string}

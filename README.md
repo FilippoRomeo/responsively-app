@@ -131,6 +131,19 @@ The terminal panel has two more views, next to **Terminal**:
 - **Ports** lists what the Session's terminals have started listening on (found by looking at the Mac every two seconds, then named by the process: node, python, postgres…), and **Open in previews** points every device at it. Another Session's terminals never show here.
 - **Tunnels** makes a service on one of your servers answer on this Mac, using your own `ssh`: pick a host from `~/.ssh/config` (or `user@host`), the service as the server sees it (`localhost:8188`) and a port here. Nothing is copied and no key is read. Status is proved, not assumed: **Connected** only once the local port answers while ssh is still alive; **Needs authentication** (with ssh's own words) when a password or unknown host would be asked; **Port in use**; **Reconnecting** with growing waits when a link drops. Tunnels can start with the Session. Like terminals, they keep running when the window closes and stop when you Stop the Session or quit; a tunnel left by a killed app is ended the next time.
 
+### Environment: Local or a Sandbox
+
+![The Environment view with Sandbox selected and not yet created: its size, an optional Mac folder, Docker, ssh keys and idle settings, and a Create sandbox button](docs/media/sandbox.png)
+
+The panel's **Environment** view chooses where this Session's terminals run. **Local** is your Mac, as before. **Sandbox** is a small Ubuntu machine just for this Session, made with [colima](https://github.com/abiosoft/colima) (`brew install colima`): its own disk, its own files, its own network. Unlike colima's default, it is shown **only the folders you pick**: your home folder, `~/.ssh` and your keys are not there, and your ssh-agent is not forwarded unless you turn that on. Your Docker context is never touched.
+
+- **Lifecycle, proved:** Create, Start, Stop, Restart, Destroy. "Running" is shown only once a command inside has answered; Destroy needs the Session stopped and its name typed. The first Create downloads a base system (a minute or two); later Starts take about ten seconds.
+- **Terminals are tmux:** each tab is a tmux session in the machine, reached over ssh, so tabs survive closing the window and quitting Responsively and reappear next time. Closing a tab ends its session.
+- **Ports:** servers started inside appear under **Ports**. **Publish** forwards one to the same number on this Mac's localhost (or another free one if that is taken) and **Open in previews** loads it; or choose **Publish at once**. Nothing is published unless you do.
+- **Settings fixed at creation:** size (1, 2 or 4 CPUs and GiB), one optional Mac folder (files in a Mac folder are about 20× slower for many small files, so keep the project inside the sandbox), Docker and Compose inside (its own Docker, never your Mac's), and ssh-agent forwarding. **Stop when idle** (30 minutes) can change any time and gives the memory back.
+- **Memory:** a running 2 GiB sandbox holds about 1.5 GB on this Mac, and macOS does not take it back until it stops, hence the idle stop. A sandbox keeps running when you quit Responsively (that is how its terminals survive); **Settings › Storage** lists every sandbox with its size.
+- Agents cannot run commands in a sandbox yet; that is the next step.
+
 ### What agents may do with them
 
 ![The question an agent triggers: Claude Code wants to start a saved tunnel, with its name, server and where it reaches, a countdown to automatic refusal, and Deny / Allow once](docs/media/agent-prompt.png)

@@ -29,6 +29,7 @@ import {initAudioMute} from './audio-mute';
 import {initTestEngine} from './testing/engine';
 import {initSessionProxy} from './proxy';
 import {initTerminals} from './terminal/ipc';
+import {initSandbox} from './sandbox';
 import {initAgentAccess} from './terminal/agent-access';
 import {initWebviewStorageManagerHandlers} from './webview-storage-manager';
 import {initIosSimulatorHandlers} from './ios-simulator';
@@ -507,6 +508,7 @@ app
     initAudioMute(getMainWindow);
     initTestEngine(getMainWindow);
     initSessionProxy();
+    initSandbox(getMainWindow);
     initTerminals(getMainWindow);
     initAgentAccess(getMainWindow, () => listMcpAgents().map((a) => a.name));
     if (process.platform === 'darwin' && !process.env.RESPONSIVELY_SESSION_ID)

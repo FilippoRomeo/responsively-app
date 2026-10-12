@@ -372,6 +372,11 @@ const schema = {
     type: 'object',
     default: {},
   },
+  /** This Session's environment: Local or Sandbox, and the Sandbox's settings. */
+  sandbox: {
+    type: 'object',
+    default: {},
+  },
   sessionTunnels: {
     type: 'array',
     items: {

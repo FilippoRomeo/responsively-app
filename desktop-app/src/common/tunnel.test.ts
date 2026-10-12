@@ -41,6 +41,22 @@ describe('sshArgs', () => {
   });
 });
 
+describe('sshArgs for a sandbox', () => {
+  it('uses its own config and never the shared master connection', () => {
+    const args = sshArgs(
+      {
+        ...def,
+        host: 'lima-colima-resp-ab',
+        sshConfig: '/h/.colima/_lima/colima-resp-ab/ssh.config',
+      },
+      9000
+    );
+    expect(args.slice(0, 2)).toEqual(['-F', '/h/.colima/_lima/colima-resp-ab/ssh.config']);
+    expect(args).toContain('ControlPath=none');
+    expect(validateTunnel({...def, sshConfig: 'relative/ssh.config'})).toMatch(/ssh config/);
+  });
+});
+
 describe('classifyExit', () => {
   it('reads the usual failures', () => {
     expect(classifyExit(255, 'bind [127.0.0.1]:8188: Address already in use', false).state).toBe(
