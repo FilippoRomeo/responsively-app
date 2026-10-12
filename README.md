@@ -112,6 +112,16 @@ A Python project (a `requirements.txt`, `pyproject.toml` or `environment.yml`) g
 - **Network** (the globe in the toolbar) sends this Session's previews through a proxy (`socks5://`, `http://` or `https://` with a port, no login yet) or through a **WireGuard config**: paste the `.conf` your VPN gives you (Proton, Mullvad and others) and Responsively runs it locally with [wireproxy](https://github.com/windtf/wireproxy) (userspace, ISC licence, v1.1.3 pinned and checked against its SHA-256 when the app is built; no root, no system VPN, only this Session). The config stays in the Session's folder with owner-only permissions and is never shown again; only `[Interface]` and `[Peer]` are accepted and shell hooks are dropped. If the tunnel stops, pages stop rather than go around it. **Test and apply** first reaches an address-echo service through the proxy and shows the address pages now leave from; if it can't connect, nothing changes. Only this Session uses it: other Sessions don't, and neither does localhost. WebRTC is limited to the proxy so it doesn't leak this Mac's address. Real iOS Safari previews run in the Simulator, outside the app, so they follow this Mac's network.
 - **iPad Safari:** every built-in iPad can now run real Safari too, from the browser chip on its header, in the matching iPad Simulator (iPad Pro M4 → iPad Pro 11-inch (M4), iPad → iPad (A16), and so on) on an iOS version already installed: no extra download.
 
+## Terminal
+
+![A Session with its Terminal panel open under the previews: two tabs, and a git log printed in colour by the user's own login shell](docs/media/terminal.png)
+
+The terminal button in the toolbar opens a real terminal (your login shell, in a real PTY, with your own `PATH` and dotfiles) under the previews. It runs on this Mac, in your home folder, with several tabs per Session.
+
+- **It keeps running.** Closing the panel, or the Session's window, leaves every tab running; opening it again shows the same tabs with their output. A tab ends when its shell exits and you close it, when you **Stop** the Session, or when Responsively quits. A background process that owns the shells (separate from the Session window) is what lets them outlive it.
+- **Nothing else can type into it.** The host listens on loopback only, behind a token, and agents have no access to terminals yet.
+- **Start commands stop cleanly.** An add-on's start command now runs in its own process group, so stopping it also stops the dev server it launched.
+
 ## Test under real conditions
 
 Ask an agent (or use the MCP tools) to measure a page the way people meet it: slow networks, a slower CPU, light or dark. `run_test` loads each page on each Chromium device under every combination (up to 60, one at a time, cache off) and writes a report: load time, LCP, layout shift, requests, bytes, failed requests, console errors, script time, memory, horizontal overflow and a screenshot per measurement. Networks: Wi-Fi, 5G, 4G, Fast 3G, Slow 3G, Offline; CPU 1× to 20× slower.

@@ -41,6 +41,7 @@ import useKeyboardShortcut, {
 import McpPanel from './McpPanel';
 import ProbeButton from '../Probe/ProbeButton';
 import NetworkButton from '../Network';
+import TerminalButton from '../Terminal/TerminalButton';
 import {AddonsButton} from '../Addons';
 import {SessionsButton, SessionsDialog, SessionsShowRequest} from '../Sessions';
 import {ColorBlindnessControls} from './ColorBlindnessControls';
@@ -175,6 +176,7 @@ const ToolBar = ({
     mcp: <McpPanel />,
     probe: <ProbeButton />,
     network: <NetworkButton />,
+    terminal: <TerminalButton />,
     appearance: <AppearanceMenu />,
   };
   const groupShown = layout.group.filter((id) => !layout.hidden.includes(id));
@@ -239,9 +241,12 @@ const ToolBar = ({
               </div>
             ) : null}
             {groupShown.length > 0 && rightShown.length > 0 ? <ToolbarDivider /> : null}
-            {rightShown.map((id) => (
-              <Fragment key={id}>{iconTools[id]}</Fragment>
-            ))}
+            {/* Tighter than the bar's own gap: this row has the most buttons. */}
+            <div className="flex items-center gap-1">
+              {rightShown.map((id) => (
+                <Fragment key={id}>{iconTools[id]}</Fragment>
+              ))}
+            </div>
             {/* Sessions live in ⋮ (and ⌘⇧M): the tab strip already names this one. */}
             <SessionsDialog showRequest={sessionsRequest} onShown={onSessionsShown} />
           </>

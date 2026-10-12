@@ -104,6 +104,8 @@
     "@types/terser-webpack-plugin": "^5.0.4",
     "@types/uuid": "^9.0.2",
     "@types/webpack-bundle-analyzer": "^4.4.2",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "chalk": "^4.1.2",
     "concurrently": "^10.0.5",
     "core-js": "^3.33.2",
@@ -131,6 +133,7 @@
     "jsdom": "^29.0.0",
     "lefthook": "^2.1.12",
     "mini-css-extract-plugin": "^2.6.1",
+    "node-pty": "1.1.0",
     "postcss-loader": "^7.0.0",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -161,7 +164,8 @@
     "asar": true,
     "asarUnpack": [
       "**\\*.{node,dll}",
-      "**/node_modules/serve-sim/**"
+      "**/node_modules/serve-sim/**",
+      "**/node_modules/node-pty/**"
     ],
     "files": [
       "dist",
@@ -230,7 +234,8 @@
   },
   "resolutions": {
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "node-abi": "^4.37.0"
   },
   "engines": {
     "node": ">=24.x",

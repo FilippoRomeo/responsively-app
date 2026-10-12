@@ -34,6 +34,7 @@ const configuration: webpack.Configuration = {
     preload: path.join(webpackPaths.srcMainPath, 'preload.ts'),
     'preload-sessions': path.join(webpackPaths.srcMainPath, 'preload-sessions.ts'),
     'preload-webview': path.join(webpackPaths.srcMainPath, 'preload-webview.ts'),
+    'terminal-host': path.join(webpackPaths.srcMainPath, 'terminal', 'host-entry.ts'),
   },
 
   externals: ['fsevents'],

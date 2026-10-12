@@ -30,6 +30,7 @@ import {atomicWrite} from '../sessions/registry';
 import {sessionsRoot} from '../sessions/service';
 import {isRegisteredWebview} from '../webview-registry';
 import {threeHook} from './three-hook';
+import {killGroup} from './process-group';
 
 const exec = promisify(execFile);
 
@@ -442,7 +443,7 @@ const starts = new Map<string, ChildProcess>();
 const stopStarts = (which: (key: string) => boolean = () => true) => {
   starts.forEach((child, key) => {
     if (!which(key)) return;
-    child.kill();
+    killGroup(child);
     starts.delete(key);
   });
 };
@@ -478,6 +479,8 @@ const syncStarts = () => {
               cwd: addon.dir,
               env: shellEnv(),
               stdio: ['ignore', out, out],
+              // Its own process group, so stopping it also stops what it started.
+              detached: true,
             }
           );
           child.on('exit', () => starts.delete(key));
