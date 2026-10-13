@@ -74,7 +74,14 @@ const currentStack = (lib: Library) => lib.stacks.find((s) => s.id === stackId()
 
 const state = (): AddonsState => {
   const lib = readLibrary();
-  return {...lib, stackId: currentStack(lib).id};
+  const missing = lib.addons.flatMap((a) =>
+    a.parts.flatMap((part) =>
+      part.kind === 'script' && a.dir && !fs.existsSync(path.join(a.dir, part.file))
+        ? [`${a.id}/${part.id}`]
+        : []
+    )
+  );
+  return {...lib, stackId: currentStack(lib).id, missing};
 };
 
 const slug = (text: string) =>

@@ -206,6 +206,7 @@ export const StorageSettings = () => {
         stacks: [],
         stackId: 'default',
         autoCleanup: false,
+        missing: [],
       }),
       read(() => addonsRequest<AddonSizes>({operation: 'sizes'}), {}),
       read(() => sessionsRequest<SessionInfo[]>({operation: 'list'}), []),

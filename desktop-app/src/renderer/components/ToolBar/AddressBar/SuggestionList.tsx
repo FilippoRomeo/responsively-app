@@ -13,7 +13,7 @@ interface Props {
 }
 
 const SuggestionList = ({match, onEnter}: Props) => {
-  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [activeIndex, setActiveIndex] = useState<number>(-1); // nothing highlighted: Enter sends what was typed
   const [history] = useState<HistoryItem[]>(window.electron.store.get('history'));
 
   const suggestions = useMemo(() => {
@@ -24,6 +24,8 @@ const SuggestionList = ({match, onEnter}: Props) => {
       .slice(0, 10);
   }, [match, history]);
 
+  useEffect(() => setActiveIndex(-1), [match]);
+
   const keyDownHandler = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
@@ -31,7 +33,7 @@ const SuggestionList = ({match, onEnter}: Props) => {
         return;
       }
       if (e.key === 'ArrowUp') {
-        if (activeIndex === 0) {
+        if (activeIndex === -1) {
           return;
         }
         setActiveIndex(activeIndex - 1);
