@@ -40,6 +40,22 @@ test.describe('URL Navigation', () => {
     });
   });
 
+  test('Enter sends what was typed, not a longer address from history', async ({
+    mainWindow,
+    testServerUrl,
+  }) => {
+    const addressBar = mainWindow.locator('[data-testid="address-bar"]');
+
+    await addressBar.fill(`${testServerUrl}/test-page.html?tier=light`);
+    await addressBar.press('Enter');
+    await expect(addressBar).toHaveValue(/tier=light/, {timeout: 15_000});
+
+    // The shorter address is a substring of the one in history: it must still win.
+    await addressBar.fill(`${testServerUrl}/test-page.html`);
+    await addressBar.press('Enter');
+    await expect(addressBar).toHaveValue(`${testServerUrl}/test-page.html`, {timeout: 15_000});
+  });
+
   test('back button navigates to previous page', async ({app, testServerUrl}) => {
     await app.dismissModals();
 

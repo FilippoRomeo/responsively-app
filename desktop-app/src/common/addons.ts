@@ -97,6 +97,8 @@ export interface AddonsState {
   stackId: string;
   /** Offer to delete add-ons nobody used for six months. */
   autoCleanup: boolean;
+  /** `addonId/partId` of script parts whose file is not there (usually: never built). */
+  missing: string[];
 }
 
 export type AddonsRequest =

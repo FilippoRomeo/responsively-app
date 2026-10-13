@@ -931,6 +931,12 @@ const Manager = ({state}: {state: AddonsState}) => {
                       <span className="block truncate text-small text-muted">
                         {partDetail(part)}
                       </span>
+                      {state.missing.includes(`${addon.id}/${part.id}`) ? (
+                        <span role="status" className="block text-small text-danger">
+                          Not built: {part.kind === 'script' ? part.file : ''} is missing, so
+                          nothing runs. Uninstall and install again, and run the build step.
+                        </span>
+                      ) : null}
                     </span>
                     <Toggle
                       isOn={on}
